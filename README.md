@@ -4,7 +4,6 @@ A Django-based web application that serves as an AI-powered research assistant f
 
 ## Features
 
-### Current Implementation
 - **OpenAlex API Integration**: Full integration with OpenAlex API using the pyalex library
 - **Paper Search Service**: Search academic papers with advanced filtering options
 - **Metadata Extraction**: Comprehensive extraction of paper metadata including:
@@ -17,6 +16,7 @@ A Django-based web application that serves as an AI-powered research assistant f
 - **Comprehensive Testing**: Unit tests for all service methods with proper mocking
 
 ### Search Filters Supported
+
 - Query-based search
 - Exclude retracted papers (default: true)
 - Open access only filtering
@@ -25,14 +25,15 @@ A Django-based web application that serves as an AI-powered research assistant f
 
 ## Technology Stack
 
-- **Backend**: Django 6.0.2
-- **API Client**: pyalex
+- **Backend**: Django
+- **API Client**: pyalex (OpenAlex Python client)
 - **Database**: SQLite (development)
-- **Environment Management**: django-environ
+- **Environment Management**: python-environ
 - **Testing**: Django TestCase with unittest.mock
 
 ## Project Structure
 
+```
 Research_Assistant/
 ├── Research_AI_Assistant/
 │   ├── __init__.py
@@ -57,6 +58,7 @@ Research_Assistant/
 ├── manage.py               # Django management script
 ├── .env                    # Environment variables
 └── .gitignore
+```
 
 ## Installation & Setup
 
@@ -65,7 +67,7 @@ Research_Assistant/
 2. **Create a virtual environment**:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   venv\Scripts\activate
    ```
 
 3. **Install dependencies**:
@@ -74,13 +76,11 @@ Research_Assistant/
    ```
 
 4. **Configure environment variables**:
-   Create a `.env` file in the project root with:
+   Create a `.env` file in `Research_Assistant/` with:
    ```
    SECRET_KEY=your_django_secret_key_here
    OPENALEX_EMAIL=your_email@example.com
    ```
-
-   > **Note**: OpenAlex requires an email address for API access. See [OpenAlex API documentation](https://docs.openalex.org/) for details.
 
 5. **Run database migrations**:
    ```bash
@@ -114,7 +114,7 @@ Search for academic papers using the OpenAlex API.
 
 **Returns:** List of work objects from OpenAlex API
 
-**Raises:** `OpenAlexAPIError` if API request fails
+**Raises:** `OpenAlexAPIError` if API request fails, `ValueError` if input parameters are invalid
 
 ### ExtractionService
 
@@ -139,46 +139,40 @@ Extract structured metadata from an OpenAlex work object.
 
 ## Testing
 
-The project includes comprehensive unit tests for the service layer:
-
-- `TestOpenAlexService.test_search_papers_success_default`: Tests default search behavior
-- `TestOpenAlexService.test_search_papers_with_filters`: Tests search with all filters applied
-- `TestOpenAlexService.test_search_papers_no_filters`: Tests search with no filters
-- `TestOpenAlexService.test_search_papers_api_error`: Tests error handling
-
 Run tests with:
 ```bash
 python manage.py test Research_AI_Assistant.tests
 ```
 
-## Future Development
-
-The following components are planned for future implementation:
-
-- Django models for data persistence
-- REST API views and endpoints
-- Web interface for paper search and display
-- User authentication and saved searches
-- Advanced filtering and sorting options
-- Citation network visualization
-- Integration with other academic APIs (Google Scholar, Semantic Scholar)
-
 ## Dependencies
 
-- Django == 6.0.2
+- Django
 - pyalex
-- django-environ
+- python-environ
+
+## License
 
 MIT License
 
-Copyright (c) 2026 SufianDev20
+Copyright (c) 2025
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## Acknowledgments
 
