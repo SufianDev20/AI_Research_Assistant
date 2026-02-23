@@ -26,38 +26,37 @@ A Django-based web application that serves as an AI-powered research assistant f
 ## Technology Stack
 
 - **Backend**: Django 6.0.2
-- **API Client**: pyalex (OpenAlex Python client)
+- **API Client**: pyalex
 - **Database**: SQLite (development)
-- **Environment Management**: python-environ
+- **Environment Management**: django-environ
 - **Testing**: Django TestCase with unittest.mock
 
 ## Project Structure
 
-```
 Research_Assistant/
 ├── Research_AI_Assistant/
 │   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
-│   ├── models.py          # Django models (not yet implemented)
-│   ├── views.py           # Django views (not yet implemented)
+│   ├── migrations/
+│   │   └── __init__.py
+│   ├── models.py
+│   ├── views.py
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── openalex_service.py    # OpenAlex API client
-│   │   ├── extract_service.py     # Metadata extraction service
-│   │   └── tests/          # Service-specific tests (future)
+│   │   └── extract_service.py     # Metadata extraction service
 │   └── tests.py            # Unit tests for services
 ├── Research_Assistant/
 │   ├── __init__.py
 │   ├── settings.py         # Django settings
-│   ├── urls.py             # URL routing (not yet implemented)
+│   ├── urls.py             # URL routing
 │   ├── asgi.py
 │   └── wsgi.py
 ├── db.sqlite3              # SQLite database
 ├── manage.py               # Django management script
 ├── .env                    # Environment variables
 └── .gitignore
-```
 
 ## Installation & Setup
 
@@ -166,17 +165,20 @@ The following components are planned for future implementation:
 
 ## Dependencies
 
-- Django >= 6.0
-- pyalex >= 0.14
-- python-environ >= 0.11
+- Django == 6.0.2
+- pyalex
+- django-environ
 
-## License
+MIT License
 
-[Add license information here]
+Copyright (c) 2026 SufianDev20
 
-## Contributing
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-[Add contribution guidelines here]
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 
 ## Acknowledgments
 
