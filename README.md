@@ -35,29 +35,30 @@ A Django-based web application that serves as an AI-powered research assistant f
 
 ```
 Research_Assistant/
+├── .env
+├── db.sqlite3
+├── manage.py
+├── test_changes.py
 ├── Research_AI_Assistant/
 │   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
-│   ├── migrations/
-│   │   └── __init__.py
 │   ├── models.py
 │   ├── views.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── openalex_service.py    # OpenAlex API client
-│   │   └── extract_service.py     # Metadata extraction service
-│   └── tests.py            # Unit tests for services
-├── Research_Assistant/
-│   ├── __init__.py
-│   ├── settings.py         # Django settings
-│   ├── urls.py             # URL routing
-│   ├── asgi.py
-│   └── wsgi.py
-├── db.sqlite3              # SQLite database
-├── manage.py               # Django management script
-├── .env                    # Environment variables
-└── .gitignore
+│   ├── tests.py
+│   ├── migrations/
+│   │   └── __init__.py
+│   └── services/
+│       ├── __init__.py
+│       ├── openalex_service.py
+│       └── extract_service.py
+└── Research_Assistant/
+    ├── __init__.py
+    ├── settings.py
+    ├── urls.py
+    ├── asgi.py
+    └── wsgi.py
+```
 ```
 
 ## Installation & Setup
