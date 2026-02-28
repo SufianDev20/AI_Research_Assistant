@@ -39,6 +39,7 @@ Research_Assistant/
 ├── db.sqlite3
 ├── manage.py
 ├── test_changes.py
+├── test_api.py
 ├── Research_AI_Assistant/
 │   ├── __init__.py
 │   ├── admin.py
@@ -102,7 +103,7 @@ Research_Assistant/
 
 ### OpenAlexService
 
-#### `search_papers(query, per_page=25, exclude_retracted=True, open_access_only=False, oa_status=None)`
+#### `search_papers(query, per_page=25, page=1, exclude_retracted=True, open_access_only=False, oa_status=None)`
 
 Search for academic papers using the OpenAlex API.
 
@@ -136,7 +137,9 @@ Extract structured metadata from an OpenAlex work object.
 - `cited_by_count`: Number of citations
 - `concepts`: Top 5 research concepts with scores
 - `source`: Primary publication source name
-- `full_text_url`: PDF URL if available
+- `is_open_access`: Boolean indicating OA status
+- `oa_status`: Open access type (gold, green, hybrid, bronze, closed)
+- `full_text_url`: PDF URL if available via best_oa_location
 
 ## Testing
 
