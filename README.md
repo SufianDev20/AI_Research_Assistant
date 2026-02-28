@@ -38,7 +38,6 @@ Research_Assistant/
 ├── .env
 ├── db.sqlite3
 ├── manage.py
-├── test_changes.py
 ├── Research_AI_Assistant/
 │   ├── __init__.py
 │   ├── admin.py
@@ -88,27 +87,48 @@ Research_Assistant/
    python manage.py migrate
    ```
 
-6. **Run tests**:
-   ```bash
-   python manage.py test
-   ```
+## 🧪 Testing
 
-7. **Start the development server**:
-   ```bash
-   python manage.py runserver
-   ```
+### Run Test Suite
+```bash
+python test_api.py
+```
+
+### Manual Testing
+```bash
+# Test API root
+curl "http://127.0.0.1:8080/api/"
+
+# Test error handling
+curl "http://127.0.0.1:8080/api/search/"  # Missing query
+curl "http://127.0.0.1:8080/api/search/?q=test&mode=invalid"  # Invalid mode
+
+# Test all search modes
+curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=relevance&per_page=2"
+curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=open_access&per_page=2"
+curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=best_match&per_page=2"
+```
+
+### Test Coverage
+The test suite covers:
+- ✅ All search modes (relevance, open_access, best_match)
+- ✅ Parameter validation
+- ✅ Error handling (missing query, invalid mode)
+- ✅ JSON response structure
+- ✅ OpenAlex API integration
 
 ## API Reference
 
 ### OpenAlexService
 
-#### `search_papers(query, per_page=25, exclude_retracted=True, open_access_only=False, oa_status=None)`
+#### `search_papers(query, per_page=25, page=1, exclude_retracted=True, open_access_only=False, oa_status=None)`
 
 Search for academic papers using the OpenAlex API.
 
 **Parameters:**
 - `query` (str): Search query string
 - `per_page` (int): Number of results per page (max 200)
+- `page` (int): Page number (default: 1)
 - `exclude_retracted` (bool): Filter out retracted papers (default: True)
 - `open_access_only` (bool): Return only open access papers (default: False)
 - `oa_status` (str, optional): Open access type filter ('gold', 'green', 'hybrid', 'bronze')
@@ -136,7 +156,9 @@ Extract structured metadata from an OpenAlex work object.
 - `cited_by_count`: Number of citations
 - `concepts`: Top 5 research concepts with scores
 - `source`: Primary publication source name
-- `full_text_url`: PDF URL if available
+- `is_open_access`: Boolean indicating OA status
+- `oa_status`: Open access type (gold, green, hybrid, bronze, closed)
+- `full_text_url`: PDF URL if available via best_oa_location
 
 ## Testing
 
