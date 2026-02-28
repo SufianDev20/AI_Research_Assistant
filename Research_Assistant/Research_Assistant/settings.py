@@ -20,6 +20,7 @@ env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 
 OPENALEX_EMAIL = env("OPENALEX_EMAIL")
+OPENALEX_API_KEY = env("OPENALEX_API_KEY", default=None)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
