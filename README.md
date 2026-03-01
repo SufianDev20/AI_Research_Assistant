@@ -111,11 +111,11 @@ curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=best_match&per_pa
 
 ### Test Coverage
 The test suite covers:
-- ✅ All search modes (relevance, open_access, best_match)
-- ✅ Parameter validation
-- ✅ Error handling (missing query, invalid mode)
-- ✅ JSON response structure
-- ✅ OpenAlex API integration
+- All search modes (relevance, open_access, best_match)
+- Parameter validation
+- Error handling (missing query, invalid mode)
+- JSON response structure
+- OpenAlex API integration
 
 ## API Reference
 
