@@ -87,7 +87,7 @@ Research_Assistant/
    python manage.py migrate
    ```
 
-## 🧪 Testing
+## Testing
 
 ### Run Test Suite
 ```bash
