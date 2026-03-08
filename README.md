@@ -136,8 +136,6 @@ curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=relevance&per_pag
 curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=open_access&per_page=2"
 curl "http://127.0.0.1:8080/api/search/?q=neural+networks&mode=best_match&per_page=2"
 ```
-
-<<<<<<< HEAD
 ### Test Coverage
 The test suite covers:
 - All search modes (relevance, open_access, best_match)
@@ -147,8 +145,6 @@ The test suite covers:
 - OpenAlex API integration
 =======
 ### Test LLM Summarization
->>>>>>> 4629574 (Added openrouter and prompt builder for LLM responses)
-
 ```bash
 # Start the Django server
 python manage.py runserver 8080
