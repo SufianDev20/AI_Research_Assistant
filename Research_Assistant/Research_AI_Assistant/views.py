@@ -205,12 +205,9 @@ def summarise(request):
         )
 
     except OpenRouterAPIError as exc:
-        if "OPENROUTER_API_KEY" in str(exc):
-            return JsonResponse(
-                {"error": "Service unavailable: API key not configured"}, status=503
-            )
+        logger.error("OpenRouter service error: %s", exc)
         return JsonResponse(
-            {"error": f"Upstream service error: {str(exc)}"}, status=502
+            {"error": "Service temporarily unavailable"}, status=503
         )
     except Exception as exc:
         logger.error("Unexpected error in summarise: %s", exc, exc_info=True)
