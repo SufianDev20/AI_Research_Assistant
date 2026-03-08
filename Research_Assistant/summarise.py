@@ -5,10 +5,12 @@ AI Research Assistant - Generate individual paper summaries.
 
 import requests
 import sys
+import os
 from pathlib import Path
 
 # Load API key from .env file
 API_KEY = None
+BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8080")
 env_path = Path(__file__).resolve().parent / '.env'
 
 if env_path.exists():
@@ -20,7 +22,7 @@ if env_path.exists():
 
 def get_metadata(query, per_page=3):
     """Fetch paper metadata from OpenAlex."""
-    url = "http://127.0.0.1:8080/api/search/"
+    url = f"{BASE_URL}/api/search/"
     params = {"q": query, "per_page": per_page}
     response = requests.get(url, params=params)
     response.raise_for_status()
@@ -29,7 +31,7 @@ def get_metadata(query, per_page=3):
 
 def summarise_papers(query, papers):
     """Generate individual summaries for each paper."""
-    url = "http://127.0.0.1:8080/api/summarise/"
+    url = f"{BASE_URL}/api/summarise/"
     payload = {"query": query, "papers": papers}
     headers = {"Content-Type": "application/json"}
     
