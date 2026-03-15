@@ -496,8 +496,6 @@ The test suite covers:
    SECRET_KEY=your-production-secret-key
    ```
 
-````
-
 2. **Database Setup**:
 
    ```bash
@@ -741,6 +739,3 @@ SOFTWARE.
 - Updated documentation with comprehensive details
 
 ---
-
-# For support, questions, or contributions, please visit the [GitHub repository](https://github.com/your-username/AIResearchAssistant) or open an issue.
-````
