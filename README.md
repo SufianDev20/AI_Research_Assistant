@@ -339,234 +339,16 @@ SECURE_HSTS_SECONDS = 31536000  # HSTS header
 
 ### Environment Variables Reference
 
-| Variable              | Required | Description              | Example                 |
-| --------------------- | -------- | ------------------------ | ----------------------- |
-| `SECRET_KEY`          | Yes      | Django secret key        | `django-insecure-...`   |
-| `OPENALEX_EMAIL`      | Yes      | Email for OpenAlex API   | `user@example.com`      |
-| `OPENALEX_API_KEY`    | Optional | OpenAlex API key         | `"your-key-here"`       |
-| `OPENROUTER_API_KEY`  | Yes      | OpenRouter API key       | `sk-or-v1-...`          |
-| `OPENROUTER_SITE_URL` | No       | Site URL for OpenRouter  | `http://127.0.0.1:8080` |
-| `DEBUG`               | No       | Django debug mode        | `True`                  |
-| `ALLOWED_HOSTS`       | No       | Allowed hosts for Django | `localhost,127.0.0.1`   |
-
-## API Reference
-
-### Endpoints
-
-#### GET `/api/`
-
-Root endpoint providing API information and available endpoints.
-
-**Response:**
-
-```json
-{
-  "message": "AI Research Assistant API",
-  "version": "1.0",
-  "endpoints": {
-    "search": "/api/search/?q=<query>&mode=<mode>&per_page=<int>",
-    "modes": ["relevance", "open_access", "best_match"]
-  },
-  "documentation": "https://docs.openalex.org/"
-}
-```
-
-#### GET `/api/search/`
-
-Search for academic papers with processed metadata and cursor pagination.
-
-**Parameters:**
-
-- `q` (required): Search query string
-- `mode`: `relevance` | `open_access` | `best_match` (default: relevance)
-- `per_page`: Results per page (1-50, default: 25)
-- `cursor`: Cursor for pagination (overrides page-based pagination)
-- `oa_status`: Open access filter (`gold`, `green`, `hybrid`, `bronze`)
-
-**Response:**
-
-```json
-{
-  "papers": [...],
-  "count": 25,
-  "total_count": 1234,
-  "per_page": 25,
-  "next_cursor": "eyJwYWdlIjogMn0=",
-  "has_more": true,
-  "mode": "relevance",
-  "query": "machine learning"
-}
-```
-
-#### GET `/api/openalex/authors/`
-
-Search for academic authors via OpenAlex API.
-
-**Parameters:**
-
-- `q` (required): Author search query
-- `per_page`: Results per page (1-50, default: 10)
-- `page`: Page number (default: 1)
-
-**Response:**
-
-```json
-{
-  "results": [...],
-  "page": 1,
-  "per_page": 10,
-  "query": "john smith"
-}
-```
-
-#### POST `/api/summarise/`
-
-Generate individual summaries for each paper using LLM.
-
-**Body:**
-
-```json
-{
-  "query": "machine learning",
-  "papers": [
-    {
-      "title": "Paper Title",
-      "authors": [...],
-      "abstract": "Abstract text...",
-      "publication_year": 2023,
-      "doi": "10.1000/182"
-    }
-  ]
-}
-```
-
-**Response:**
-
-```json
-{
-  "summary": "**Paper [1]: Paper Title**\nSummary text with Harvard citation...",
-  "paper_count": 3,
-  "query": "machine learning"
-}
-```
-
-#### POST `/api/generate_title/`
-
-Generate a title for a research conversation.
-
-**Body:**
-
-```json
-{
-  "messages": [
-    { "role": "user", "content": "What is machine learning?" },
-    { "role": "assistant", "content": "Machine learning is..." }
-  ]
-}
-```
-
-**Response:**
-
-```json
-{
-  "title": "Machine Learning Fundamentals"
-}
-```
-
-### Database Models
-
-#### QueryLog
-
-Logs each search query for analytics (no user PII stored).
-
-**Fields:**
-
-- `query_text`: Search query string (max 500 chars)
-- `ranking_mode`: Search mode used (relevance/open_access/best_match)
-- `result_count`: Number of results returned
-- `created_at`: Timestamp of the query
-
-**Indexes:** Created_at and ranking_mode for efficient querying
-
-**Methods:**
-
-- `__str__()`: String representation of the query log entry
-
-### Service Classes
-
-#### OpenAlexService
-
-##### `search_papers(query, per_page=25, cursor=None, exclude_retracted=True, open_access_only=False, oa_status=None)`
-
-Search for academic papers with filters and cursor pagination.
-
-**Parameters:**
-
-- `query` (str): Search query string
-- `per_page` (int): Results per page (1-200)
-- `cursor` (str, optional): Cursor for pagination
-- `exclude_retracted` (bool): Filter out retracted papers
-- `open_access_only` (bool): Return only open access papers
-- `oa_status` (str): Open access type filter
-
-**Returns:** Dictionary with 'results' and 'meta' keys containing pagination info
-
-**Raises:** `OpenAlexAPIError`, `ValueError`
-
-##### `search_authors(query, per_page=25, page=1)`
-
-Search for academic authors.
-
-**Parameters:**
-
-- `query` (str): Author search query
-- `per_page` (int): Results per page (1-200)
-- `page` (int): Page number
-
-**Returns:** List of author objects
-
-**Raises:** `OpenAlexAPIError`, `ValueError`
-
-#### OpenRouterService
-
-##### `complete(system_prompt, user_message, model=None)`
-
-Generate LLM response using OpenRouter API.
-
-**Parameters:**
-
-- `system_prompt` (str): System prompt for LLM
-- `user_message` (str): User message
-- `model` (str, optional): Specific model to use
-
-**Returns:** LLM response string
-
-**Raises:** `OpenRouterAPIError`
-
-#### ExtractionService
-
-##### `extract_metadata(work)`
-
-Extract structured metadata from an OpenAlex work object.
-
-**Parameters:**
-
-- `work` (dict): Raw work object from OpenAlex API
-
-**Returns:** Dictionary containing extracted metadata:
-
-- `openalex_id`: OpenAlex work ID
-- `title`: Paper title
-- `authors`: List of author dictionaries with name, ORCID, and institutions
-- `abstract`: Reconstructed abstract text
-- `publication_year`: Year of publication
-- `doi`: Digital Object Identifier
-- `cited_by_count`: Number of citations
-- `concepts`: Top 5 research concepts with scores
-- `source`: Primary publication source name
-- `is_open_access`: Boolean indicating OA status
-- `oa_status`: Open access type (gold, green, hybrid, bronze, closed)
-- `full_text_url`: PDF URL if available via best_oa_location
+| Variable               | Required | Description                 | Default                 |
+| ---------------------- | -------- | --------------------------- | ----------------------- |
+| `SECRET_KEY`           | Yes      | Django secret key           | None                    |
+| `OPENALEX_EMAIL`       | Yes      | Email for OpenAlex API      | None                    |
+| `OPENALEX_API_KEY`     | No       | OpenAlex API key (optional) | None                    |
+| `OPENROUTER_API_KEY`   | Yes      | OpenRouter API key          | None                    |
+| `OPENROUTER_SITE_URL`  | No       | Site URL for OpenRouter     | `http://127.0.0.1:8080` |
+| `OPENROUTER_SITE_NAME` | No       | Site name for OpenRouter    | `Research AI Assistant` |
+| `DEBUG`                | No       | Django debug mode           | `True`                  |
+| `ALLOWED_HOSTS`        | No       | Allowed hosts for Django    | `localhost,127.0.0.1`   |
 
 ## Testing
 
@@ -629,11 +411,11 @@ This paper presents C4.5, an improved version of the ID3 decision tree algorithm
 
 References
 
-[1] Pedregosa, F.; Varoquaux, G.; Gramfort, A.; Michel, V.; Thirion, B.; Grisel, O.; Blondel, M.; Prettenhofer, P.; Weiss, R.; Dubourg, V.; Vanderplas, J.; Passos, A.; Cournapeau, D.; Brucher, M.; Perrot, M.; Duchesnay, E. (2011) 'Scikit-learn: Machine Learning in Python'. _Journal of Machine Learning Research_, 12, pp. 2825-2830.
+[1] Pedregosa, F.; Varoquaux, G.; Gramfort, A.; Michel, V.; Thirion, B.; Grisel, O.; Blondel, M.; Prettenhofer, P.; Weiss, R.; Dubourg, V.; Vanderplas, J.; Passos, A.; Cournapeau, D.; Brucher, M.; Perrot, M.; Duchesnay, E. (2011) 'Scikit-learn: Machine Learning in Python'. *Journal of Machine Learning Research*, 12, pp. 2825-2830.
 
-[2] Goldberg, D.E. (1989) 'Genetic algorithms in search, optimization, and machine learning'. _Choice Reviews Online_.
+[2] Goldberg, D.E. (1989) 'Genetic algorithms in search, optimization, and machine learning'. *Choice Reviews Online*.
 
-[3] Quinlan, J.R. (1993) 'C4.5: Programs for Machine Learning'. _Morgan Kaufmann_.
+[3] Quinlan, J.R. (1993) 'C4.5: Programs for Machine Learning'. *Morgan Kaufmann*.
 ```
 
 ### Test Coverage
@@ -713,6 +495,8 @@ The test suite covers:
    ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
    SECRET_KEY=your-production-secret-key
    ```
+
+````
 
 2. **Database Setup**:
 
@@ -933,7 +717,6 @@ SOFTWARE.
 - [pyalex](https://github.com/J535D165/pyalex) for the Python OpenAlex client
 - [OpenRouter](https://openrouter.ai/docs/quickstart) for the LLM API
 - [FontAwesome](https://fontawesome.com/) for icons
-- [TailwindCSS](https://tailwindcss.com/) for CSS framework
 
 ## Changelog
 
@@ -959,4 +742,5 @@ SOFTWARE.
 
 ---
 
-For support, questions, or contributions, please visit the [GitHub repository](https://github.com/your-username/AIResearchAssistant) or open an issue.
+# For support, questions, or contributions, please visit the [GitHub repository](https://github.com/your-username/AIResearchAssistant) or open an issue.
+````
