@@ -249,5 +249,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Django community for excellent documentation and framework
 
 ---
-
-# For support, questions, or contributions, please visit the [GitHub repository](https://github.com/your-username/AIResearchAssistant) or open an issue.
