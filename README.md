@@ -29,19 +29,19 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 
 ### Main Interface
 
-![Main Interface](templates/images/Interface.png)
+![Main Interface](Research_Assistant/Research_AI_Assistant/templates/images/Interface.png)
 
 ### Year Filter Selection
 
-![Year Filter 1](templates/images/Filter1.png)
+![Year Filter 1](Research_Assistant/Research_AI_Assistant/templates/images/Filter1.png)
 
 ### Filter Options
 
-![Year Filter 2](templates/images/Filter2.png)
+![Year Filter 2](Research_Assistant/Research_AI_Assistant/templates/images/Filter2.png)
 
 ### Research Response View
 
-![Response Page](templates/images/ResponsePage.png)
+![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/ResponsePage.png)
 
 ## 🛠️ Technology Stack
 
