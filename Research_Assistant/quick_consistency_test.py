@@ -47,25 +47,20 @@ def test_single_model():
         print("\nCONSISTENCY CHECKS:")
         
         # Check for required elements
-        if "Paper 1:" in response:
-            print("+ Has numbered paper format")
-        else:
-            print("- Missing numbered paper format")
+        required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
+        missing_fields = []
         
-        if "Authors:" in response:
-            print("+ Has authors section")
-        else:
-            print("- Missing authors section")
+        for field in required_fields:
+            if field in response:
+                print(f"+ Has {field.lower().replace(':', '')} section")
+            else:
+                print(f"- Missing {field.lower().replace(':', '')} section")
+                missing_fields.append(field)
         
-        if "Year:" in response:
-            print("+ Has year section")
+        if not missing_fields:
+            print("+ All required fields present")
         else:
-            print("- Missing year section")
-        
-        if "References:" in response:
-            print("+ Has references section")
-        else:
-            print("- Missing references section")
+            print(f"- Missing {len(missing_fields)} required fields: {', '.join(missing_fields)}")
         
         # Check for no markdown
         if not any(char in response for char in ['*', '#', '`']):
@@ -108,6 +103,7 @@ def main():
         print("2. Look for proper Harvard citations in References")
         print("3. Verify no markdown formatting is used")
         print("4. Check word count is reasonable")
+        print("5. Ensure all required fields are present: Authors:, Year:, Source:, DOI:, Summary:, References:")
     else:
         print("\nTest failed - check error messages above")
 

@@ -79,6 +79,16 @@ class PerformanceTracker:
                     }
                 )
                 
+                # Validate format compliance for new records too
+                required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
+                passed_format_check = all(field in response_content for field in required_fields)
+                
+                if created:
+                    # Update format compliance for new record
+                    perf.update_format_compliance(passed_format_check)
+                    perf.update_reliability_score()
+                    perf.save()
+                
                 if not created:
                     # Update existing performance record
                     perf.total_requests += 1
@@ -87,6 +97,9 @@ class PerformanceTracker:
                     perf.avg_response_time = perf.total_response_time / perf.total_requests
                     perf.last_success = timezone.now()
                     perf.consecutive_failures = 0
+                    
+                    # Update format compliance metrics
+                    perf.update_format_compliance(passed_format_check)
                     
                     # Update reliability score
                     perf.update_reliability_score()

@@ -253,7 +253,8 @@ def generate_title(request):
         # Get title from LLM
         title = openrouter_service.complete(
             system_prompt="You are a helpful assistant that generates concise, professional titles for research conversations.",
-            user_message=f"Based on this conversation, suggest a short, catchy, professional title (maximum 40 characters). Respond with ONLY the title text - no quotes, explanations, or extra words.\n\nConversation:\n{conversation_text}"
+            user_message=f"Based on this conversation, suggest a short, catchy, professional title (maximum 40 characters). Respond with ONLY the title text - no quotes, explanations, or extra words.\n\nConversation:\n{conversation_text}",
+            request_type="title"
         )
 
         # Clean the title
@@ -323,7 +324,8 @@ def summarise(request):
         # Get summary from LLM
         summary = openrouter_service.complete(
             system_prompt=system_prompt,
-            user_message=user_message
+            user_message=user_message,
+            request_type="summary"
         )
 
         return JsonResponse({"summary": summary})

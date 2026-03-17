@@ -59,6 +59,15 @@ def test_openrouter_performance():
         print(f"+ Summary generated (length: {len(summary)} chars)")
         print(f"Preview: {summary[:150]}...")
         
+        # Check format compliance
+        required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
+        missing_fields = [field for field in required_fields if field not in summary]
+        
+        if not missing_fields:
+            print("+ All required fields present in summary")
+        else:
+            print(f"- Missing {len(missing_fields)} required fields: {', '.join(missing_fields)}")
+        
         return True
         
     except Exception as e:
@@ -101,6 +110,10 @@ def check_performance_data():
             print(f"    Success rate: {model.success_rate:.1f}%")
             print(f"    Reliability score: {model.reliability_score:.3f}")
             print(f"    Avg response time: {model.avg_response_time:.2f}s")
+            if model.format_compliance_count > 0:
+                print(f"    Format compliance: {model.format_compliance_score:.1%} ({model.format_compliance_passed}/{model.format_compliance_count} checks passed)")
+            else:
+                print(f"    Format compliance: No data")
         
         # Check response logs
         recent_logs = ResponseLog.objects.all().order_by('-created_at')[:5]

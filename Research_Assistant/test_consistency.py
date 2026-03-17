@@ -77,6 +77,7 @@ def test_instruction_consistency():
             
             print(f"+ Response received ({len(response)} chars)")
             print(f"Format compliance: {analysis['format_compliance']}")
+            print(f"Required fields: {analysis.get('required_fields', 'Unknown')}")
             print(f"Citation format: {analysis['citation_format']}")
             print(f"Content rules: {analysis['content_rules']}")
             print(f"Word count: {analysis['word_count']}")
@@ -92,6 +93,7 @@ def test_instruction_consistency():
             results[model_name] = {
                 'error': str(e),
                 'format_compliance': 'Failed',
+                'required_fields': 'N/A',
                 'citation_format': 'N/A',
                 'content_rules': 'N/A',
                 'word_count': 'N/A'
@@ -119,6 +121,7 @@ def analyze_response_consistency(response: str, model_name: str) -> dict:
     
     # Check for required format elements
     lines = response.split('\n')
+    required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
     
     # 1. Check if papers are numbered
     has_numbered_papers = any(line.strip().startswith("Paper 1:") or "Paper 2:" in line for line in lines)
@@ -128,7 +131,26 @@ def analyze_response_consistency(response: str, model_name: str) -> dict:
         analysis['format_compliance'] = 'Poor'
         analysis['issues'].append('Missing numbered paper format')
     
-    # 2. Check for Harvard citation format in References section
+    # 2. Check for all required fields
+    missing_fields = []
+    present_fields = []
+    
+    for field in required_fields:
+        if field in response:
+            present_fields.append(field)
+        else:
+            missing_fields.append(field)
+    
+    if len(missing_fields) == 0:
+        analysis['required_fields'] = 'Complete'
+    elif len(missing_fields) <= 2:
+        analysis['required_fields'] = 'Partial'
+        analysis['issues'].append(f'Missing {len(missing_fields)} required fields: {", ".join(missing_fields)}')
+    else:
+        analysis['required_fields'] = 'Poor'
+        analysis['issues'].append(f'Missing {len(missing_fields)} required fields: {", ".join(missing_fields)}')
+    
+    # 3. Check for Harvard citation format in References section
     references_section = False
     harvard_citations = []
     
@@ -152,7 +174,7 @@ def analyze_response_consistency(response: str, model_name: str) -> dict:
         analysis['citation_format'] = 'Poor'
         analysis['issues'].append('Missing References section')
     
-    # 3. Check content rules
+    # 4. Check content rules
     has_paper_sections = any("Paper 1:" in line or "Paper 2:" in line for line in lines)
     has_authors_year = any("Authors:" in line for line in lines)
     has_no_markdown = not any('*' in line or '#' in line for line in lines)
@@ -173,7 +195,7 @@ def analyze_response_consistency(response: str, model_name: str) -> dict:
         analysis['content_rules'] = 'Poor'
         analysis['issues'].append('Missing required content structure')
     
-    # 4. Word count check (should be reasonable for summary)
+    # 5. Word count check (should be reasonable for summary)
     word_count = analysis['word_count']
     if 50 <= word_count <= 300:
         analysis['word_count'] = 'Appropriate'
@@ -194,6 +216,12 @@ def compare_model_consistency(results: dict):
         if 'error' not in analysis:
             compliance = analysis['format_compliance']
             print(f"  {model}: {compliance}")
+    
+    print("\nRequired Fields Comparison:")
+    for model, analysis in results.items():
+        if 'error' not in analysis:
+            fields = analysis.get('required_fields', 'Unknown')
+            print(f"  {model}: {fields}")
     
     print("\nCitation Format Comparison:")
     for model, analysis in results.items():
@@ -219,12 +247,19 @@ def compare_model_consistency(results: dict):
         if 'error' not in analysis:
             score = 0
             if analysis['format_compliance'] == 'Good':
-                score += 3
+                score += 2
             elif analysis['format_compliance'] == 'Partial':
                 score += 1
             
-            if analysis['citation_format'] == 'Good':
+            # Add required fields scoring
+            required_fields_score = analysis.get('required_fields', 'Poor')
+            if required_fields_score == 'Complete':
                 score += 3
+            elif required_fields_score == 'Partial':
+                score += 1
+            
+            if analysis['citation_format'] == 'Good':
+                score += 2
             elif analysis['citation_format'] == 'Partial':
                 score += 1
             
@@ -234,19 +269,19 @@ def compare_model_consistency(results: dict):
                 score += 1
             
             if analysis['word_count'] == 'Appropriate':
-                score += 2
+                score += 1
             
             scores[model] = score
     
     if scores:
         best_model = max(scores, key=scores.get)
-        print(f"\nMost Consistent Model: {best_model} (Score: {scores[best_model]}/10)")
+        print(f"\nMost Consistent Model: {best_model} (Score: {scores[best_model]}/11)")
         
         # Show consistency ranking
         print("\nConsistency Ranking:")
         ranked_models = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         for i, (model, score) in enumerate(ranked_models, 1):
-            print(f"  {i}. {model}: {score}/10")
+            print(f"  {i}. {model}: {score}/11")
 
 def main():
     """Run consistency tests."""
@@ -280,6 +315,10 @@ def main():
                       if 'error' not in r and r['format_compliance'] == 'Good']
         print(f"Models with good format compliance: {len(good_format)}")
         
+        complete_fields = [m for m, r in results.items() 
+                          if 'error' not in r and r.get('required_fields') == 'Complete']
+        print(f"Models with complete required fields: {len(complete_fields)}")
+        
         good_citations = [m for m, r in results.items() 
                         if 'error' not in r and r['citation_format'] == 'Good']
         print(f"Models with proper citations: {len(good_citations)}")
@@ -289,12 +328,17 @@ def main():
         print("- Some models are not following format instructions consistently")
         print("- Consider prioritizing models with better compliance in reliability settings")
     
+    if len(complete_fields) < len(successful_models):
+        print("- Some models are missing required fields (Authors:, Year:, Source:, DOI:, Summary:, References:)")
+        print("- Format compliance tracking will help identify consistently reliable models")
+    
     if len(good_citations) < len(successful_models):
         print("- Citation formatting varies between models")
         print("- May need additional prompt engineering for consistency")
     
     print("- Use performance tracking to monitor consistency over time")
     print("- Consider model-specific prompts for consistently poor performers")
+    print("- Format compliance now contributes 30% to reliability scores")
 
 if __name__ == "__main__":
     main()

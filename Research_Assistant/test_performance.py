@@ -58,6 +58,10 @@ def test_performance_stats():
             print("\nTop performers:")
             for model in data.get('top_performers', [])[:3]:
                 print(f"  {model['model']}: {model['reliability_score']:.3f} ({model['success_rate']:.1f}% success)")
+                if 'format_compliance_score' in model:
+                    print(f"    Format compliance: {model['format_compliance_score']:.1%}")
+                if 'avg_response_time' in model:
+                    print(f"    Avg response time: {model['avg_response_time']:.2f}s")
             
             print("\nPerformance summary:")
             summary = data.get('performance_summary', {})
@@ -88,6 +92,10 @@ def test_model_details():
             print(f"Reliability score: {perf.get('reliability_score', 0):.3f}")
             print(f"Total requests: {perf.get('total_requests', 0)}")
             print(f"Avg response time: {perf.get('avg_response_time', 0):.2f}s")
+            if 'format_compliance_score' in perf:
+                print(f"Format compliance: {perf.get('format_compliance_score', 0):.1%}")
+            if 'format_compliance_count' in perf:
+                print(f"Format checks: {perf.get('format_compliance_count', 0)} ({perf.get('format_compliance_passed', 0)} passed)")
             
             reliability = data.get('reliability', {})
             if reliability:
@@ -123,6 +131,8 @@ def test_model_comparison():
                 print(f"    Reliability: {model['reliability_score']:.3f}")
                 print(f"    Response time: {model['avg_response_time']:.2f}s")
                 print(f"    Tier: {model['tier']}")
+                if 'format_compliance_score' in model:
+                    print(f"    Format compliance: {model['format_compliance_score']:.1%}")
             
             print("\nComparison metrics:")
             metrics = data.get('comparison_metrics', {})
@@ -214,6 +224,8 @@ def test_performance_after_requests():
             for model in data.get('top_performers', [])[:3]:
                 if model['total_requests'] > 0:  # Only show models with actual requests
                     print(f"  {model['model']}: {model['reliability_score']:.3f} ({model['success_rate']:.1f}% success, {model['total_requests']} requests)")
+                    if 'format_compliance_score' in model:
+                        print(f"    Format compliance: {model['format_compliance_score']:.1%}")
             
     except Exception as e:
         print(f"Error: {e}")

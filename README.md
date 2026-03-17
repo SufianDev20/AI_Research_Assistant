@@ -2,7 +2,7 @@
 
 A comprehensive Django-based web application that serves as an AI-powered research assistant for academic papers. The application integrates with the OpenAlex API to search, retrieve, and process academic paper metadata, and uses OpenRouter's free LLM models to generate individual paper summaries with proper academic citations.
 
-## 🎯 Features
+## Features
 
 ### Core Functionality
 
@@ -18,32 +18,46 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
 - **Real-time Analytics**: Admin dashboard for monitoring model performance and system health
 
-## 📊 Performance Tracking System
+## Performance Tracking System
 
 The application includes a comprehensive performance tracking system for OpenRouter models:
 
 ### Key Features
 
-- **Reliability Scoring**: Dynamic scoring (0.0-1.0) based on success rate, response time, recent activity, and consecutive failures
+- **Reliability Scoring**: Dynamic scoring (0.0-1.0) based on success rate, response time, recent activity, consecutive failures, and **format compliance (30% weight)**
 - **Intelligent Fallback**: Models automatically tried in performance order, not randomly
 - **Circuit Breaker Pattern**: Failing models automatically disabled after configurable thresholds
 - **Real-time Monitoring**: Live dashboard with colored metrics and error analysis
 - **Model Tiers**: Configurable tiers (Primary, Secondary, Emergency, Disabled)
 - **Request Logging**: Detailed logging of every API request with error tracking
+- **Format Compliance Tracking**: Automatic validation of required fields (Authors:, Year:, Source:, DOI:, Summary:, References:)
 
 ### Performance Metrics
 
 - **Success Rate**: Percentage of successful requests per model
 - **Response Time**: Average response time in milliseconds
 - **Consecutive Failures**: Track failure streaks for circuit breaker
-- **Reliability Score**: Weighted score combining multiple factors
+- **Reliability Score**: Weighted score combining multiple factors including **format compliance (30% weight)**
+- **Format Compliance Score**: Percentage of responses that include all required fields
 - **Error Analysis**: Common failure patterns and error messages
+
+### Format Compliance System
+
+The system automatically validates every LLM response for required academic formatting:
+
+- **Required Fields**: `Authors:`, `Year:`, `Source:`, `DOI:`, `Summary:`, `References:`
+- **Automatic Validation**: Built into performance tracker, runs on every successful request
+- **Cumulative Scoring**: Tracks pass/fail rates over time
+- **Database Integration**: Format compliance scores stored and used for model selection
+- **Real-time Updates**: Admin panel shows live format compliance metrics
 
 ### Top Performing Models
 
-1. **arcee-ai/trinity-large-preview:free** - 75% success rate, 3.87s response
-2. **stepfun/step-3.5-flash:free** - 100% success rate (when responding), 12.89s response
-3. **google/gemma-3-4b-it:free** - Currently disabled due to API errors
+Based on actual format compliance testing:
+
+1. **arcee-ai/trinity-large-preview:free** - 71.4% format compliance, 0.695 reliability score
+2. **stepfun/step-3.5-flash:free** - 0.0% format compliance, 0.600 reliability score
+3. **google/gemma-3-4b-it:free** - 0.0% format compliance, 0.244 reliability score
 
 ### Frontend Features
 
@@ -56,7 +70,7 @@ The application includes a comprehensive performance tracking system for OpenRou
 - **Year Filter**: Single slider to filter papers by publication year (1900-2026)
 - **Dynamic Tooltip**: Interactive year display when adjusting the filter
 
-## 🖥️ Interface Screenshots
+## Interface Screenshots
 
 ### Main Interface
 
@@ -74,7 +88,7 @@ The application includes a comprehensive performance tracking system for OpenRou
 
 ![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/ResponsePage.png)
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Backend
 
@@ -100,7 +114,7 @@ The application includes a comprehensive performance tracking system for OpenRou
 - **OpenAlex**: Academic paper metadata and citation data
 - **OpenRouter**: LLM models for paper summarization
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 AIResearchAssistant/
@@ -138,7 +152,7 @@ AIResearchAssistant/
             └── performance_tracker.py   # Model performance monitoring and intelligent fallback
 ```
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 
@@ -213,7 +227,7 @@ AIResearchAssistant/
    - **Admin Dashboard**: `http://127.0.0.1:8080/admin/`
    - **API Documentation**: `http://127.0.0.1:8080/api/`
 
-## 🔑 Getting API Keys
+## Getting API Keys
 
 ### OpenAlex API Key
 
@@ -229,7 +243,7 @@ AIResearchAssistant/
 3. Generate an API key
 4. Copy the key and add to your `.env` file
 
-## 🧪 Testing
+## Testing
 
 ### API Testing
 
@@ -253,6 +267,12 @@ python quick_consistency_test.py
 
 # Test comprehensive model comparison
 python test_consistency.py
+
+# Test format compliance validation
+python test_format_validation.py
+
+# Test performance tracking system
+python test_performance.py
 ```
 
 ### Admin Dashboard Testing
@@ -262,7 +282,7 @@ python test_consistency.py
 - View response logs and error patterns
 - Configure model tiers and circuit breaker settings
 
-## 🔒 Security Features
+## Security Features
 
 - **Environment Variables**: All API keys stored in `.env` file
 - **No Hardcoded Secrets**: Zero hardcoded API keys in codebase
@@ -270,7 +290,7 @@ python test_consistency.py
 - **CSRF Protection**: Django CSRF protection enabled
 - **Input Validation**: Comprehensive parameter validation on all endpoints
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -283,10 +303,11 @@ python test_consistency.py
 
 ### Performance Monitoring
 
-- **Model Reliability**: Check admin dashboard for success rates and response times
+- **Model Reliability**: Check admin dashboard for success rates, response times, and format compliance
 - **Circuit Breaker**: Models automatically disabled after consecutive failures
-- **Format Compliance**: System achieves 90%+ instruction consistency across models
-- **Best Performing Model**: `arcee-ai/trinity-large-preview:free` (75% success rate, 3.87s response)
+- **Format Compliance**: System tracks instruction following with 30% reliability weight
+- **Best Performing Model**: `arcee-ai/trinity-large-preview:free` (71.4% format compliance, 0.695 reliability)
+- **Data-Driven Selection**: Models chosen based on actual instruction-following performance
 
 ### API Endpoints for Monitoring
 
@@ -294,24 +315,24 @@ python test_consistency.py
 - **Model Details**: `GET /api/performance/model/?model_name=<model>`
 - **Model Comparison**: `GET /api/performance/compare/?models=<model1,model2>`
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### 📋 License Summary
+### License Summary
 
-- ✅ **Commercial use** allowed
-- ✅ **Modification** allowed
-- ✅ **Distribution** allowed
-- ✅ **Private use** allowed
-- ⚠️ **Must include** license and copyright notice
-- ⚠️ **No liability** - software provided "as-is"
+- Commercial use allowed
+- Modification allowed
+- Distribution allowed
+- Private use allowed
+- Must include license and copyright notice
+- No liability - software provided "as-is"
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 ### APIs & Data Sources
 
-- [OpenAlex](https://openalex.org/) for comprehensive academic paper data
+- [OpenAlex](https://openalex.org/) for comprehensive academic research database
 - [OpenRouter](https://openrouter.ai/) for LLM API access and free models
 
 ### Frameworks & Libraries

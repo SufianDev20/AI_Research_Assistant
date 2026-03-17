@@ -9,10 +9,13 @@ References:
 """
 
 import logging
+import time
 from typing import Dict
 
 import requests
 from django.conf import settings
+
+from .performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +23,11 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Default free model.
 # Browse free models at https://openrouter.ai/models?max_price=0
-DEFAULT_MODEL = "arcee-ai/trinity-mini:free"
+DEFAULT_MODEL = "arcee-ai/trinity-large-preview:free"
 
 # List of all available free models for fallback
 FREE_MODELS = [
-    "arcee-ai/trinity-mini:free",
+    "arcee-ai/trinity-large-preview:free",
     "google/gemma-3-4b-it:free",
     "nvidia/nemotron-nano-9b-v2:free",
     "stepfun/step-3.5-flash:free",
@@ -88,15 +91,17 @@ class OpenRouterService:
         user_message: str,
         temperature: float = 0.3,
         max_tokens: int = 4000,
+        request_type: str = "summary",
     ) -> str:
         """
-        Send a chat completion request to OpenRouter with fallback model support.
+        Send a chat completion request to OpenRouter with intelligent fallback and performance tracking.
 
         Args:
             system_prompt: Instruction block for the model (role: system).
             user_message:  The user-turn content containing paper metadata.
             temperature:   Sampling temperature. 0.3 keeps output factual.
             max_tokens:    Maximum tokens in the completion.
+            request_type:  Type of request for tracking (summary, title, other).
 
         Returns:
             The model's reply as a plain string.
@@ -107,8 +112,8 @@ class OpenRouterService:
         Reference:
             https://openrouter.ai/docs/api/reference/overview#completions-request-format
         """
-        # Try models in order of preference
-        models_to_try = FREE_MODELS.copy()
+        # Get intelligent model order based on performance
+        models_to_try = PerformanceTracker.get_intelligent_model_order(FREE_MODELS.copy())
 
         # Move the default model to the front if it's not already
         if self.model in models_to_try:
@@ -118,9 +123,19 @@ class OpenRouterService:
         last_error = None
 
         for attempt, model_name in enumerate(models_to_try, 1):
+            request_start_time = time.time()
+            request_id, query_hash = PerformanceTracker.log_request_start(
+                model_name, request_type, user_message
+            )
+            
             try:
                 logger.info(
                     f"Trying model {attempt}/{len(models_to_try)}: {model_name}"
+                )
+
+                # Get model-specific temperature
+                model_temperature = PerformanceTracker.get_model_temperature(
+                    model_name, temperature
                 )
 
                 payload = {
@@ -129,7 +144,7 @@ class OpenRouterService:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message},
                     ],
-                    "temperature": temperature,
+                    "temperature": model_temperature,
                     "max_tokens": max_tokens,
                 }
 
@@ -150,6 +165,12 @@ class OpenRouterService:
                     error_msg = f"OpenRouter returned no choices. Full response: {data}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
+                    
+                    # Log failure
+                    response_time = time.time() - request_start_time
+                    PerformanceTracker.log_request_failure(
+                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                    )
                     continue
 
                 choice = choices[0]
@@ -158,6 +179,12 @@ class OpenRouterService:
                     error_msg = f"OpenRouter model error: {choice['error']}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
+                    
+                    # Log failure
+                    response_time = time.time() - request_start_time
+                    PerformanceTracker.log_request_failure(
+                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                    )
                     continue
 
                 content = choice.get("message", {}).get("content")
@@ -165,10 +192,22 @@ class OpenRouterService:
                     error_msg = "OpenRouter response missing message.content."
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
+                    
+                    # Log failure
+                    response_time = time.time() - request_start_time
+                    PerformanceTracker.log_request_failure(
+                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                    )
                     continue
 
+                # Log success
+                response_time = time.time() - request_start_time
+                PerformanceTracker.log_request_success(
+                    model_name, request_id, request_type, response_time, content, query_hash
+                )
+
                 logger.info(
-                    f"OpenRouter completion: model={model_name} tokens={data.get('usage', {}).get('total_tokens')}"
+                    f"OpenRouter completion: model={model_name} tokens={data.get('usage', {}).get('total_tokens')} time={response_time:.2f}s"
                 )
 
                 return content.strip()
@@ -182,6 +221,12 @@ class OpenRouterService:
                 error_msg = f"Model {model_name} failed: {str(exc)}"
                 logger.warning(error_msg)
                 last_error = OpenRouterAPIError(error_msg)
+                
+                # Log failure
+                response_time = time.time() - request_start_time
+                PerformanceTracker.log_request_failure(
+                    model_name, request_id, request_type, response_time, error_msg, query_hash
+                )
                 continue
 
         # All models failed
