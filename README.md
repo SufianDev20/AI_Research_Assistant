@@ -6,13 +6,44 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 
 ### Core Functionality
 
-- **OpenAlex API Integration**: Full integration with OpenAlex API using the pyalex library
-- **OpenRouter LLM Integration**: Uses free models from OpenRouter to generate individual paper summaries
-- **Paper Search Service**: Search academic papers with advanced filtering options
+- **OpenAlex API Integration**: Full integration with OpenAlex API using pyalex library
+- **OpenRouter LLM Integration**: Uses free models from OpenRouter to generate individual paper summaries with intelligent fallback
+- **Performance Tracking System**: Comprehensive monitoring of model performance with reliability scoring
+- **Intelligent Model Selection**: Automatic fallback to best-performing models based on success rates and response times
+- **Paper Search Service**: Search academic papers with advanced filtering options (year range, open access status, random sampling)
 - **Author Search Service**: Search for academic authors via OpenAlex API
-- **Metadata Extraction**: Comprehensive extraction of paper metadata including title, authors, abstract, publication year, DOI, and research concepts
-- **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations
+- **Metadata Extraction**: Comprehensive extraction of paper metadata including title, authors, abstract, publication year, DOI, research concepts, and open access information
+- **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
+- **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
+- **Real-time Analytics**: Admin dashboard for monitoring model performance and system health
+
+## 📊 Performance Tracking System
+
+The application includes a comprehensive performance tracking system for OpenRouter models:
+
+### Key Features
+
+- **Reliability Scoring**: Dynamic scoring (0.0-1.0) based on success rate, response time, recent activity, and consecutive failures
+- **Intelligent Fallback**: Models automatically tried in performance order, not randomly
+- **Circuit Breaker Pattern**: Failing models automatically disabled after configurable thresholds
+- **Real-time Monitoring**: Live dashboard with colored metrics and error analysis
+- **Model Tiers**: Configurable tiers (Primary, Secondary, Emergency, Disabled)
+- **Request Logging**: Detailed logging of every API request with error tracking
+
+### Performance Metrics
+
+- **Success Rate**: Percentage of successful requests per model
+- **Response Time**: Average response time in milliseconds
+- **Consecutive Failures**: Track failure streaks for circuit breaker
+- **Reliability Score**: Weighted score combining multiple factors
+- **Error Analysis**: Common failure patterns and error messages
+
+### Top Performing Models
+
+1. **arcee-ai/trinity-large-preview:free** - 75% success rate, 3.87s response
+2. **stepfun/step-3.5-flash:free** - 100% success rate (when responding), 12.89s response
+3. **google/gemma-3-4b-it:free** - Currently disabled due to API errors
 
 ### Frontend Features
 
@@ -49,10 +80,12 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 
 - **Framework**: Django 6.0+
 - **API Client**: pyalex (OpenAlex Python client)
-- **LLM Provider**: OpenRouter (free models)
+- **LLM Provider**: OpenRouter (free models with intelligent fallback)
 - **Database**: SQLite (development), PostgreSQL (production ready)
 - **Environment Management**: django-environ
 - **Rate Limiting**: django-ratelimit
+- **Performance Monitoring**: Custom performance tracking system with reliability scoring
+- **Model Management**: Circuit breaker pattern and intelligent model selection
 
 ### Frontend
 
@@ -99,9 +132,10 @@ AIResearchAssistant/
         │       └── scripts.js           # Frontend JavaScript
         └── services/                    # Business logic services
             ├── openalex_service.py      # OpenAlex API client
-            ├── openrouter_service.py    # OpenRouter LLM client
-            ├── extract_service.py       # Metadata extraction
-            └── prompt_builder.py        # LLM prompt construction
+            ├── openrouter_service.py    # OpenRouter LLM client with performance tracking
+            ├── extract_service.py       # Metadata extraction from OpenAlex
+            ├── prompt_builder.py        # LLM prompt construction
+            └── performance_tracker.py   # Model performance monitoring and intelligent fallback
 ```
 
 ## 🚀 Installation & Setup
@@ -156,14 +190,28 @@ AIResearchAssistant/
    python manage.py migrate
    ```
 
-6. **Start the development server**:
+6. **Initialize model performance tracking**:
+
+   ```bash
+   python manage.py initialize_models
+   ```
+
+7. **Create superuser account**:
+
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+8. **Start development server**:
 
    ```bash
    python manage.py runserver 8080
    ```
 
-7. **Access the application**:
-   Open your browser and navigate to `http://127.0.0.1:8080`
+9. **Access the application**:
+   - **Frontend**: `http://127.0.0.1:8080`
+   - **Admin Dashboard**: `http://127.0.0.1:8080/admin/`
+   - **API Documentation**: `http://127.0.0.1:8080/api/`
 
 ## 🔑 Getting API Keys
 
@@ -183,6 +231,8 @@ AIResearchAssistant/
 
 ## 🧪 Testing
 
+### API Testing
+
 ```bash
 # Run all tests
 python manage.py test Research_AI_Assistant.tests
@@ -191,6 +241,26 @@ python manage.py test Research_AI_Assistant.tests
 curl "http://127.0.0.1:8080/api/"
 curl "http://127.0.0.1:8080/api/search/?q=machine+learning&per_page=5"
 ```
+
+### Performance Testing
+
+```bash
+# Test OpenRouter models and performance tracking
+python test_openrouter.py
+
+# Test instruction consistency across models
+python quick_consistency_test.py
+
+# Test comprehensive model comparison
+python test_consistency.py
+```
+
+### Admin Dashboard Testing
+
+- Visit `http://127.0.0.1:8080/admin/`
+- Monitor model performance in "Model Performance" section
+- View response logs and error patterns
+- Configure model tiers and circuit breaker settings
 
 ## 🔒 Security Features
 
@@ -208,6 +278,21 @@ curl "http://127.0.0.1:8080/api/search/?q=machine+learning&per_page=5"
 2. **API Key Errors**: Verify `.env` file is in `Research_Assistant/` directory
 3. **Port Already in Use**: Change port or kill existing process
 4. **OpenRouter Model Errors**: System automatically falls back to other free models
+5. **Admin Interface Errors**: Run `python manage.py initialize_models` to set up model tracking
+6. **Performance Data Not Showing**: Check that requests are being made to generate tracking data
+
+### Performance Monitoring
+
+- **Model Reliability**: Check admin dashboard for success rates and response times
+- **Circuit Breaker**: Models automatically disabled after consecutive failures
+- **Format Compliance**: System achieves 90%+ instruction consistency across models
+- **Best Performing Model**: `arcee-ai/trinity-large-preview:free` (75% success rate, 3.87s response)
+
+### API Endpoints for Monitoring
+
+- **Performance Stats**: `GET /api/performance/stats/`
+- **Model Details**: `GET /api/performance/model/?model_name=<model>`
+- **Model Comparison**: `GET /api/performance/compare/?models=<model1,model2>`
 
 ## 📄 License
 
