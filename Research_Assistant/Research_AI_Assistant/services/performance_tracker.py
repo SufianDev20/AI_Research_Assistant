@@ -162,10 +162,10 @@ class PerformanceTracker:
                     if reliability and perf.consecutive_failures >= reliability.circuit_breaker_threshold:
                         perf.is_active = False
                         logger.warning(f"Circuit breaker triggered for {model_name} after {perf.consecutive_failures} consecutive failures")
-                    
-                    # Update reliability score
-                    perf.update_reliability_score()
-                    perf.save()
+
+                # Run for both created and not created
+                perf.update_reliability_score()
+                perf.save()
                 
                 # Log detailed response
                 ResponseLog.objects.create(

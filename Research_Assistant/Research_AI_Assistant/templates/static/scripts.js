@@ -272,7 +272,6 @@ document.addEventListener("DOMContentLoaded", () => {
         color: "#" + Math.floor(Math.random() * 16777215).toString(16),
         messages: [{ role: "user", content: query }],
         papers: [],
-        additionalPapers: [],
       };
 
       this.generateResearchResponse();
@@ -506,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const tooltip = this.elements.sliderTooltip;
       const percent = (slider.value - slider.min) / (slider.max - slider.min);
       const offset = percent * slider.offsetWidth;
-      
+
       tooltip.style.left = `${offset}px`;
     }
 
@@ -522,7 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Use cursor pagination if provided, otherwise start from beginning
       const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
       const seedParam = randomSeed ? `&random_seed=${randomSeed}` : "";
-      
+
       // Handle single year filter: if minYear is null, only use max_year
       let yearParams;
       if (minYear === null || minYear === undefined) {
@@ -530,7 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         yearParams = `&min_year=${minYear}&max_year=${maxYear}`;
       }
-      
+
       const url = `/api/search/?q=${encodeURIComponent(query)}&mode=${sortPref}&per_page=${Math.min(maxPapers, 50)}${yearParams}${cursorParam}${seedParam}`;
 
       const response = await fetch(url);
@@ -654,7 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async loadMorePapers() {
       if (!appState.nextCursor || appState.isLoadingMore) return;
-      
+
       appState.isLoadingMore = true;
       const btn = this.elements.loadMoreBtn;
       const status = this.elements.loadMoreStatus;
@@ -682,14 +681,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // Update cursor for next load
         appState.nextCursor = data.next_cursor;
 
+        // Append new papers to the main papers array
+        appState.currentResearchBinder.papers.push(...data.papers);
+
         // Render additional papers in separate section
         this.renderAdditionalPapers(data.papers);
-
-        // Store additional papers separately
-        if (!appState.currentResearchBinder.additionalPapers) {
-          appState.currentResearchBinder.additionalPapers = [];
-        }
-        appState.currentResearchBinder.additionalPapers.push(...data.papers);
 
         // Summarize additional papers
         try {
@@ -844,7 +840,7 @@ document.addEventListener("DOMContentLoaded", () => {
         appState.isLoadingMore = false;
         if (btn) btn.disabled = false;
         if (status) status.textContent = "";
-        
+
         // Final pagination update to ensure button visibility is correct
         this.updatePaginationInfo();
       }
@@ -883,9 +879,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Ensure elements are available
       this.ensureElements();
 
-      const originalPapers = appState.currentResearchBinder.papers?.length || 0;
-      const additionalPapers = appState.currentResearchBinder.additionalPapers?.length || 0;
-      const totalLoaded = originalPapers + additionalPapers;
+      const totalLoaded = appState.currentResearchBinder.papers?.length || 0;
       const totalCount = appState.totalCount;
 
       // Find or create pagination info element
@@ -911,7 +905,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Keep button visible as long as there are more papers to load
       if (this.elements.loadMoreContainer) {
         const hasMore = appState.nextCursor && !appState.isLoadingMore;
-        
+
         if (hasMore) {
           this.elements.loadMoreContainer.style.display = "flex";
           // Ensure button has click handler
@@ -1030,6 +1024,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==================== BINDER MANAGEMENT ====================
     saveToBinder() {
       if (!appState.currentResearchBinder) return;
+
+      // Migrate additionalPapers to main papers array for compatibility
+      if (appState.currentResearchBinder.additionalPapers && appState.currentResearchBinder.additionalPapers.length > 0) {
+        appState.currentResearchBinder.papers.push(...appState.currentResearchBinder.additionalPapers);
+        delete appState.currentResearchBinder.additionalPapers; // Remove old array
+      }
 
       appState.binders.push({ ...appState.currentResearchBinder });
       this.renderBinders();
@@ -1239,11 +1239,27 @@ document.addEventListener("DOMContentLoaded", () => {
     appState = new AppState();
     domManager = new DOMManager();
 
+    // Migrate existing binders with additionalPapers to new format
+    migrateExistingBinders();
+
     // Initial render
     domManager.renderBinders();
     domManager.updateYearLabel();
 
     console.log("🧠 BRAIN AI Research Assistant initialized");
+  }
+
+  function migrateExistingBinders() {
+    // Fix any existing binders that have separate additionalPapers arrays
+    appState.binders.forEach(binder => {
+      if (binder.additionalPapers && binder.additionalPapers.length > 0) {
+        // Move additional papers to main array
+        binder.papers = binder.papers || [];
+        binder.papers.push(...binder.additionalPapers);
+        delete binder.additionalPapers; // Remove old array
+        console.log(`Migrated binder "${binder.name}": ${binder.papers.length} total papers`);
+      }
+    });
   }
 
   // Initialize the application
