@@ -290,6 +290,8 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.bindersSection.style.display = "block";
       }
 
+      this.renderBinders();
+
       appState.isResearchView = false;
       appState.currentResearchBinder = null;
 
@@ -684,6 +686,16 @@ document.addEventListener("DOMContentLoaded", () => {
         // Append new papers to the main papers array
         appState.currentResearchBinder.papers.push(...data.papers);
 
+        // Update the binder in the binders array if it's an existing binder
+        if (!appState.currentResearchBinder.id.startsWith("temp-")) {
+          const binderIndex = appState.binders.findIndex(b => b.id === appState.currentResearchBinder.id);
+          if (binderIndex !== -1) {
+            // Update the binder in the array with current state
+            appState.binders[binderIndex] = JSON.parse(JSON.stringify(appState.currentResearchBinder));
+            this.renderBinders(); // Update binder display
+          }
+        }
+
         // Render additional papers in separate section
         this.renderAdditionalPapers(data.papers);
 
@@ -727,6 +739,23 @@ document.addEventListener("DOMContentLoaded", () => {
           );
           summaryDiv.innerHTML = this.markdownToHtml(summary);
           summaryDiv.style.opacity = "1";
+          
+          // Also add summary to messages array for persistence
+          if (appState.currentResearchBinder) {
+            appState.currentResearchBinder.messages.push({
+              role: "assistant",
+              content: summary
+            });
+            
+            // Update binder in array if it's an existing binder
+            if (!appState.currentResearchBinder.id.startsWith("temp-")) {
+              const binderIndex = appState.binders.findIndex(b => b.id === appState.currentResearchBinder.id);
+              if (binderIndex !== -1) {
+                appState.binders[binderIndex] = JSON.parse(JSON.stringify(appState.currentResearchBinder));
+                this.renderBinders(); // Update binder display
+              }
+            }
+          }
         } catch (err) {
           console.warn("Summary of additional papers failed:", err);
 
