@@ -133,7 +133,21 @@
                 </div>
 
                 <div>
-                  <button onclick="resetFilters()" class="reset-button">
+                  <button
+                    onclick="
+                      document.getElementById('yearFilter').value = '2026';
+                      document.getElementById('searchBy').value = 'best_match';
+                      document.getElementById('quota').value = '5';
+                      document
+                        .getElementById('yearFilter')
+                        .dispatchEvent(new Event('input', { bubbles: true }));
+                      document.getElementById('yearValue').textContent = '2026';
+                      document.getElementById('sliderTooltip').textContent =
+                        '2026';
+                      console.log('Filters reset');
+                    "
+                    class="reset-button"
+                  >
                     RESET
                   </button>
                 </div>
@@ -261,15 +275,58 @@
       </div>
     </div>
 
-    <script src="{% static 'scripts.js' %}?v=20260318-1"></script>
+    <script src="{% static 'scripts.js' %}?v=20260318-2"></script>
     <script>
       // Simple console test for load more functionality
       console.log(
-        '� To test load more: search for "machine learning" with 5 papers, then check for load more button',
+        '🧪 To test load more: search for "machine learning" with 5 papers, then check for load more button',
       );
       console.log(
         "💡 If button doesn't appear, run: testLoadMore() in console",
       );
+
+      // Test reset filters function
+      console.log(
+        "🔄 To test reset filters: run testResetFilters() in console",
+      );
+
+      function testResetFilters() {
+        console.log("🧪 Testing resetFilters function...");
+        console.log("resetFilters function exists:", typeof resetFilters);
+        console.log("domManager exists:", typeof domManager);
+
+        // Test direct DOM access
+        const yearFilter = document.getElementById("yearFilter");
+        const searchBy = document.getElementById("searchBy");
+        const quota = document.getElementById("quota");
+
+        console.log("Elements found:", {
+          yearFilter: !!yearFilter,
+          searchBy: !!searchBy,
+          quota: !!quota,
+        });
+
+        if (yearFilter) console.log("Current year value:", yearFilter.value);
+        if (searchBy) console.log("Current searchBy value:", searchBy.value);
+        if (quota) console.log("Current quota value:", quota.value);
+
+        // Call resetFilters
+        if (typeof resetFilters === "function") {
+          resetFilters();
+
+          // Check values after reset
+          setTimeout(() => {
+            console.log("After reset:");
+            if (yearFilter) console.log("Year value:", yearFilter.value);
+            if (searchBy) console.log("SearchBy value:", searchBy.value);
+            if (quota) console.log("Quota value:", quota.value);
+          }, 100);
+        } else {
+          console.error("resetFilters function not found!");
+        }
+      }
+
+      window.testResetFilters = testResetFilters;
 
       function testLoadMore() {
         console.log("🧪 Testing load more button...");

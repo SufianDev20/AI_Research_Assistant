@@ -1026,8 +1026,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!appState.currentResearchBinder) return;
 
       // Migrate additionalPapers to main papers array for compatibility
-      if (appState.currentResearchBinder.additionalPapers && appState.currentResearchBinder.additionalPapers.length > 0) {
-        appState.currentResearchBinder.papers.push(...appState.currentResearchBinder.additionalPapers);
+      if (
+        appState.currentResearchBinder.additionalPapers &&
+        appState.currentResearchBinder.additionalPapers.length > 0
+      ) {
+        appState.currentResearchBinder.papers.push(
+          ...appState.currentResearchBinder.additionalPapers,
+        );
         delete appState.currentResearchBinder.additionalPapers; // Remove old array
       }
 
@@ -1200,14 +1205,63 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetFilters() {
+    console.log("resetFilters called");
+    
+    // Try to use domManager if available
     if (domManager) {
-      if (domManager.elements.yearFilter)
+      console.log("Using domManager to reset filters");
+      
+      // Reset year filter to default (2026)
+      if (domManager.elements.yearFilter) {
         domManager.elements.yearFilter.value = "2026";
-      if (domManager.elements.searchBy)
+        console.log("Year filter reset to:", domManager.elements.yearFilter.value);
+      }
+      
+      // Reset search by to default (best_match)
+      if (domManager.elements.searchBy) {
         domManager.elements.searchBy.value = "best_match";
-      if (domManager.elements.quota) domManager.elements.quota.value = "5";
+        console.log("Search by reset to:", domManager.elements.searchBy.value);
+      }
+      
+      // Reset quota to default (5 papers)
+      if (domManager.elements.quota) {
+        domManager.elements.quota.value = "5";
+        console.log("Quota reset to:", domManager.elements.quota.value);
+      }
+      
+      // Update year label display
       domManager.updateYearLabel();
+    } else {
+      // Fallback: directly access DOM elements
+      console.log("domManager not available, using direct DOM access");
+      
+      const yearFilter = document.getElementById("yearFilter");
+      const searchBy = document.getElementById("searchBy");
+      const quota = document.getElementById("quota");
+      
+      if (yearFilter) {
+        yearFilter.value = "2026";
+        console.log("Year filter reset to:", yearFilter.value);
+      }
+      
+      if (searchBy) {
+        searchBy.value = "best_match";
+        console.log("Search by reset to:", searchBy.value);
+      }
+      
+      if (quota) {
+        quota.value = "5";
+        console.log("Quota reset to:", quota.value);
+      }
+      
+      // Update year label directly
+      const yearValue = document.getElementById("yearValue");
+      const sliderTooltip = document.getElementById("sliderTooltip");
+      if (yearValue) yearValue.textContent = "2026";
+      if (sliderTooltip) sliderTooltip.textContent = "2026";
     }
+    
+    console.log("Filters reset complete");
   }
 
   function performSearch() {
@@ -1251,13 +1305,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function migrateExistingBinders() {
     // Fix any existing binders that have separate additionalPapers arrays
-    appState.binders.forEach(binder => {
+    appState.binders.forEach((binder) => {
       if (binder.additionalPapers && binder.additionalPapers.length > 0) {
         // Move additional papers to main array
         binder.papers = binder.papers || [];
         binder.papers.push(...binder.additionalPapers);
         delete binder.additionalPapers; // Remove old array
-        console.log(`Migrated binder "${binder.name}": ${binder.papers.length} total papers`);
+        console.log(
+          `Migrated binder "${binder.name}": ${binder.papers.length} total papers`,
+        );
       }
     });
   }
