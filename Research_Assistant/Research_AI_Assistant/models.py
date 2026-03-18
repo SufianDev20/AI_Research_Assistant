@@ -108,7 +108,7 @@ class ModelPerformance(models.Model):
         
         # Recent activity score (10% weight) - recent success is better
         recent_score = 0.0
-        if self.last_succclsess:
+        if self.last_success:
             from django.utils import timezone
             import datetime
             days_since_success = (timezone.now() - self.last_success).days
