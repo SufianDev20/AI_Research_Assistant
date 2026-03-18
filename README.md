@@ -104,7 +104,7 @@ Based on actual format compliance testing:
 ### Frontend
 
 - **Template Engine**: Django Templates
-- **CSS Framework**: TailwindCSS
+- **CSS Framework**: Vanilla CSS
 - **Icons**: FontAwesome 6.6.0
 - **JavaScript**: Vanilla JavaScript with modern ES6+ features
 - **Architecture**: Component-based with DOM management
