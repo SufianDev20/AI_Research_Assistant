@@ -144,7 +144,6 @@
                       document.getElementById('yearValue').textContent = '2026';
                       document.getElementById('sliderTooltip').textContent =
                         '2026';
-                      console.log('Filters reset');
                     "
                     class="reset-button"
                   >
@@ -276,83 +275,5 @@
     </div>
 
     <script src="{% static 'scripts.js' %}?v=20260318-2"></script>
-    <script>
-      // Simple console test for load more functionality
-      console.log(
-        '🧪 To test load more: search for "machine learning" with 5 papers, then check for load more button',
-      );
-      console.log(
-        "💡 If button doesn't appear, run: testLoadMore() in console",
-      );
-
-      // Test reset filters function
-      console.log(
-        "🔄 To test reset filters: run testResetFilters() in console",
-      );
-
-      function testResetFilters() {
-        console.log("🧪 Testing resetFilters function...");
-        console.log("resetFilters function exists:", typeof resetFilters);
-        console.log("domManager exists:", typeof domManager);
-
-        // Test direct DOM access
-        const yearFilter = document.getElementById("yearFilter");
-        const searchBy = document.getElementById("searchBy");
-        const quota = document.getElementById("quota");
-
-        console.log("Elements found:", {
-          yearFilter: !!yearFilter,
-          searchBy: !!searchBy,
-          quota: !!quota,
-        });
-
-        if (yearFilter) console.log("Current year value:", yearFilter.value);
-        if (searchBy) console.log("Current searchBy value:", searchBy.value);
-        if (quota) console.log("Current quota value:", quota.value);
-
-        // Call resetFilters
-        if (typeof resetFilters === "function") {
-          resetFilters();
-
-          // Check values after reset
-          setTimeout(() => {
-            console.log("After reset:");
-            if (yearFilter) console.log("Year value:", yearFilter.value);
-            if (searchBy) console.log("SearchBy value:", searchBy.value);
-            if (quota) console.log("Quota value:", quota.value);
-          }, 100);
-        } else {
-          console.error("resetFilters function not found!");
-        }
-      }
-
-      window.testResetFilters = testResetFilters;
-
-      function testLoadMore() {
-        console.log("🧪 Testing load more button...");
-        const container = document.getElementById("loadMoreContainer");
-        const btn = document.getElementById("loadMoreBtn");
-
-        console.log("Container found:", !!container);
-        console.log("Button found:", !!btn);
-        console.log("AppState:", window.appState);
-
-        if (window.appState) {
-          console.log("Next cursor:", window.appState.nextCursor);
-          console.log("Total count:", window.appState.totalCount);
-          console.log("Is loading more:", window.appState.isLoadingMore);
-        }
-
-        if (
-          (container && !container.style.display) ||
-          container.style.display === "none"
-        ) {
-          container.style.display = "flex";
-          console.log("✅ Forced container to show");
-        }
-      }
-
-      window.testLoadMore = testLoadMore;
-    </script>
   </body>
 </html>
