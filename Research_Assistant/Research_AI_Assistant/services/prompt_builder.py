@@ -29,7 +29,7 @@ Repeat this block for every paper. Do not combine papers. Omit a field only if i
 After all paper blocks, output:
 References:
 [N] Surname, I. (Year) 'Title'. Source. doi: DOI.
-Use up to three authors, then et al. Omit fields not in metadata. Plain text only. No markdown."""
+Use up to three authors, then et al. Omit fields not in metadata. Plain text only. No markdown. No abstract available state: Abstract not available - summary based on title and metadata only"""
 # ---------------------------------------------------------------------------
 # User message builder — assembles the numbered paper block for each request.
 # ---------------------------------------------------------------------------
@@ -81,7 +81,9 @@ def build_user_message(papers: List[Dict], query: str) -> str:
         # Only include abstract if it's substantial (reduce tokens)
         abstract = paper.get("abstract", "").strip()
         if abstract and len(abstract) > 100:
-            lines.append(f"Abstract: {abstract[:500]}...")  # Truncate long abstracts
+            lines.append(f"Abstract: {abstract[:500]}...")  # Truncate long abstract lines
+        else:
+            lines.append("Abstract: Abstract not available - summary based on title and metadata only")
 
         lines.append("")
 

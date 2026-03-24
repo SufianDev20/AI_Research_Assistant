@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function() {
   // ==================== BRAIN AI RESEARCH ASSISTANT ====================
   // DOM-oriented JavaScript Architecture
 
@@ -77,96 +77,92 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     setupEventListeners() {
-      const { elements } = this;
+      var elements = this.elements; 
 
-      // Search functionality
-      if (elements.searchButton) {
-        elements.searchButton.addEventListener("click", () =>
-          this.handleSearch(),
-        );
-      }
+      // Search functionality - button uses onclick="performSearch()" in HTML
+      // No additional event listener needed to avoid conflicts
 
       if (elements.queryInput) {
-        elements.queryInput.addEventListener("keydown", (e) => {
+        elements.queryInput.addEventListener("keydown", function(e) {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             this.handleSearch();
           }
-        });
+        }.bind(this));
       }
 
       // Filter listeners
       if (elements.yearFilter) {
-        elements.yearFilter.addEventListener("input", () =>
-          this.updateYearLabel(),
-        );
-        elements.yearFilter.addEventListener("mousedown", () =>
-          this.showTooltip(),
-        );
-        elements.yearFilter.addEventListener("mouseup", () =>
-          this.hideTooltip(),
-        );
-        elements.yearFilter.addEventListener("touchstart", () =>
-          this.showTooltip(),
-        );
-        elements.yearFilter.addEventListener("touchend", () =>
-          this.hideTooltip(),
-        );
+        elements.yearFilter.addEventListener("input", function() {
+          this.updateYearLabel();
+        }.bind(this));
+        elements.yearFilter.addEventListener("mousedown", function() {
+          this.showTooltip();
+        }.bind(this));
+        elements.yearFilter.addEventListener("mouseup", function() {
+          this.hideTooltip();
+        }.bind(this));
+        elements.yearFilter.addEventListener("touchstart", function() {
+          this.showTooltip();
+        }.bind(this));
+        elements.yearFilter.addEventListener("touchend", function() {
+          this.hideTooltip();
+        }.bind(this));
       }
 
       // Research view listeners
       if (elements.researchSendBtn) {
-        elements.researchSendBtn.addEventListener("click", () =>
-          this.handleResearchMessage(),
-        );
+        elements.researchSendBtn.addEventListener("click", function() {
+          this.handleResearchMessage();
+        }.bind(this));
       }
 
       if (elements.researchInput) {
-        elements.researchInput.addEventListener("keydown", (e) => {
+        elements.researchInput.addEventListener("keydown", function(e) {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             this.handleResearchMessage();
           }
-        });
+        }.bind(this));
       }
 
       if (elements.researchBackBtn) {
-        elements.researchBackBtn.addEventListener("click", () =>
-          this.hideResearchView(),
-        );
+        elements.researchBackBtn.addEventListener("click", function() {
+          this.hideResearchView();
+        }.bind(this));
       }
 
       if (elements.saveToBinderBtn) {
-        elements.saveToBinderBtn.addEventListener("click", () =>
-          this.saveToBinder(),
-        );
+        elements.saveToBinderBtn.addEventListener("click", function() {
+          this.saveToBinder();
+        }.bind(this));
       }
 
       // Load more button listener
       if (elements.loadMoreBtn) {
-        elements.loadMoreBtn.addEventListener("click", () =>
-          this.loadMorePapers(),
-        );
+        elements.loadMoreBtn.addEventListener("click", function() {
+          this.loadMorePapers();
+        }.bind(this));
       }
 
       // Modal listeners (backwards compatibility)
       if (elements.modalSendBtn) {
-        elements.modalSendBtn.addEventListener("click", () =>
-          this.handleModalMessage(),
-        );
+        elements.modalSendBtn.addEventListener("click", function() {
+          this.handleModalMessage();
+        }.bind(this));
       }
 
       if (elements.modalInput) {
-        elements.modalInput.addEventListener("keydown", (e) => {
+        elements.modalInput.addEventListener("keydown", function(e) {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             this.handleModalMessage();
           }
-        });
+        }.bind(this));
       }
 
       // Global keyboard shortcuts
-      document.addEventListener("keydown", (e) => {
+      document.addEventListener("keydown", function(e) {
         if (e.metaKey && e.key === "k") {
           e.preventDefault();
           if (!appState.isResearchView && elements.queryInput) {
@@ -178,7 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // Outside click for dropdown
-      document.addEventListener("click", (e) => {
+      document.addEventListener("click", function(e) {
         if (
           elements.profileDropdown &&
           !e.target.closest("#profileDropdown") &&
@@ -191,19 +187,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ==================== EVENT HANDLERS ====================
     handleSearch() {
-      const query = this.elements.queryInput?.value.trim();
+      var query = this.elements.queryInput ? this.elements.queryInput.value.trim() : "";
+      console.log("handleSearch called with query:", query);
+      
       if (!query) {
+        console.log("Empty query - showing alert");
         alert("Type a research question!");
         return;
       }
 
-      this.showResearchView(query);
-      this.elements.queryInput.value = "";
+      console.log("Elements available:", {
+        queryInput: !!this.elements.queryInput,
+        researchView: !!this.elements.researchView,
+        heroSection: !!this.elements.heroSection,
+        bindersSection: !!this.elements.bindersSection
+      });
+
+      try {
+        console.log("Calling showResearchView with query:", query);
+        this.showResearchView(query);
+        this.elements.queryInput.value = "";
+      } catch (error) {
+        console.error("Error in handleSearch:", error);
+        alert("Failed to start research. Please try again.");
+      }
     }
 
     handleResearchMessage() {
-      const input = this.elements.researchInput;
-      const text = input?.value.trim();
+      var input = this.elements.researchInput;
+      var text = input ? input.value.trim() : "";
       if (!text || appState.isThinking || !appState.currentResearchBinder)
         return;
 
@@ -217,13 +229,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     handleModalMessage() {
-      const input = this.elements.modalInput;
-      const text = input?.value.trim();
+      var input = this.elements.modalInput;
+      var text = input ? input.value.trim() : "";
       if (!text || appState.isThinking || !appState.currentOpenBinderId) return;
 
-      const binder = appState.binders.find(
-        (b) => b.id === appState.currentOpenBinderId,
-      );
+      var binder = appState.binders.find(function(b) { return b.id === appState.currentOpenBinderId; });
       if (!binder) return;
 
       binder.messages.push({ role: "user", content: text });
@@ -234,47 +244,92 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ==================== DOM MANIPULATION ====================
     showResearchView(query) {
+      console.log("showResearchView called with query:", query);
+      
       // Hide hero and binders
-      if (this.elements.heroSection)
+      if (this.elements.heroSection) {
+        console.log("Hiding hero section");
         this.elements.heroSection.style.display = "none";
-      if (this.elements.bindersSection)
+      } else {
+        console.warn("Hero section element not found");
+      }
+      
+      if (this.elements.bindersSection) {
+        console.log("Hiding binders section");
         this.elements.bindersSection.style.display = "none";
+      } else {
+        console.warn("Binders section element not found");
+      }
 
       // Show research view
       if (this.elements.researchView) {
+        console.log("Showing research view");
         this.elements.researchView.classList.add("show");
+      } else {
+        console.warn("Research view element not found");
+        return;
       }
 
-      // Set query
+      // Set query top of bar 
       if (this.elements.researchQuery) {
+        console.log("Setting research query text:", query);
         this.elements.researchQuery.textContent = query;
+      } else {
+        console.warn("Research query element not found");
       }
 
-      // Hide save button
+      // Hide save button only till first AI response appears
       if (this.elements.saveToBinderBtn) {
+        console.log("Hiding save button initially");
         this.elements.saveToBinderBtn.style.display = "none";
+      } else {
+        console.warn("Save button element not found");
       }
 
       // Clear chat
       if (this.elements.researchChatContainer) {
+        console.log("Clearing research chat container");
         this.elements.researchChatContainer.innerHTML = "";
+      } else {
+        console.warn("Research chat container element not found");
+        return;
       }
 
       // Add user message
-      this.addMessage(query, true, this.elements.researchChatContainer);
+      if (query) {
+        console.log("Adding user message to chat:", query);
+        this.addMessage(query, true, this.elements.researchChatContainer);
+      } else {
+        console.warn("No query provided, skipping user message");
+      }
 
       appState.isResearchView = true;
 
       // Create temporary binder
-      appState.currentResearchBinder = {
-        id: "temp-" + Date.now(),
-        name: query.length > 35 ? query.substring(0, 32) + "..." : query,
-        color: "#" + Math.floor(Math.random() * 16777215).toString(16),
-        messages: [{ role: "user", content: query }],
-        papers: [],
-      };
+      if (query) {
+        console.log("Creating temporary binder with query:", query);
+        appState.currentResearchBinder = {
+          id: "temp-" + Date.now(),
+          name: query.length > 35 ? query.substring(0, 32) + "..." : query,
+          color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+          messages: [{ role: "user", content: query }],
+          papers: [],
+        };
+        console.log("Temporary binder created:", appState.currentResearchBinder);
+      } else {
+        console.warn("No query provided, skipping binder creation");
+      }
 
-      this.generateResearchResponse();
+      try {
+        console.log("Calling generateResearchResponse");
+        this.generateResearchResponse();
+      } catch (error) {
+        console.error("Error in showResearchView:", error);
+        alert("Failed to start research. Please try again.");
+        // Reset state on error
+        appState.isResearchView = false;
+        appState.currentResearchBinder = null;
+      }
     }
 
     hideResearchView() {
@@ -303,18 +358,17 @@ document.addEventListener("DOMContentLoaded", () => {
     addMessage(content, isUser = false, container) {
       if (!container) return null;
 
-      const div = document.createElement("div");
-      div.className = `message ${isUser ? "user" : "assistant"}`;
+      var div = document.createElement("div");
+      div.className = "message " + (isUser ? "user" : "assistant");
 
       if (isUser) {
         div.textContent = content;
       } else {
-        div.innerHTML = `
-                <div class="thinking-indicator">
-                    <i class="fa-solid fa-brain thinking-icon"></i>
-                    <span>Generating response...</span>
-                </div>
-            `;
+        div.innerHTML = 
+                '<div class="thinking-indicator">' +
+                    '<i class="fa-solid fa-brain thinking-icon"></i>' +
+                    '<span>Generating response...</span>' +
+                '</div>';
       }
 
       container.appendChild(div);
@@ -328,92 +382,89 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.bindersContainer.innerHTML = "";
 
       if (this.elements.binderCount) {
-        this.elements.binderCount.textContent = `${appState.binders.length} active`;
+        this.elements.binderCount.textContent = appState.binders.length + " active";
       }
 
-      appState.binders.forEach((binder) => {
-        const binderElement = this.createBinderElement(binder);
+      appState.binders.forEach(function(binder) {
+        var binderElement = this.createBinderElement(binder);
         this.elements.bindersContainer.appendChild(binderElement);
-      });
+      }.bind(this));
     }
 
     createBinderElement(binder) {
-      const lastMessage =
-        binder.messages?.length > 0
+      var lastMessage =
+        binder.messages && binder.messages.length > 0
           ? binder.messages[binder.messages.length - 1].content
           : "No messages yet";
-      const paperCount = binder.papers?.length || 0;
-      const messageCount = binder.messages?.length || 0;
-      const firstPaper =
-        binder.papers?.length > 0 ? binder.papers[0].title : null;
+      var paperCount = binder.papers ? binder.papers.length : 0;
+      var messageCount = binder.messages ? binder.messages.length : 0;
+      var firstPaper =
+        binder.papers && binder.papers.length > 0 ? binder.papers[0].title : null;
 
-      const card = document.createElement("div");
+      var card = document.createElement("div");
       card.className = "binder-card";
-      card.onclick = () => this.openBinder(binder.id);
+      var self = this;
+      card.onclick = function() {
+        return self.openBinder(binder.id);
+      };
 
-      card.innerHTML = `
-            <div style="background: ${binder.color}" class="binder-color-bar"></div>
-            <div class="binder-content">
-                <div class="binder-header">
-                    <div onclick="event.stopImmediatePropagation(); domManager.editBinderColor(${binder.id});" 
-                         style="background: ${binder.color}" class="binder-color-dot"></div>
-                    <div contenteditable="true" spellcheck="false"
-                         onblur="domManager.saveBinderName(${binder.id}, this.innerText)"
-                         class="binder-title">${binder.name}</div>
-                </div>
-                
-                ${
-                  firstPaper
-                    ? `
-                <div class="binder-paper-preview">
-                    <div class="binder-paper-label">Latest Paper</div>
-                    <div class="binder-paper-title">
-                        ${firstPaper.substring(0, 80)}${firstPaper.length > 80 ? "..." : ""}
-                    </div>
-                </div>
-                `
-                    : ""
-                }
-                
-                <div class="binder-stats">
-                    <div class="binder-stats-left">
-                        <div class="binder-stat">
-                            <i class="fa-solid fa-comment-dots"></i>
-                            <span>${messageCount} messages</span>
-                        </div>
-                        ${
-                          paperCount > 0
-                            ? `
-                        <div class="binder-stat">
-                            <i class="fa-solid fa-file-alt"></i>
-                            <span>${paperCount} papers</span>
-                        </div>
-                        `
-                            : ""
-                        }
-                    </div>
-                    <div class="binder-status">Live</div>
-                </div>
-                
-                ${
-                  lastMessage && lastMessage !== "No messages yet"
-                    ? `
-                <div class="binder-last-message">
-                    <div class="binder-last-message-text">
-                        "${lastMessage.substring(0, 60)}${lastMessage.length > 60 ? "..." : ""}"
-                    </div>
-                </div>
-                `
-                    : ""
-                }
-            </div>
-        `;
+      // Build HTML string with compatible syntax
+      var html = '<div style="background: ' + binder.color + '" class="binder-color-bar"></div>' +
+                 '<div class="binder-content">' +
+                     '<div class="binder-header">' +
+                         '<div onclick="event.stopImmediatePropagation(); domManager.editBinderColor(' + binder.id + ');" ' +
+                              'style="background: ' + binder.color + '" class="binder-color-dot"></div>' +
+                         '<div contenteditable="true" spellcheck="false" ' +
+                              'onblur="domManager.saveBinderName(' + binder.id + ', this.innerText)" ' +
+                              'class="binder-title">' + binder.name + '</div>' +
+                     '</div>';
+
+      // Add paper preview if exists
+      if (firstPaper) {
+        html += '<div class="binder-paper-preview">' +
+                '<div class="binder-paper-label">Latest Paper</div>' +
+                '<div class="binder-paper-title">' +
+                    (firstPaper.substring(0, 80) + (firstPaper.length > 80 ? "..." : "")) +
+                '</div>' +
+                '</div>';
+      }
+
+      // Add stats
+      html += '<div class="binder-stats">' +
+                  '<div class="binder-stats-left">' +
+                      '<div class="binder-stat">' +
+                          '<i class="fa-solid fa-comment-dots"></i>' +
+                          '<span>' + messageCount + ' messages</span>' +
+                      '</div>';
+
+      if (paperCount > 0) {
+        html += '<div class="binder-stat">' +
+                    '<i class="fa-solid fa-file-alt"></i>' +
+                    '<span>' + paperCount + ' papers</span>' +
+                '</div>';
+      }
+
+      html += '</div>' +
+                  '<div class="binder-status">Live</div>' +
+              '</div>';
+
+      // Add last message if exists
+      if (lastMessage && lastMessage !== "No messages yet") {
+        html += '<div class="binder-last-message">' +
+                    '<div class="binder-last-message-text">' +
+                        '"' + (lastMessage.substring(0, 60) + (lastMessage.length > 60 ? "..." : "")) + '"' +
+                    '</div>' +
+                '</div>';
+      }
+
+      html += '</div>';
+      card.innerHTML = html;
 
       return card;
     }
-
+    // Opens Binder that is after saving
     openBinder(id) {
-      const binder = appState.binders.find((b) => b.id === id);
+      var binder = appState.binders.find(function(b) { return b.id === id; });
       if (!binder) return;
 
       // Hide hero and binders
@@ -428,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Set query
-      const firstUserMessage = binder.messages.find((m) => m.role === "user");
+      var firstUserMessage = binder.messages.find(function(m) { return m.role === "user"; });
       if (this.elements.researchQuery) {
         this.elements.researchQuery.textContent = firstUserMessage
           ? firstUserMessage.content
@@ -443,9 +494,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear and populate chat
       if (this.elements.researchChatContainer) {
         this.elements.researchChatContainer.innerHTML = "";
-
-        binder.messages.forEach((msg) => {
-          const div = this.addMessage(
+        // Clears container then replays full message history. addMessage handles both user and assistant messages. For assistant messages, thinking indicator placeholder is immediately replaced with actual content via markdownToHtml. opacity: "1" is set explicitly because new assistant messages animate in, but restored messages should appear instantly without animation.
+        binder.messages.forEach(function(msg) {
+          var div = this.addMessage(
             msg.content,
             msg.role === "user",
             this.elements.researchChatContainer,
@@ -454,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
             div.innerHTML = this.markdownToHtml(msg.content);
             div.style.opacity = "1";
           }
-        });
+        }.bind(this));
 
         if (binder.papers?.length > 0) {
           this.renderPaperCards(
@@ -465,35 +516,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       appState.isResearchView = true;
-      appState.currentResearchBinder = binder;
-
-      if (this.elements.researchInput) {
-        this.elements.researchInput.focus();
-      }
+      appState.currentResearchBinder = binder; // Brings the temporary saved binder into the frontend based on previous query
     }
 
     updateYearLabel() {
       if (!this.elements.yearFilter) return;
 
-      const year = parseInt(this.elements.yearFilter.value);
-
+      var year = parseInt(this.elements.yearFilter.value);
       if (this.elements.yearValue) {
         this.elements.yearValue.textContent = year;
       }
-
       if (this.elements.sliderTooltip) {
         this.elements.sliderTooltip.textContent = year;
-        this.updateTooltipPosition();
       }
+
+      this.updateTooltipPosition();
     }
 
+    // Adds .show class which sets opacity: 1 in CSS, fading in the tooltip. Immediately repositions it above the current thumb position before user starts dragging.
     showTooltip() {
       if (this.elements.sliderTooltip) {
         this.elements.sliderTooltip.classList.add("show");
         this.updateTooltipPosition();
       }
     }
-
+    // Removes .show class, setting opacity back to 0, fading out the tooltip when dragging stops on year slider.
     hideTooltip() {
       if (this.elements.sliderTooltip) {
         this.elements.sliderTooltip.classList.remove("show");
@@ -503,12 +550,12 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTooltipPosition() {
       if (!this.elements.yearFilter || !this.elements.sliderTooltip) return;
 
-      const slider = this.elements.yearFilter;
-      const tooltip = this.elements.sliderTooltip;
-      const percent = (slider.value - slider.min) / (slider.max - slider.min);
-      const offset = percent * slider.offsetWidth;
+      var slider = this.elements.yearFilter;
+      var tooltip = this.elements.sliderTooltip;
+      var percent = (slider.value - slider.min) / (slider.max - slider.min); // Calculates how far along the slider's thumb is as a value between 0 and 1. For example if value is 2008, min is 1990, max is 2026: (2008 - 1990) / (2026 - 1990) = 18/36 = 0.5, meaning that thumb is at 50%. Converts into pixel values for slider width to be visible.
+      var offset = percent * slider.offsetWidth;
 
-      tooltip.style.left = `${offset}px`;
+      tooltip.style.left = offset + "px";
     }
 
     async retrieveFromBackend(
@@ -521,20 +568,20 @@ document.addEventListener("DOMContentLoaded", () => {
       cursor = null,
     ) {
       // Use cursor pagination if provided, otherwise start from beginning
-      const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
-      const seedParam = randomSeed ? `&random_seed=${randomSeed}` : "";
+      var cursorParam = cursor ? "&cursor=" + encodeURIComponent(cursor) : "";
+      var seedParam = randomSeed ? "&random_seed=" + randomSeed : "";
 
       // Handle single year filter: if minYear is null, only use max_year
       let yearParams;
       if (minYear === null || minYear === undefined) {
-        yearParams = `&max_year=${maxYear}`;
+        yearParams = "&max_year=" + maxYear;
       } else {
-        yearParams = `&min_year=${minYear}&max_year=${maxYear}`;
+        yearParams = "&min_year=" + minYear + "&max_year=" + maxYear;
       }
 
-      const url = `/api/search/?q=${encodeURIComponent(query)}&mode=${sortPref}&per_page=${Math.min(maxPapers, 50)}${yearParams}${cursorParam}${seedParam}`;
+      var url = "/api/search/?q=" + encodeURIComponent(query) + "&mode=" + sortPref + "&per_page=" + Math.min(maxPapers, 50) + yearParams + cursorParam + seedParam;
 
-      const response = await fetch(url);
+      var response = await fetch(url);
       if (!response.ok)
         throw new Error(`Backend search error ${response.status}`);
 
@@ -554,7 +601,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const assistantDiv = this.addMessage("", false, container);
 
-      // Show loading
+     // Shows brain and generating response till LLM provides the response
       assistantDiv.innerHTML = `
             <div class="research-loading">
                 <i class="fa-solid fa-brain"></i>
@@ -597,13 +644,6 @@ document.addEventListener("DOMContentLoaded", () => {
         appState.currentResearchBinder.papers = searchData.papers;
         const papersToUse = searchData.papers;
 
-        if (searchData.papers.length > 0) {
-          this.renderPaperCards(searchData.papers, container);
-        }
-
-        // Update UI with pagination info after papers are rendered
-        this.updatePaginationInfo();
-
         // Apply rate limiting before LLM call
         await this.waitForRateLimit();
 
@@ -619,37 +659,63 @@ document.addEventListener("DOMContentLoaded", () => {
           }),
         });
 
+        console.log("API response status:", response.status);
+        
         if (!response.ok) {
           const err = await response.json();
+          console.error("API error response:", err);
           throw new Error(err.error || `Summarise error ${response.status}`);
         }
 
         const data = await response.json();
+        console.log("API response data:", data);
         const summary = data.summary || "No summary returned.";
+        console.log("Generated summary length:", summary.length);
 
+        // Replace the "Generating response..." placeholder with the actual response
         assistantDiv.innerHTML = this.markdownToHtml(summary);
+        assistantDiv.style.opacity = "1";
+
+        // Render papers BELOW the assistant response
+        if (searchData.papers.length > 0) {
+          this.renderPaperCards(searchData.papers, this.elements.researchChatContainer);
+        }
+
+        // Update UI with pagination info after response + papers are rendered
+        this.updatePaginationInfo();
+
         appState.currentResearchBinder.messages.push({
           role: "assistant",
           content: summary,
         });
 
-        // Ensure load more visibility is refreshed after the assistant response renders
+        // Ensure load more visibility is refreshed after assistant response renders
         this.updatePaginationInfo();
 
         // Show save button for temporary binders
-        if (appState.currentResearchBinder.id.startsWith("temp-")) {
-          if (this.elements.saveToBinderBtn) {
-            this.elements.saveToBinderBtn.style.display = "block";
-          }
+        if (this.elements.saveToBinderBtn && appState.currentResearchBinder?.id?.startsWith("temp-")) {
+          console.log("Showing save button for temporary binder");
+          this.elements.saveToBinderBtn.style.display = "block";
         }
+
       } catch (err) {
-        assistantDiv.innerHTML = `Error: ${err.message}`;
-      } finally {
-        appState.isThinking = false;
-        if (sendBtn) sendBtn.disabled = false;
-        if (this.elements.researchInput) {
-          this.elements.researchInput.focus();
+        console.error("Error in generateResearchResponse:", err);
+        // Replace the "Generating response..." placeholder with the error
+        if (assistantDiv) {
+          assistantDiv.innerHTML = "Error: " + (err && err.message ? err.message : "Unknown error");
+          assistantDiv.style.opacity = "1";
         }
+        
+        // Show user-friendly error message but continue flow
+        if (this.elements.loadMoreStatus) {
+          this.elements.loadMoreStatus.textContent = `Error: ${err.message}`;
+        }
+        
+        // Still update pagination info even on error to show correct state
+        this.updatePaginationInfo();
+      } finally {
+        console.log("generateResearchResponse completed, setting isThinking to false");
+        appState.isThinking = false;
       }
     }
 
@@ -700,9 +766,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        // Render additional papers in separate section
-        this.renderAdditionalPapers(data.papers);
-
         // Summarize additional papers
         try {
           await this.waitForRateLimit();
@@ -743,6 +806,9 @@ document.addEventListener("DOMContentLoaded", () => {
           );
           summaryDiv.innerHTML = this.markdownToHtml(summary);
           summaryDiv.style.opacity = "1";
+
+          // Render additional papers BELOW the additional summary
+          this.renderAdditionalPapers(data.papers);
 
           // Also add summary to messages array for persistence
           if (appState.currentResearchBinder) {
@@ -798,6 +864,9 @@ document.addEventListener("DOMContentLoaded", () => {
           `;
           this.elements.researchChatContainer.appendChild(errorDiv);
 
+          // Render additional papers BELOW the summary error message
+          this.renderAdditionalPapers(data.papers);
+
           // Add retry functionality
           const retryBtn = errorDiv.querySelector("button");
           if (retryBtn) {
@@ -840,6 +909,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   );
                   summaryDiv.innerHTML = this.markdownToHtml(summary);
                   summaryDiv.style.opacity = "1";
+
+                  // Render additional papers BELOW the retried summary
+                  this.renderAdditionalPapers(data.papers);
                 } else {
                   throw new Error("Retry failed");
                 }
@@ -1290,8 +1362,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function performSearch() {
-    if (domManager) domManager.handleSearch();
+    console.log("performSearch called");
+    if (domManager) {
+      console.log("domManager exists, calling handleSearch");
+      domManager.handleSearch();
+    } else {
+      console.error("domManager not initialized yet");
+      alert("Application still loading. Please try again in a moment.");
+    }
   }
+
+  window.toggleProfileDropdown = toggleProfileDropdown;
+  window.logout = logout;
+  window.resetFilters = resetFilters;
+  window.performSearch = performSearch;
 
   function openBinder(id) {
     if (domManager) domManager.openBinder(id);
@@ -1313,6 +1397,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (domManager) domManager.editBinderColor(binderId);
   }
 
+  window.openBinder = openBinder;
+  window.closeModal = closeModal;
+  window.saveBinderName = saveBinderName;
+  window.editBinderColor = editBinderColor;
+
   // ==================== INITIALIZATION ====================
   function init() {
     appState = new AppState();
@@ -1325,7 +1414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     domManager.renderBinders();
     domManager.updateYearLabel();
 
-    console.log("🧠 BRAIN AI Research Assistant initialized");
+    console.log("BRAIN AI Research Assistant initialized");
   }
 
   function migrateExistingBinders() {
