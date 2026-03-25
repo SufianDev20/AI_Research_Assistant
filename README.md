@@ -373,7 +373,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenAlex community for maintaining comprehensive academic research database
 - OpenRouter for providing free LLM models for research applications
 - Django community for excellent documentation and framework
-
-```
-
-```
