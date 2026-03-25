@@ -16,7 +16,7 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
 - **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
-- **Real-time Analytics**: Admin dashboard for monitoring model performance and system health
+- **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
 
 ## Performance Tracking System
 
@@ -40,6 +40,18 @@ The application includes a comprehensive performance tracking system for OpenRou
 - **Reliability Score**: Weighted score combining multiple factors including **format compliance (30% weight)**
 - **Format Compliance Score**: Percentage of responses that include all required fields
 - **Error Analysis**: Common failure patterns and error messages
+
+### Performance Dashboard
+
+A dedicated admin interface for real-time monitoring of AI model performance:
+
+- **Web Interface**: Accessible at `/admin/performance-dashboard/`
+- **Live Statistics**: Total models, active models, tier categories, and recent activities
+- **Top Performing Models**: Real-time ranking with reliability scores and response times
+- **Recent Activity Log**: Success/failure tracking with timestamps
+- **Tier Distribution**: Visual representation of model performance tiers
+- **Auto-refresh**: Data automatically refreshes every 30 seconds
+- **Modern UI**: Responsive design with dark theme and intuitive navigation
 
 ### Format Compliance System
 
@@ -87,6 +99,10 @@ Based on actual format compliance testing:
 ### Research Response View
 
 ![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/ResponsePage.png)
+
+### Performance Dashboard
+
+![Performance Dashboard](Research_Assistant/Research_AI_Assistant/templates/images/Performance_Dashboard.png)
 
 ## Technology Stack
 
@@ -140,7 +156,10 @@ AIResearchAssistant/
         │   │   ├── Interface.png
         │   │   ├── Filter 1.png
         │   │   ├── Filter 2.png
-        │   │   └── Response Page.png
+        │   │   ├── Response Page.png
+        │   │   └── Performance_Dashboard.png
+        │   └── admin/                   # Admin templates
+        │       └── performance_dashboard.html  # Performance monitoring dashboard
         │   └── static/                  # Static assets
         │       ├── styles.css          # Main stylesheet
         │       └── scripts.js           # Frontend JavaScript
@@ -278,6 +297,7 @@ python test_performance.py
 ### Admin Dashboard Testing
 
 - Visit `http://127.0.0.1:8080/admin/`
+- **Performance Dashboard**: Access `/admin/performance-dashboard/` for real-time monitoring
 - Monitor model performance in "Model Performance" section
 - View response logs and error patterns
 - Configure model tiers and circuit breaker settings
@@ -354,4 +374,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenRouter for providing free LLM models for research applications
 - Django community for excellent documentation and framework
 
----
+```
+
+```

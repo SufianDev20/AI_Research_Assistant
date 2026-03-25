@@ -21,5 +21,5 @@ urlpatterns = [
     path("api/performance/stats/", views_performance.model_performance_stats, name="performance_stats"),
     path("api/performance/model/", views_performance.model_details, name="model_details"),
     path("api/performance/compare/", views_performance.model_comparison, name="model_comparison"),
-    path("admin/performance/", views_performance.performance_dashboard, name="performance_dashboard"),
+    path("performance/", views_performance.performance_dashboard, name="performance_dashboard"),
 ]
