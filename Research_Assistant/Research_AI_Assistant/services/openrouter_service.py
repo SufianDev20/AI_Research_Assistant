@@ -27,6 +27,7 @@ DEFAULT_MODEL = "arcee-ai/trinity-large-preview:free"
 
 # List of all available free models for fallback
 FREE_MODELS = [
+    "arcee-ai/trinity-mini:free",
     "arcee-ai/trinity-large-preview:free",
     "google/gemma-3-4b-it:free",
     "nvidia/nemotron-nano-9b-v2:free",
@@ -113,7 +114,9 @@ class OpenRouterService:
             https://openrouter.ai/docs/api/reference/overview#completions-request-format
         """
         # Get intelligent model order based on performance
-        models_to_try = PerformanceTracker.get_intelligent_model_order(FREE_MODELS.copy())
+        models_to_try = PerformanceTracker.get_intelligent_model_order(
+            FREE_MODELS.copy()
+        )
 
         # Move the default model to the front if it's not already
         if self.model in models_to_try:
@@ -127,7 +130,7 @@ class OpenRouterService:
             request_id, query_hash = PerformanceTracker.log_request_start(
                 model_name, request_type, user_message
             )
-            
+
             try:
                 logger.info(
                     f"Trying model {attempt}/{len(models_to_try)}: {model_name}"
@@ -165,11 +168,16 @@ class OpenRouterService:
                     error_msg = f"OpenRouter returned no choices. Full response: {data}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-                    
+
                     # Log failure
                     response_time = time.time() - request_start_time
                     PerformanceTracker.log_request_failure(
-                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                        model_name,
+                        request_id,
+                        request_type,
+                        response_time,
+                        error_msg,
+                        query_hash,
                     )
                     continue
 
@@ -179,11 +187,16 @@ class OpenRouterService:
                     error_msg = f"OpenRouter model error: {choice['error']}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-                    
+
                     # Log failure
                     response_time = time.time() - request_start_time
                     PerformanceTracker.log_request_failure(
-                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                        model_name,
+                        request_id,
+                        request_type,
+                        response_time,
+                        error_msg,
+                        query_hash,
                     )
                     continue
 
@@ -192,18 +205,28 @@ class OpenRouterService:
                     error_msg = "OpenRouter response missing message.content."
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-                    
+
                     # Log failure
                     response_time = time.time() - request_start_time
                     PerformanceTracker.log_request_failure(
-                        model_name, request_id, request_type, response_time, error_msg, query_hash
+                        model_name,
+                        request_id,
+                        request_type,
+                        response_time,
+                        error_msg,
+                        query_hash,
                     )
                     continue
 
                 # Log success
                 response_time = time.time() - request_start_time
                 PerformanceTracker.log_request_success(
-                    model_name, request_id, request_type, response_time, content, query_hash
+                    model_name,
+                    request_id,
+                    request_type,
+                    response_time,
+                    content,
+                    query_hash,
                 )
 
                 logger.info(
@@ -221,11 +244,16 @@ class OpenRouterService:
                 error_msg = f"Model {model_name} failed: {str(exc)}"
                 logger.warning(error_msg)
                 last_error = OpenRouterAPIError(error_msg)
-                
+
                 # Log failure
                 response_time = time.time() - request_start_time
                 PerformanceTracker.log_request_failure(
-                    model_name, request_id, request_type, response_time, error_msg, query_hash
+                    model_name,
+                    request_id,
+                    request_type,
+                    response_time,
+                    error_msg,
+                    query_hash,
                 )
                 continue
 

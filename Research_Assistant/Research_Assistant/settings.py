@@ -129,3 +129,5 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     BASE_DIR / "Research_AI_Assistant" / "templates" / "static",
 ]
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+

@@ -77,7 +77,7 @@ if __name__ == "__main__":
             print("\nTop 3 most cited papers:")
             for i, paper in enumerate(data.get("papers", [])[:3], 1):
                 print(f"  {i}. {paper.get('title')}")
-                print(f"     Citations: {paper.get('cited_by_count')}")
+                print(f" Citations: {paper.get('cited_by_count')}")
             print("\n")
     except Exception as e:
         print(f"Error: {e}\n")

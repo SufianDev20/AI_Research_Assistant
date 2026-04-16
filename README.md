@@ -96,9 +96,29 @@ Based on actual format compliance testing:
 
 ![Year Filter 2](Research_Assistant/Research_AI_Assistant/templates/images/Filter2.png)
 
+### Filter Number of Papers Selection
+
+![Number of Papers](Research_Assistant/Research_AI_Assistant/templates/images/Filter3.png)
+
 ### Research Response View
 
 ![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/ResponsePage.png)
+
+### Response Page Filter By Relevance for References
+
+![Filter By Relevance](Research_Assistant/Research_AI_Assistant/templates/images/FilterByRelevance.png)
+
+### Response Page Filter by Most Cited
+
+![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/FilterMostCited.png)
+
+### Binder saving of the response page
+
+![Binder Saving](Research_Assistant/Research_AI_Assistant/templates/images/BinderSaved.png)
+
+### Binder delete of the response page
+
+![Binder Delete](Research_Assistant/Research_AI_Assistant/templates/images/BinderDelete.png)
 
 ### Performance Dashboard
 
@@ -154,9 +174,14 @@ AIResearchAssistant/
         │   ├── index.html               # Main frontend template
         │   ├── images/                  # Interface screenshots
         │   │   ├── Interface.png
-        │   │   ├── Filter 1.png
-        │   │   ├── Filter 2.png
-        │   │   ├── Response Page.png
+        │   │   ├── Filter3.png
+        │   │   ├── FilterByRelevance.png
+        │   │   ├── FilterMostCited.png
+        │   │   ├── BinderSaved.png
+        │   │   ├── BinderDelete.png
+        │   │   ├── Filter1.png
+        │   │   ├── Filter2.png
+        │   │   ├── ResponsePage.png
         │   │   └── Performance_Dashboard.png
         │   └── admin/                   # Admin templates
         │       └── performance_dashboard.html  # Performance monitoring dashboard
@@ -211,7 +236,7 @@ AIResearchAssistant/
    OPENALEX_EMAIL=your_email@example.com
    OPENALEX_API_KEY=<"Your API key">
    OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxx
-   OPENROUTER_SITE_URL=http://127.0.0.1:8080
+   OPENROUTER_SITE_URL=http://127.0.0.1:{your_chosen_port_number}
    OPENROUTER_SITE_NAME=Research AI Assistant
    DEBUG=True
    ALLOWED_HOSTS=localhost,127.0.0.1
@@ -238,13 +263,13 @@ AIResearchAssistant/
 8. **Start development server**:
 
    ```bash
-   python manage.py runserver 8080
+   python manage.py runserver {your_chosen_port_number}
    ```
 
 9. **Access the application**:
-   - **Frontend**: `http://127.0.0.1:8080`
-   - **Admin Dashboard**: `http://127.0.0.1:8080/admin/`
-   - **API Documentation**: `http://127.0.0.1:8080/api/`
+   - **Frontend**: `http://127.0.0.1:{your_chosen_port_number}`
+   - **Admin Dashboard**: `http://127.0.0.1:{your_chosen_port_number}/admin/`
+   - **API Documentation**: `http://127.0.0.1:{your_chosen_port_number}/api/`
 
 ## Getting API Keys
 
@@ -271,8 +296,8 @@ AIResearchAssistant/
 python manage.py test Research_AI_Assistant.tests
 
 # Test API endpoints
-curl "http://127.0.0.1:8080/api/"
-curl "http://127.0.0.1:8080/api/search/?q=machine+learning&per_page=5"
+curl "http://127.0.0.1:{your_chosen_port_number}/api/"
+curl "http://127.0.0.1:{your_chosen_port_number}/api/search/?q=machine+learning&per_page=5"
 ```
 
 ### Performance Testing
@@ -296,7 +321,7 @@ python test_performance.py
 
 ### Admin Dashboard Testing
 
-- Visit `http://127.0.0.1:8080/admin/`
+- Visit `http://127.0.0.1:{your_chosen_port_number}/admin/`
 - **Performance Dashboard**: Access `/admin/performance-dashboard/` for real-time monitoring
 - Monitor model performance in "Model Performance" section
 - View response logs and error patterns
@@ -373,7 +398,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenAlex community for maintaining comprehensive academic research database
 - OpenRouter for providing free LLM models for research applications
 - Django community for excellent documentation and framework
-
-```
-
-```

@@ -174,7 +174,9 @@ class TestOpenAlexViews(TestCase):
     def test_authors_search_success(self, mock_search_authors):
         mock_search_authors.return_value = [{"id": "A1"}]
 
-        resp = self.client.get(reverse("research_ai_assistant:openalex_authors_search"), {"q": "foo"})
+        resp = self.client.get(
+            reverse("research_ai_assistant:openalex_authors_search"), {"q": "foo"}
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["results"], [{"id": "A1"}])
         mock_search_authors.assert_called_once_with(query="foo", per_page=10, page=1)

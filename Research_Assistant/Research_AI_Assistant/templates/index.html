@@ -86,28 +86,31 @@
             <div class="filters-section">
               <div class="filters-container">
                 <div class="year-range">
-                  <label class="filter-label">YEAR FILTER</label>
-                  <div class="year-slider-single">
-                    <div class="slider-labels">
-                      <span>1990</span>
-                      <span>2026</span>
+                  <label class="filter-label">YEARS</label>
+                  <div class="dual-slider-wrapper">
+                    <div class="slider-display-labels">
+                      <span id="minYearDisplay">1900</span>
+                      <span id="maxYearDisplay">2026</span>
                     </div>
-                    <div class="slider-container">
+                    <div class="dual-slider-track">
+                      <div class="slider-track-base"></div>
+                      <div class="slider-fill" id="sliderFill"></div>
                       <input
                         type="range"
-                        id="yearFilter"
-                        min="1990"
+                        id="yearMin"
+                        min="1900"
+                        max="2026"
+                        value="1900"
+                        class="year-slider thumb-min"
+                      />
+                      <input
+                        type="range"
+                        id="yearMax"
+                        min="1900"
                         max="2026"
                         value="2026"
-                        oninput="updateYearLabel()"
-                        class="year-slider"
+                        class="year-slider thumb-max"
                       />
-
-                      <div id="sliderTooltip" class="slider-tooltip">2026</div>
-                    </div>
-                    <div class="slider-description">
-                      Show papers published up to
-                      <span id="yearValue">2026</span>
                     </div>
                   </div>
                 </div>
@@ -134,20 +137,7 @@
                 </div>
 
                 <div>
-                  <button
-                    onclick="
-                      document.getElementById('yearFilter').value = '2026';
-                      document.getElementById('searchBy').value = 'best_match';
-                      document.getElementById('quota').value = '5';
-                      document
-                        .getElementById('yearFilter')
-                        .dispatchEvent(new Event('input', { bubbles: true }));
-                      document.getElementById('yearValue').textContent = '2026';
-                      document.getElementById('sliderTooltip').textContent =
-                        '2026';
-                    "
-                    class="reset-button"
-                  >
+                  <button onclick="resetFilters()" class="reset-button">
                     RESET
                   </button>
                 </div>
@@ -211,10 +201,6 @@
           </div>
           <div class="modal-footer-text">BRAIN AI Research Assistant</div>
         </div>
-        <div id="sourcesPanel" class="sources-panel">
-          <h3 class="sources-title">Sources from OpenAlex</h3>
-          <div id="sourcesList" class="sources-list"></div>
-        </div>
       </div>
     </div>
 
@@ -242,19 +228,37 @@
 
       <!-- Chat/Response Area -->
       <div class="research-chat-area">
-        <div id="researchChatContainer" class="research-chat-container"></div>
+        <div class="research-main-content">
+          <div id="researchChatContainer" class="research-chat-container"></div>
 
-        <!-- Load More Button Container -->
-        <div
-          id="loadMoreContainer"
-          class="load-more-container"
-          style="display: none"
-        >
-          <button id="loadMoreBtn" class="load-more-btn">
-            <i class="fa-solid fa-plus-circle"></i>
-            <span>Load More Papers</span>
-          </button>
-          <div id="loadMoreStatus" class="load-more-status"></div>
+          <!-- Load More Button Container -->
+          <div
+            id="loadMoreContainer"
+            class="load-more-container"
+            style="display: none"
+          >
+            <button id="loadMoreBtn" class="load-more-btn">
+              <i class="fa-solid fa-plus-circle"></i>
+              <span>Load More Papers</span>
+            </button>
+            <div id="loadMoreStatus" class="load-more-status"></div>
+          </div>
+        </div>
+
+        <!-- Right Side References Panel -->
+        <div id="referencesPanel" class="references-panel">
+          <div class="references-header">
+            <h3 class="references-title">References</h3>
+            <div class="references-filters">
+              <button class="filter-btn active" data-filter="relevance">
+                Relevance
+              </button>
+              <button class="filter-btn" data-filter="cited_by_count">
+                Most Cited
+              </button>
+            </div>
+          </div>
+          <div id="referencesList" class="references-list"></div>
         </div>
       </div>
 
@@ -275,6 +279,6 @@
       </div>
     </div>
 
-    <script src="{% static 'scripts.js' %}?v=20260324-6"></script>
+    <script src="{% static 'scripts.js' %}?v=2026045-1"></script>
   </body>
 </html>
