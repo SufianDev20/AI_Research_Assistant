@@ -5,7 +5,6 @@ Sends structured paper metadata to a free OpenRouter model and returns a Harvard
 References:
 1)OpenRouter QuickStart: https://openrouter.ai/docs/quickstart
 2)OpenRouter API overview:https://openrouter.ai/docs/api/reference/overview
-
 """
 
 import logging
@@ -23,7 +22,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Default free model.
 # Browse free models at https://openrouter.ai/models?max_price=0
-DEFAULT_MODEL = "arcee-ai/trinity-large-preview:free"
+DEFAULT_MODEL = "arcee-ai/trinity-mini:free"
 
 # List of all available free models for fallback
 FREE_MODELS = [
