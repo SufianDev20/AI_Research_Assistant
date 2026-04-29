@@ -1,3 +1,4 @@
+# This is Abd-Allah's copy to edit later
 # AI Research Assistant
 
 A comprehensive Django-based web application that serves as an AI-powered research assistant for academic papers. The application integrates with the OpenAlex API to search, retrieve, and process academic paper metadata, and uses OpenRouter's free LLM models to generate individual paper summaries with proper academic citations.
