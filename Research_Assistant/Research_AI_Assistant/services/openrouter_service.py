@@ -26,11 +26,11 @@ DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 # List of all available free models for fallback
 FREE_MODELS = [
-    "arcee-ai/trinity-mini:free",
-    "arcee-ai/trinity-large-preview:free",
+    "qwen/qwen3-coder:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
     "google/gemma-3-4b-it:free",
     "nvidia/nemotron-nano-9b-v2:free",
-    "stepfun/step-3.5-flash:free",
+    "poolside/laguna-m.1:free",
     "z-ai/glm-4.5-air:free",
     "nvidia/nemotron-3-nano-30b-a3b:free",
     "qwen/qwen3-next-80b-a3b-instruct:free",

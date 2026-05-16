@@ -6,11 +6,14 @@ Run: python manage.py initialize_models
 from django.core.management.base import BaseCommand
 from django.db.models import Avg, Count, Q
 from Research_AI_Assistant.models import ModelReliability, ModelPerformance
-from Research_AI_Assistant.services.openrouter_service import FREE_MODELS, DEFAULT_MODEL
+from Research_AI_Assistant.services.openrouter_service import FREE_MODELS
 
 
 class Command(BaseCommand):
     help = "Initialize OpenRouter model reliability configuration based on actual performance data"
+
+    MIN_REQUESTS_FOR_PRIMARY = 10
+    MIN_REQUESTS_FOR_SECONDARY = 5
 
     def handle(self, *args, **options):
         self.stdout.write("Initializing OpenRouter model reliability configuration...")
@@ -76,34 +79,30 @@ class Command(BaseCommand):
                     }
                 else:
                     # No data yet - use default values
-                    metrics[model_name] = {
-                        "total_requests": 0,
-                        "success_rate": 0.0,
-                        "reliability_score": 0.0,
-                        "format_compliance_score": 0.0,
-                        "format_compliance_count": 0,
-                        "format_compliance_passed": 0,
-                        "avg_response_time": 0.0,
-                        "consecutive_failures": 0,
-                        "is_active": True,
-                    }
+                    metrics[model_name] = self._default_metrics()
             except Exception as e:
                 self.stdout.write(
                     self.style.WARNING(f"Error getting metrics for {model_name}: {e}")
                 )
-                metrics[model_name] = {
-                    "total_requests": 0,
-                    "success_rate": 0.0,
-                    "reliability_score": 0.0,
-                    "format_compliance_score": 0.0,
-                    "format_compliance_count": 0,
-                    "format_compliance_passed": 0,
-                    "avg_response_time": 0.0,
-                    "consecutive_failures": 0,
-                    "is_active": True,
-                }
+                metrics[model_name] = self._default_metrics()
 
         return metrics
+
+    def _default_metrics(self):
+        """
+        Return the default metrics for a model with no data
+        """
+        return {
+            "total_requests": 0,
+            "success_rate": 0.0,
+            "reliability_score": 0.0,
+            "format_compliance_score": 0.0,
+            "format_compliance_count": 0,
+            "format_compliance_passed": 0,
+            "avg_response_time": 0.0,
+            "consecutive_failures": 0,
+            "is_active": True,
+        }
 
     def generate_data_driven_config(self, performance_data):
         """Generate model configuration based on actual performance data."""
@@ -130,14 +129,25 @@ class Command(BaseCommand):
 
         for i, (model_name, metrics) in enumerate(sorted_models):
             # Determine tier based on performance
+            has_enough_data_for_primary = (
+                metrics["total_requests"] >= self.MIN_REQUESTS_FOR_PRIMARY
+            )
+            has_enough_data_for_secondary = (
+                metrics["total_requests"] >= self.MIN_REQUESTS_FOR_SECONDARY
+            )
             if i < primary_count and metrics["reliability_score"] >= 0.7:
                 tier = "primary"
                 priority = i + 1
                 max_retries = 3
                 circuit_breaker_threshold = 5
-            elif i < secondary_count and metrics["reliability_score"] >= 0.4:
+            elif (
+                not metrics["has_data"]
+                or metrics["total_requests"] < self.MIN_REQUESTS_FOR_SECONDARY
+            ):
+                # Not enough data — place in secondary, not emergency.
+                # Emergency is reserved for models with proven poor performance,not for models we have not tested yet.
                 tier = "secondary"
-                priority = i + 10
+                priority = i + 30
                 max_retries = 2
                 circuit_breaker_threshold = 7
             else:
@@ -190,6 +200,9 @@ class Command(BaseCommand):
             avg_reliability = sum(m["reliability_score"] for m in active_models) / len(
                 active_models
             )
+            models_with_format = [
+                m for m in active_models if m["format_compliance_count"] > 0
+            ]
             avg_format_compliance = (
                 sum(
                     m["format_compliance_score"]
@@ -200,6 +213,7 @@ class Command(BaseCommand):
                 if any(m["format_compliance_count"] > 0 for m in active_models)
                 else 0
             )
+            models_with_time = [m for m in active_models if m["avg_response_time"] > 0]
             avg_response_time = (
                 sum(
                     m["avg_response_time"]

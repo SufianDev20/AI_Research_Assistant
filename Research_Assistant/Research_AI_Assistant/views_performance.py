@@ -7,16 +7,21 @@ import logging
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-from django_ratelimit.decorators import ratelimit
+from rest_framework.decorators import api_view,throttle_classes
+from rest_framework import status
+from rest_framework.throttling import AnonRateThrottle
+from rest_framework.response import Response
 
 from .models import ModelPerformance, ResponseLog, ModelReliability
 from .services.performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
 
+class modelPerformanceRateThrottle(AnonRateThrottle):
+    rate="60/m"
 
 @require_GET
-@ratelimit(key="ip", rate="60/m")
+@throttle_classes([modelPerformanceRateThrottle])
 def model_performance_stats(request):
     """
     Get comprehensive model performance statistics.
@@ -66,11 +71,11 @@ def model_performance_stats(request):
         
     except Exception as exc:
         logger.error(f"Error in model_performance_stats: {exc}")
-        return JsonResponse({"error": "Failed to retrieve performance stats"}, status=500)
+        return JsonResponse({"error": "Failed to retrieve performance stats"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@require_GET
-@ratelimit(key="ip", rate="60/m")
+@api_view(['GET'])
+@throttle_classes([modelPerformanceRateThrottle])
 def model_details(request):
     """
     Get detailed information for a specific model.
@@ -89,7 +94,7 @@ def model_details(request):
     model_name = request.GET.get("model_name", "").strip()
     
     if not model_name:
-        return JsonResponse({"error": "model_name parameter is required"}, status=400)
+        return JsonResponse({"error": "model_name parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         # Get model performance data
@@ -161,11 +166,11 @@ def model_details(request):
         
     except Exception as exc:
         logger.error(f"Error in model_details for {model_name}: {exc}")
-        return JsonResponse({"error": "Failed to retrieve model details"}, status=500)
+        return JsonResponse({"error": "Failed to retrieve model details"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@require_GET
-@ratelimit(key="ip", rate="60/m")
+@api_view(['GET'])
+@throttle_classes([modelPerformanceRateThrottle])
 def model_comparison(request):
     """
     Compare performance between multiple models.
@@ -181,12 +186,12 @@ def model_comparison(request):
     models_param = request.GET.get("models", "").strip()
     
     if not models_param:
-        return JsonResponse({"error": "models parameter is required"}, status=400)
+        return JsonResponse({"error": "models parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     model_names = [name.strip() for name in models_param.split(",") if name.strip()]
     
     if len(model_names) < 2:
-        return JsonResponse({"error": "At least 2 models required for comparison"}, status=400)
+        return JsonResponse({"error": "At least 2 models required for comparison"}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         models_data = []
@@ -228,11 +233,11 @@ def model_comparison(request):
         
     except Exception as exc:
         logger.error(f"Error in model_comparison: {exc}")
-        return JsonResponse({"error": "Failed to compare models"}, status=500)
+        return JsonResponse({"error": "Failed to compare models"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@require_GET
-@ratelimit(key="ip", rate="60/m")
+@api_view(['GET'])
+@throttle_classes([modelPerformanceRateThrottle])
 def performance_dashboard(request):
     """
     Render performance monitoring dashboard.
@@ -267,7 +272,7 @@ def performance_dashboard(request):
         
     except Exception as exc:
         logger.error(f"Error in performance_dashboard: {exc}")
-        return JsonResponse({"error": "Failed to load dashboard"}, status=500)
+        return JsonResponse({"error": "Failed to load dashboard"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _get_common_errors(model_name: str, limit: int = 5) -> list:

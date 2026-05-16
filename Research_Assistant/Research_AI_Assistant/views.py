@@ -10,7 +10,10 @@ import re
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
-from django_ratelimit.decorators import ratelimit
+from rest_framework.decorators import api_view,throttle_classes
+from rest_framework.throttling import AnonRateThrottle
+from rest_framework.response import Response
+from rest_framework import status
 
 from .models import QueryLog
 from .services.openalex_service import OpenAlexAPIError, OpenAlexService
@@ -22,8 +25,15 @@ logger = logging.getLogger(__name__)
 
 openalex_service = OpenAlexService()
 
+class SearchRateThrottle(AnonRateThrottle):
+    """Rate throttle for search requests for Annonymous users"""
+    rate="100/s"
 
-@require_GET
+class GenerateTitle(AnonRateThrottle):
+    """Rate throttle for title generation requests for Annonymous users"""
+    rate="20/m"
+
+@api_view(['GET'])
 def api_root(request):
     """
     Root endpoint providing API information.
@@ -43,8 +53,8 @@ def api_root(request):
     )
 
 
-@require_GET
-@ratelimit(key="ip", rate="100/s")  # OpenAlex: Max 100 requests per second
+@api_view(['GET'])
+@throttle_classes([SearchRateThrottle])
 def search(request):
     """
     Search academic papers via OpenAlex with ranking modes and pagination.
@@ -89,7 +99,7 @@ def search(request):
 
     # Validate query
     if not query:
-        return JsonResponse({"error": "Query parameter 'q' is required."}, status=400)
+        return JsonResponse({"error": "Query parameter 'q' is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Validate mode
     valid_modes = {"relevance", "open_access", "best_match"}
@@ -98,7 +108,7 @@ def search(request):
             {
                 "error": f"Invalid mode '{mode}'. Must be one of: {', '.join(sorted(valid_modes))}"
             },
-            status=400,
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
     # Validate per_page
@@ -115,7 +125,7 @@ def search(request):
 
     # Validate load_more: if true, cursor is required
     if load_more and not cursor:
-        return JsonResponse({"error": "cursor parameter is required when load_more=true"}, status=400)
+        return JsonResponse({"error": "cursor parameter is required when load_more=true"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Validate and parse year parameters
     min_year = None
@@ -125,20 +135,20 @@ def search(request):
         try:
             min_year = int(min_year_raw)
             if min_year < 1900 or min_year > 2026:
-                return JsonResponse({"error": "min_year must be between 1900 and 2026"}, status=400)
+                return JsonResponse({"error": "min_year must be between 1900 and 2026"}, status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError):
-            return JsonResponse({"error": "min_year must be a valid integer"}, status=400)
+            return JsonResponse({"error": "min_year must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     
     if max_year_raw is not None:
         try:
             max_year = int(max_year_raw)
             if max_year < 1900 or max_year > 2026:
-                return JsonResponse({"error": "max_year must be between 1900 and 2026"}, status=400)
+                return JsonResponse({"error": "max_year must be between 1900 and 2026"}, status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError):
-            return JsonResponse({"error": "max_year must be a valid integer"}, status=400)
+            return JsonResponse({"error": "max_year must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     
     if min_year is not None and max_year is not None and min_year > max_year:
-        return JsonResponse({"error": "min_year cannot be greater than max_year"}, status=400)
+        return JsonResponse({"error": "min_year cannot be greater than max_year"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Parse random_seed parameter
     random_seed = None
@@ -174,10 +184,10 @@ def search(request):
         next_cursor = meta.get('next_cursor')
         
     except ValueError as exc:
-        return JsonResponse({"error": str(exc)}, status=400)
+        return JsonResponse({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except OpenAlexAPIError as exc:
         logger.error("OpenAlex error: %s", exc)
-        return JsonResponse({"error": str(exc)}, status=502)
+        return JsonResponse({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
     # Extract structured metadata from raw works
     papers = [ExtractionService.extract_metadata(work) for work in raw_results]
@@ -212,7 +222,7 @@ def search(request):
 
 
 @require_POST
-@ratelimit(key="ip", rate="20/m")
+@throttle_classes([GenerateTitle])
 def generate_title(request):
     """
     Generate a title for a research conversation using OpenRouter LLM.
@@ -267,10 +277,10 @@ def generate_title(request):
 
     except OpenRouterAPIError as exc:
         logger.error("OpenRouter title generation error: %s", exc)
-        return JsonResponse({"error": "Service temporarily unavailable"}, status=503)
+        return JsonResponse({"error": "Service temporarily unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     except Exception as exc:
         logger.error("Unexpected error in generate_title: %s", exc, exc_info=True)
-        return JsonResponse({"error": "Internal server error"}, status=500)
+        return JsonResponse({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def frontend(request):
@@ -281,7 +291,7 @@ def frontend(request):
 
 
 @require_POST
-@ratelimit(key="ip", rate="20/m")
+@throttle_classes([GenerateTitle])
 def summarise(request):
     """
     Generate a summary of research papers using OpenRouter LLM.
@@ -336,18 +346,18 @@ def summarise(request):
             "error": "Service temporarily unavailable", 
             "error_code": "OPENROUTER_API_ERROR",
             "message": "Summary service temporarily unavailable - please try again later"
-        }, status=503)
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     except Exception as exc:
         logger.error("Unexpected error in summarise: %s", exc, exc_info=True)
         return JsonResponse({
             "error": "Internal server error",
             "error_code": "INTERNAL_ERROR", 
             "message": "An unexpected error occurred"
-        }, status=500)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @require_GET
-@ratelimit(key="ip", rate="100/s")  # OpenAlex: Max 100 requests per second
+@throttle_classes([SearchRateThrottle])
 def search_authors(request):
     """
     Search authors via OpenAlex API.
@@ -420,4 +430,4 @@ def search_authors(request):
         )
     except OpenAlexAPIError as exc:
         logger.error("OpenAlex author search error: %s", exc)
-        return JsonResponse({"error": str(exc)}, status=502)
+        return JsonResponse({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)

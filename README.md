@@ -128,12 +128,11 @@ Based on actual format compliance testing:
 
 ### Backend
 
-- **Framework**: Django 6.0+
+- **Framework**: Django 6.0+, Django REST Framework
 - **API Client**: pyalex (OpenAlex Python client)
 - **LLM Provider**: OpenRouter (free models with intelligent fallback)
 - **Database**: SQLite (development), PostgreSQL (production ready)
 - **Environment Management**: django-environ
-- **Rate Limiting**: django-ratelimit
 - **Performance Monitoring**: Custom performance tracking system with reliability scoring
 - **Model Management**: Circuit breaker pattern and intelligent model selection
 
@@ -166,8 +165,10 @@ AIResearchAssistant/
     │   ├── settings.py                 # Django settings
     │   └── urls.py                     # Root URL configuration
     └── Research_AI_Assistant/          # Main Django app
-        ├── models.py                    # Database models
+        ├── models.py                    # Database Model
+        ├── serializers.py               # Django Serializer
         ├── views.py                     # API views and endpoints
+        ├── views_performance.py         # Monitoring Performance of OpenRouter
         ├── urls.py                      # App URL configuration
         ├── tests.py                     # Unit tests
         ├── templates/                   # HTML templates
@@ -383,9 +384,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Frameworks & Libraries
 
 - [Django](https://www.djangoproject.com/) (BSD 3-Clause) - Web framework
+- [Django REST Framework](https://www.django-rest-framework.org/) (Encode OSS Ltd)- Web Framework
 - [pyalex](https://github.com/J535D165/pyalex) (MIT) - OpenAlex Python client
 - [django-environ](https://github.com/joke2k/django-environ) (MIT) - Environment variable management
-- [django-ratelimit](https://github.com/jsocol/django-ratelimit) (BSD 3-Clause) - Rate limiting
 - [requests](https://requests.readthedocs.io/) (Apache 2.0) - HTTP client library
 
 ### Frontend Assets
@@ -398,3 +399,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenAlex community for maintaining comprehensive academic research database
 - OpenRouter for providing free LLM models for research applications
 - Django community for excellent documentation and framework
+- Django REST Framework for API handling with better efficient way
