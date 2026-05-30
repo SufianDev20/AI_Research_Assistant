@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", function () {
       this.totalCount = null;
       this.searchParams = null;
       this.currentFilter = "relevance";
+      this.lastLLMCall=0;
     }
   }
 
@@ -303,7 +304,7 @@ document.addEventListener("DOMContentLoaded", function () {
           !e.target.closest("#profileDropdown") &&
           !e.target.closest('button[onclick="toggleProfileDropdown()"]')
         ) {
-          elements.profileDropdown.classList.add("hidden");
+          elements.profileDropdown.classList.remove("show");
         }
       });
     }
@@ -1482,18 +1483,21 @@ document.addEventListener("DOMContentLoaded", function () {
       // Handle References section with proper formatting
       let processedText = text;
 
-      return processedText
-        .replace(/```(?:\s*\w+)?\s*\n([\s\S]*?)\n```/g, (match, p1) => {
-          const code = this.escapeHtml(p1.trim());
-          return `<pre class="code-block"><code>${code}</code></pre>`;
-        })
-        .replace(/\*\*([^\r\n*]+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/__([^\r\n_]+?)__/g, "<strong>$1</strong>")
-        .replace(/\*([^\r\n*]+?)\*/g, "<em>$1</em>")
-        .replace(/_([^\r\n_]+?)_/g, "<em>$1</em>")
-        .replace(/`([^`\r\n]+)`/g, "<code>$1</code>")
-        .replace(/^\s*[-*+]\s+/gm, "• ")
-        .replace(/\n/g, "<br>");
+     return processedText
+  .replace(/```(?:\s*\w+)?\s*\n([\s\S]*?)\n```/g, (match, p1) => {
+    const code = this.escapeHtml(p1.trim());
+    return `<pre class="code-block"><code>${code}</code></pre>`;
+  })
+  .replace(/^### (.+)$/gm, "<h4>$1</h4>")
+  .replace(/^## (.+)$/gm, "<h3>$1</h3>")
+  .replace(/^# (.+)$/gm, "<h2>$1</h2>")
+  .replace(/\*\*([^\r\n*]+?)\*\*/g, "<strong>$1</strong>")
+  .replace(/__([^\r\n_]+?)__/g, "<strong>$1</strong>")
+  .replace(/\*([^\r\n*]+?)\*/g, "<em>$1</em>")
+  .replace(/_([^\r\n_]+?)_/g, "<em>$1</em>")
+  .replace(/`([^`\r\n]+)`/g, "<code>$1</code>")
+  .replace(/^\s*[-*+]\s+/gm, "• ")
+  .replace(/\n/g, "<br>");F
     }
 
     escapeHtml(unsafe) {
@@ -1713,14 +1717,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
           const lastUserQuery =
             binder.messages[binder.messages.length - 1].content;
-          const papers = await domManager.retrieveFromBackend(
+          const data = await domManager.retrieveFromBackend(
             lastUserQuery,
             null, // minYear - not needed for single filter
             maxYear,
             sortPref,
             maxPapers,
           );
-
+          const papers=data.papers || [];
           binder.papers = papers;
 
           if (papers.length > 0) {
@@ -1744,8 +1748,8 @@ document.addEventListener("DOMContentLoaded", function () {
             throw new Error(err.error || `Summarise error ${response.status}`);
           }
 
-          const data = await response.json();
-          const summary = data.summary || "No summary returned.";
+          const responseData = await response.json();
+          const summary = responseData.summary || "No summary returned.";
 
           assistantDiv.innerHTML = domManager.markdownToHtml(summary);
           binder.messages.push({ role: "assistant", content: summary });
@@ -1773,7 +1777,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function toggleProfileDropdown() {
     const dropdown = document.getElementById("profileDropdown");
     if (dropdown) {
-      dropdown.classList.toggle("hidden");
+      dropdown.classList.toggle("show");
     }
   }
 
@@ -1843,24 +1847,11 @@ document.addEventListener("DOMContentLoaded", function () {
   window.logout = logout;
   window.resetFilters = resetFilters;
   window.performSearch = performSearch;
-
-  function openBinder(id) {
-    if (domManager) domManager.openBinder(id);
-  }
-
-  function closeModal() {
-    if (domManager && domManager.elements.modalOverlay) {
-      domManager.elements.modalOverlay.classList.add("hidden");
-      domManager.elements.modalOverlay.classList.remove("flex");
-      appState.currentOpenBinderId = null;
-    }
-  }
-
   // ==================== GLOBAL VARIABLES ====================
   let appState;
   let domManager;
 
-  // ==================== GLOBAL FUNCTIONS ====================
+  // ==================== GLOBAL FUNCTIONS (for backwards compatibility) ====================
   function deleteBinder(binderId) {
     console.log('deleteBinder called with ID:', binderId);
     console.log('domManager available:', !!domManager);
@@ -1884,14 +1875,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (domManager) domManager.editBinderColor(binderId);
   }
 
-  // Expose functions to global scope
-  window.openBinder = openBinder;
-  window.closeModal = closeModal;
-  window.saveBinderName = saveBinderName;
-  window.editBinderColor = editBinderColor;
-  window.deleteBinder = deleteBinder;
-  window.domManager = domManager;
-
   // ==================== INITIALIZATION ====================
   function init() {
     appState = new AppState();
@@ -1909,6 +1892,14 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
       domManager.updateYearLabel();
     }
+
+    // Expose domManager to global scope AFTER initialization
+    window.domManager = domManager;
+    window.openBinder = openBinder;
+    window.closeModal = closeModal;
+    window.saveBinderName = saveBinderName;
+    window.editBinderColor = editBinderColor;
+    window.deleteBinder = deleteBinder;
 
     console.log("BRAIN AI Research Assistant initialized");
   }

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "Research_AI_Assistant",
+    "rest_framework",
 ]
 
 MIDDLEWARE = [
@@ -130,4 +131,15 @@ STATICFILES_DIRS = [
     BASE_DIR / "Research_AI_Assistant" / "templates" / "static",
 ]
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
-
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        # Remove BrowsableAPIRenderer in production — it adds overhead
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/min",
+    },
+}
