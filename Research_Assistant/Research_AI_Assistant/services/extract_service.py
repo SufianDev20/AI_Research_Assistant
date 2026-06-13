@@ -42,7 +42,9 @@ class ExtractionService:
             "full_text_url": ExtractionService._extract_full_text_url(work),
             "referenced_works": ExtractionService._extract_referenced_works(work),
             "referenced_works_count": len(work.get("referenced_works", [])),
-        }
+            "pdf_url":work.get("primary_location",{}).get("pdf_url") or None,
+            "oa_url":work.get("primary_location",{}).get("oa_url") or None
+       }
 
     @staticmethod
     def _extract_authors(work: Dict) -> List[Dict]:

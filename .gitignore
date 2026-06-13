@@ -45,6 +45,8 @@ db.sqlite3
 *.log
 media/
 staticfiles/
+**/migrations/__pycache__/
+
 
 # Package distribution
 *.egg-info/

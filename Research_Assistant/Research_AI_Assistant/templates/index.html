@@ -1,21 +1,12 @@
 {% load static %}
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BRAIN - AI Research &amp; Citation Assistant</title>
     {% csrf_token %}
-    <script>
-      // Get CSRF token for AJAX requests
-      const csrfToken = document.querySelector(
-        "[name=csrfmiddlewaretoken]",
-      ).value;
-    </script>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
-    />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
     <link rel="stylesheet" href="{% static 'styles.css' %}" />
   </head>
   <body class="app-body">
@@ -70,12 +61,7 @@
           <!-- Main Search Container -->
           <div class="search-card">
             <div class="search-input-section">
-              <input
-                id="queryInput"
-                type="text"
-                placeholder="What breakthrough in quantum computing happened in the last 5 years?"
-                class="search-input"
-              />
+              <input id="queryInput" type="text" placeholder="What breakthrough in quantum computing happened in the last 5 years?" class="search-input" />
 
               <button onclick="performSearch()" class="search-button">
                 <i class="fa-solid fa-magnifying-glass"></i>
@@ -95,22 +81,8 @@
                     <div class="dual-slider-track">
                       <div class="slider-track-base"></div>
                       <div class="slider-fill" id="sliderFill"></div>
-                      <input
-                        type="range"
-                        id="yearMin"
-                        min="1900"
-                        max="2026"
-                        value="1900"
-                        class="year-slider thumb-min"
-                      />
-                      <input
-                        type="range"
-                        id="yearMax"
-                        min="1900"
-                        max="2026"
-                        value="2026"
-                        class="year-slider thumb-max"
-                      />
+                      <input type="range" id="yearMin" min="1900" max="2026" value="1900" class="year-slider thumb-min" />
+                      <input type="range" id="yearMax" min="1900" max="2026" value="2026" class="year-slider thumb-max" />
                     </div>
                   </div>
                 </div>
@@ -125,9 +97,7 @@
                 </div>
 
                 <div class="filter-dropdown">
-                  <label class="filter-label"
-                    >Number of Papers (Default:5)</label
-                  >
+                  <label class="filter-label">Number of Papers (Default:5)</label>
                   <select id="quota" class="filter-select">
                     <option value="5" selected>5 papers</option>
                     <option value="10">10 papers</option>
@@ -137,9 +107,7 @@
                 </div>
 
                 <div>
-                  <button onclick="resetFilters()" class="reset-button">
-                    RESET
-                  </button>
+                  <button onclick="resetFilters()" class="reset-button">RESET</button>
                 </div>
               </div>
             </div>
@@ -161,20 +129,12 @@
       </div>
     </div>
 
-    <div
-      id="modalOverlay"
-      onclick="if (event.target.id === 'modalOverlay') closeModal();"
-      class="modal-overlay"
-    >
+    <div id="modalOverlay" onclick="if (event.target.id === 'modalOverlay') closeModal();" class="modal-overlay">
       <div onclick="event.stopImmediatePropagation()" class="modal">
         <div class="modal-header">
           <div class="modal-title-section">
             <div id="modalBinderColor" class="modal-binder-color"></div>
-            <input
-              id="modalBinderName"
-              onblur="saveModalName()"
-              class="modal-title-input"
-            />
+            <input id="modalBinderName" onblur="saveModalName()" class="modal-title-input" />
           </div>
 
           <div class="modal-close-section">
@@ -188,12 +148,7 @@
 
         <div class="modal-footer">
           <div class="modal-input-section">
-            <input
-              id="modal-input"
-              type="text"
-              placeholder="Continue your research... (Enter to send)"
-              class="modal-input"
-            />
+            <input id="modal-input" type="text" placeholder="Continue your research... (Enter to send)" class="modal-input" />
             <button id="modal-send-btn" class="modal-send-button">
               <i class="fa-solid fa-paper-plane"></i>
               <span>Send</span>
@@ -209,17 +164,11 @@
       <!-- Top Bar -->
       <div class="research-top-bar">
         <div class="research-top-left">
-          <button id="researchBackBtn" class="research-back-btn">
-            <i class="fa-solid fa-arrow-left"></i>
-          </button>
+          <button id="researchBackBtn" class="research-back-btn"><i class="fa-solid fa-arrow-left"></i></button>
           <div id="researchQuery" class="research-query"></div>
         </div>
         <div class="research-top-right">
-          <button
-            id="saveToBinderBtn"
-            class="save-to-binder-btn"
-            style="display: none"
-          >
+          <button id="saveToBinderBtn" class="save-to-binder-btn" style="display: none">
             <i class="fa-solid fa-bookmark"></i>
             <span>Save to Binder</span>
           </button>
@@ -232,11 +181,7 @@
           <div id="researchChatContainer" class="research-chat-container"></div>
 
           <!-- Load More Button Container -->
-          <div
-            id="loadMoreContainer"
-            class="load-more-container"
-            style="display: none"
-          >
+          <div id="loadMoreContainer" class="load-more-container" style="display: none">
             <button id="loadMoreBtn" class="load-more-btn">
               <i class="fa-solid fa-plus-circle"></i>
               <span>Load More Papers</span>
@@ -250,12 +195,8 @@
           <div class="references-header">
             <h3 class="references-title">References</h3>
             <div class="references-filters">
-              <button class="filter-btn active" data-filter="relevance">
-                Relevance
-              </button>
-              <button class="filter-btn" data-filter="cited_by_count">
-                Most Cited
-              </button>
+              <button class="filter-btn active" data-filter="relevance">Relevance</button>
+              <button class="filter-btn" data-filter="cited_by_count">Most Cited</button>
             </div>
           </div>
           <div id="referencesList" class="references-list"></div>
@@ -265,12 +206,7 @@
       <!-- Bottom Input Bar -->
       <div class="research-input-bar">
         <div class="research-input-section">
-          <input
-            id="research-input"
-            type="text"
-            placeholder="Ask follow-up questions... (Enter to send)"
-            class="research-input"
-          />
+          <input id="research-input" type="text" placeholder="Ask follow-up questions... (Enter to send)" class="research-input" />
           <button id="research-send-btn" class="research-send-button">
             <i class="fa-solid fa-paper-plane"></i>
             <span>Send</span>
@@ -278,7 +214,75 @@
         </div>
       </div>
     </div>
+    <!-- PAPER DETAIL VIEW -->
+    <div id="paperView" class="paper-view">
+      <!-- Top Bar -->
+      <div class="paper-view-top-bar">
+        <div class="paper-view-top-left">
+          <button id="paperBackBtn" class="research-back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+          <div class="paper-view-title-wrap">
+            <span id="paperViewTitle" class="paper-view-title"></span>
+            <span id="paperViewMeta" class="paper-view-meta"></span>
+          </div>
+        </div>
+        <div class="paper-view-top-right">
+          <span id="paperOABadge" class="oa-badge" style="display:none">Open Access</span>
+          <a id="paperDOILink" href="#" target="_blank" rel="noopener noreferrer" class="paper-doi-link" style="display:none"><i class="fa-solid fa-arrow-up-right-from-square"></i> View PDF</a>
+        </div>
+      </div>
 
-    <script src="{% static 'scripts.js' %}?v=20260530-3"></script>
+      <!-- Three-column body -->
+      <div class="paper-view-body">
+        <!-- LEFT: Paper list sidebar -->
+        <div class="paper-sidebar">
+          <div class="paper-sidebar-header">
+            <span class="paper-sidebar-title">Papers</span>
+            <div class="paper-sidebar-filters">
+              <button class="filter-btn active" data-psort="relevance">Relevance</button>
+              <button class="filter-btn" data-psort="cited_by_count">Most Cited</button>
+            </div>
+          </div>
+          <div id="paperSidebarList" class="paper-sidebar-list"></div>
+        </div>
+
+        <!-- CENTER: Content / extraction area -->
+        <div class="paper-center">
+          <div id="paperContent" class="paper-content">
+            <!-- States: idle, loading, extracted, unavailable -->
+            <div id="paperIdleState" class="paper-state">
+              <i class="fa-solid fa-file-lines paper-state-icon"></i>
+              <p class="paper-state-text">Select a paper from the sidebar to begin.</p>
+            </div>
+            <div id="paperLoadingState" class="paper-state" style="display:none">
+              <i class="fa-solid fa-brain paper-state-icon" style="animation: pulse 2s infinite; color:#60a5fa"></i>
+              <p class="paper-state-text">Extracting paper content...</p>
+              <p class="paper-state-sub">This may take 10–30 seconds for large PDFs.</p>
+            </div>
+            <div id="paperExtractedState" style="display:none">
+              <div id="paperMarkdown" class="paper-markdown"></div>
+            </div>
+            <div id="paperUnavailableState" class="paper-state" style="display:none">
+              <i class="fa-solid fa-lock paper-state-icon" style="color:#94a3b8"></i>
+              <p class="paper-state-text">Full text not available.</p>
+              <p class="paper-state-sub">This paper is not open access. You can still ask general questions using the summary below.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: QA panel -->
+        <div class="paper-qa-panel">
+          <div class="paper-qa-header">
+            <span class="paper-qa-title">Ask This Paper</span>
+            <span id="paperQAStatus" class="paper-qa-status"></span>
+          </div>
+          <div id="paperQAChat" class="paper-qa-chat"></div>
+          <div class="paper-qa-input-bar">
+            <input id="paperQAInput" type="text" placeholder="Ask a question about this paper..." class="research-input" />
+            <button id="paperQASendBtn" class="research-send-button"><i class="fa-solid fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{% static 'scripts.js' %}?v=20260606-2"></script>
   </body>
 </html>

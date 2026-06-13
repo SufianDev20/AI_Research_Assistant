@@ -209,3 +209,40 @@ class ModelReliability(models.Model):
             raise ValidationError("Custom temperature must be between 0.0 and 2.0")
         if self.priority < 0:
             raise ValidationError("Priority cannot be negative")
+
+
+class PaperPDF(models.Model):
+    """
+    Stores extracted PDF content for open-access papers.
+    Keyed by OpenAlex work ID to avoid re-fetching.
+    """
+
+    openalex_id = models.CharField(max_length=100, unique=True)
+    pdf_url = models.URLField(max_length=500)
+    image_paths = models.JSONField(default=list)  # List of image file paths
+    markdown_content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    page_count = models.PositiveIntegerField(null=True, blank=True)
+    extraction_success = models.CharField(
+        max_length=20,
+        choices=[("success", "Success"), ("pending", "Pending"), ("failed", "Failed")],
+        default="pending",
+    )
+    error_message = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"PaperPdf {self.openalex_id} - {self.extraction_success}"
+
+    @property
+    def extraction_status(self):
+        """Backward-compatible alias for views expecting `extraction_status`.
+
+        Some parts of the codebase (views) reference `extraction_status` while
+        the model field is named `extraction_success`. Provide a property with
+        a setter so both read and write use the same underlying field.
+        """
+        return self.extraction_success
+
+    @extraction_status.setter
+    def extraction_status(self, value):
+        self.extraction_success = value

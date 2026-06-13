@@ -76,6 +76,7 @@ class Command(BaseCommand):
                         "avg_response_time": perf.avg_response_time,
                         "consecutive_failures": perf.consecutive_failures,
                         "is_active": perf.is_active,
+                        "has_data": perf.total_requests > 0,
                     }
                 else:
                     # No data yet - use default values
@@ -102,6 +103,7 @@ class Command(BaseCommand):
             "avg_response_time": 0.0,
             "consecutive_failures": 0,
             "is_active": True,
+            "has_data": False,
         }
 
     def generate_data_driven_config(self, performance_data):

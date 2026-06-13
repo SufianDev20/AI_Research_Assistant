@@ -10,30 +10,36 @@ import re
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
-from rest_framework.decorators import api_view,throttle_classes
+from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import QueryLog
+from .models import QueryLog, PaperPDF
 from .services.openalex_service import OpenAlexAPIError, OpenAlexService
 from .services.extract_service import ExtractionService
 from .services.openrouter_service import OpenRouterAPIError, OpenRouterService
 from .services.prompt_builder import system_prompt, build_user_message
+from .services.pdf_service import PDFService, PDFExtractionError
 
 logger = logging.getLogger(__name__)
 
 openalex_service = OpenAlexService()
 
+
 class SearchRateThrottle(AnonRateThrottle):
     """Rate throttle for search requests for Annonymous users"""
-    rate="100/s"
+
+    rate = "100/s"
+
 
 class GenerateTitle(AnonRateThrottle):
     """Rate throttle for title generation requests for Annonymous users"""
-    rate="20/m"
 
-@api_view(['GET'])
+    rate = "20/m"
+
+
+@api_view(["GET"])
 def api_root(request):
     """
     Root endpoint providing API information.
@@ -53,7 +59,7 @@ def api_root(request):
     )
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @throttle_classes([SearchRateThrottle])
 def search(request):
     """
@@ -99,7 +105,10 @@ def search(request):
 
     # Validate query
     if not query:
-        return JsonResponse({"error": "Query parameter 'q' is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse(
+            {"error": "Query parameter 'q' is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Validate mode
     valid_modes = {"relevance", "open_access", "best_match"}
@@ -125,30 +134,48 @@ def search(request):
 
     # Validate load_more: if true, cursor is required
     if load_more and not cursor:
-        return JsonResponse({"error": "cursor parameter is required when load_more=true"}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse(
+            {"error": "cursor parameter is required when load_more=true"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Validate and parse year parameters
     min_year = None
     max_year = None
-    
+
     if min_year_raw is not None:
         try:
             min_year = int(min_year_raw)
             if min_year < 1900 or min_year > 2026:
-                return JsonResponse({"error": "min_year must be between 1900 and 2026"}, status=status.HTTP_400_BAD_REQUEST)
+                return JsonResponse(
+                    {"error": "min_year must be between 1900 and 2026"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         except (ValueError, TypeError):
-            return JsonResponse({"error": "min_year must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return JsonResponse(
+                {"error": "min_year must be a valid integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     if max_year_raw is not None:
         try:
             max_year = int(max_year_raw)
             if max_year < 1900 or max_year > 2026:
-                return JsonResponse({"error": "max_year must be between 1900 and 2026"}, status=status.HTTP_400_BAD_REQUEST)
+                return JsonResponse(
+                    {"error": "max_year must be between 1900 and 2026"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         except (ValueError, TypeError):
-            return JsonResponse({"error": "max_year must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return JsonResponse(
+                {"error": "max_year must be a valid integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     if min_year is not None and max_year is not None and min_year > max_year:
-        return JsonResponse({"error": "min_year cannot be greater than max_year"}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse(
+            {"error": "min_year cannot be greater than max_year"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Parse random_seed parameter
     random_seed = None
@@ -162,7 +189,11 @@ def search(request):
     open_access_only = mode == "open_access"
 
     logger.info(
-        "Search request: query='%s' mode='%s' per_page=%d load_more=%s", query, mode, per_page, load_more
+        "Search request: query='%s' mode='%s' per_page=%d load_more=%s",
+        query,
+        mode,
+        per_page,
+        load_more,
     )
 
     try:
@@ -177,12 +208,12 @@ def search(request):
             max_year=max_year,
             random_seed=random_seed,
         )
-        
-        raw_results = api_response.get('results', [])
-        meta = api_response.get('meta', {})
-        total_count = meta.get('count', len(raw_results))
-        next_cursor = meta.get('next_cursor')
-        
+
+        raw_results = api_response.get("results", [])
+        meta = api_response.get("meta", {})
+        total_count = meta.get("count", len(raw_results))
+        next_cursor = meta.get("next_cursor")
+
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except OpenAlexAPIError as exc:
@@ -248,27 +279,31 @@ def generate_title(request):
     messages = data.get("messages")
 
     if not messages or not isinstance(messages, list) or len(messages) == 0:
-        return JsonResponse({"error": "Missing or invalid 'messages' field"}, status=400)
+        return JsonResponse(
+            {"error": "Missing or invalid 'messages' field"}, status=400
+        )
 
     try:
         # Initialize OpenRouter service
         openrouter_service = OpenRouterService()
 
         # Convert conversation history to a single user message for title generation
-        conversation_text = "\n".join([
-            f"{msg.get('role', '').title()}: {msg.get('content', '')}"
-            for msg in messages[-5:]  # Use last 5 messages to avoid token limits
-        ])
-        
+        conversation_text = "\n".join(
+            [
+                f"{msg.get('role', '').title()}: {msg.get('content', '')}"
+                for msg in messages[-5:]  # Use last 5 messages to avoid token limits
+            ]
+        )
+
         # Get title from LLM
         title = openrouter_service.complete(
             system_prompt="You are a helpful assistant that generates concise, professional titles for research conversations.",
             user_message=f"Based on this conversation, suggest a short, catchy, professional title (maximum 40 characters). Respond with ONLY the title text - no quotes, explanations, or extra words.\n\nConversation:\n{conversation_text}",
-            request_type="title"
+            request_type="title",
         )
 
         # Clean the title
-        title = re.sub(r'^["\']|["\']$|^\s*Title:\s*', '', title).strip()
+        title = re.sub(r'^["\']|["\']$|^\s*Title:\s*', "", title).strip()
 
         if len(title) < 5 or len(title) > 60:
             title = "Research Conversation"
@@ -277,17 +312,23 @@ def generate_title(request):
 
     except OpenRouterAPIError as exc:
         logger.error("OpenRouter title generation error: %s", exc)
-        return JsonResponse({"error": "Service temporarily unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return JsonResponse(
+            {"error": "Service temporarily unavailable"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     except Exception as exc:
         logger.error("Unexpected error in generate_title: %s", exc, exc_info=True)
-        return JsonResponse({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return JsonResponse(
+            {"error": "Internal server error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 def frontend(request):
     """
     Render the frontend HTML template for BRAIN AI Research Assistant.
     """
-    return render(request, 'index.html')
+    return render(request, "index.html")
 
 
 @require_POST
@@ -335,25 +376,31 @@ def summarise(request):
         summary = openrouter_service.complete(
             system_prompt=system_prompt,
             user_message=user_message,
-            request_type="summary"
+            request_type="summary",
         )
 
         return JsonResponse({"summary": summary})
 
     except OpenRouterAPIError as exc:
         logger.error("OpenRouter summarise error: %s", exc)
-        return JsonResponse({
-            "error": "Service temporarily unavailable", 
-            "error_code": "OPENROUTER_API_ERROR",
-            "message": "Summary service temporarily unavailable - please try again later"
-        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return JsonResponse(
+            {
+                "error": "Service temporarily unavailable",
+                "error_code": "OPENROUTER_API_ERROR",
+                "message": "Summary service temporarily unavailable - please try again later",
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     except Exception as exc:
         logger.error("Unexpected error in summarise: %s", exc, exc_info=True)
-        return JsonResponse({
-            "error": "Internal server error",
-            "error_code": "INTERNAL_ERROR", 
-            "message": "An unexpected error occurred"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return JsonResponse(
+            {
+                "error": "Internal server error",
+                "error_code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @require_GET
@@ -431,3 +478,153 @@ def search_authors(request):
     except OpenAlexAPIError as exc:
         logger.error("OpenAlex author search error: %s", exc)
         return JsonResponse({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+class PDFThrottle(AnonRateThrottle):
+    rate = "10/m"  # PDF fetches are expensive
+
+
+class SummariseThrottle(AnonRateThrottle):
+    rate = "10/m"  # Summarisation is expensive
+
+
+@api_view(["POST"])
+@throttle_classes([PDFThrottle])
+def extract_pdf(request):
+    """
+    POST /api/extract-pdf/
+    Body: { "openalex_id": "https://openalex.org/W123", "pdf_url": "https://..." }
+    """
+    openalex_id = request.data.get("openalex_id", "").strip()
+    pdf_url = request.data.get("pdf_url", "").strip()
+    open_access = request.data.get("is_open_access", False)
+    if not openalex_id or not pdf_url:
+        return Response(
+            {"error": "Both 'openalex_id' and 'pdf_url' are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not open_access:
+        return Response(
+            {"error": "cannot extract this paper is not open access"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Return cached result — filter on the actual DB column name
+    cached = PaperPDF.objects.filter(
+        openalex_id=openalex_id, extraction_success="success"
+    ).first()
+    if cached:
+        return Response(
+            {
+                "openalex_id": openalex_id,
+                "markdown": cached.markdown_content,
+                "page_count": cached.page_count,
+                "image_paths": cached.image_paths,
+                "cached": True,
+            }
+        )
+
+    # Prevent duplicate concurrent fetches
+    record, created = PaperPDF.objects.get_or_create(
+        openalex_id=openalex_id,
+        defaults={"pdf_url": pdf_url, "extraction_success": "pending"},
+    )
+
+    if not created and record.extraction_success == "pending":
+        return Response(
+            {"error": "Extraction already in progress."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # If a previous attempt failed, allow retry by resetting to pending
+    if not created and record.extraction_success == "failed":
+        record.extraction_success = "pending"
+        record.pdf_url = pdf_url
+        record.save(update_fields=["extraction_success", "pdf_url"])
+
+    try:
+        result = PDFService.fetch_and_extract(pdf_url, openalex_id)
+
+        record.markdown_content = result["markdown"]
+        record.page_count = result["page_count"]
+        record.image_paths = result["image_paths"]
+        record.extraction_success = "success"
+        record.pdf_url = pdf_url
+        record.error_message = None
+        record.save()
+
+        return Response(
+            {
+                "openalex_id": openalex_id,
+                "markdown": result["markdown"],
+                "page_count": result["page_count"],
+                "image_paths": result["image_paths"],
+                "cached": False,
+            }
+        )
+
+    except PDFExtractionError as exc:
+        record.extraction_success = "failed"
+        record.error_message = str(exc)
+        record.save(update_fields=["extraction_success", "error_message"])
+        logger.error("PDF extraction failed for %s: %s", openalex_id, exc)
+        return Response(
+            {"error": str(exc)},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+
+@api_view(["POST"])
+@throttle_classes([SummariseThrottle])
+def ask_paper(request):
+    """
+    POST /api/ask-paper/
+    Body: { "openalex_id": "https://openalex.org/W123", "question": "What method did they use?" }
+    """
+    openalex_id = request.data.get("openalex_id", "").strip()
+    question = request.data.get("question", "").strip()
+
+    if not openalex_id or not question:
+        return Response(
+            {"error": "Both 'openalex_id' and 'question' are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    record = PaperPDF.objects.filter(
+        openalex_id=openalex_id, extraction_success="success"
+    ).first()
+    if not record:
+        return Response(
+            {"error": "Paper not extracted yet. Call /api/extract-pdf/ first."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # 6000 chars covers roughly 3-4 pages within free model token limits
+    context = record.markdown_content[:6000]
+
+    try:
+        openrouter_service = OpenRouterService()
+        answer = openrouter_service.complete(
+            system_prompt=(
+                "You are a research assistant. Answer questions about the provided "
+                "academic paper content accurately and concisely. "
+                "Cite specific sections when relevant. "
+                "If the answer is not in the paper, say so explicitly."
+            ),
+            user_message=f"Paper content:\n\n{context}\n\n---\n\nQuestion: {question}",
+            request_type="paper_qa",
+        )
+        return Response({"answer": answer, "openalex_id": openalex_id})
+
+    except OpenRouterAPIError as exc:
+        logger.error("OpenRouter ask_paper error: %s", exc)
+        return Response(
+            {"error": "LLM service temporarily unavailable."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except Exception as exc:
+        logger.error("Unexpected error in ask_paper: %s", exc, exc_info=True)
+        return Response(
+            {"error": "Internal server error."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
