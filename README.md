@@ -15,6 +15,7 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **Author Search Service**: Search for academic authors via OpenAlex API
 - **Metadata Extraction**: Comprehensive extraction of paper metadata including title, authors, abstract, publication year, DOI, research concepts, and open access information
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
+- **PDF extraction for answering**: Extracts text from PDFs to answer questions using LLMs for the research paper.
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
 - **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
 - **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
@@ -195,6 +196,7 @@ AIResearchAssistant/
             ├── openrouter_service.py    # OpenRouter LLM client with performance tracking
             ├── extract_service.py       # Metadata extraction from OpenAlex
             ├── prompt_builder.py        # LLM prompt construction
+            ├── pdf_service.py            # PDF generation for summaries
             └── performance_tracker.py   # Model performance monitoring and intelligent fallback
 ```
 
