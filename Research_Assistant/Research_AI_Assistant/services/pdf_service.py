@@ -13,7 +13,7 @@ import tempfile
 
 import requests
 from django.conf import settings
-import pymupdf4llm as pm4
+
 logger = logging.getLogger(__name__)
 
 MAX_PDF_BYTES = 50 * 1024 * 1024

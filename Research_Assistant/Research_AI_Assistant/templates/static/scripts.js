@@ -860,10 +860,9 @@ document.addEventListener("DOMContentLoaded", function () {
             " citations</div>";
 
           card.addEventListener("click", (e) => {
-            if (!e.target.closest("a")) {
-              this.showPaperView(sortedPapers, i);
-            }
-          });
+               e.preventDefault();
+               this.showPaperView(sortedPapers, i);
+        });
 
           this.elements.referencesList.appendChild(card);
         }.bind(this),
@@ -2132,6 +2131,7 @@ DOMManager.prototype._loadPaperPDF = async function(paper) {
   const openalex_id = paper.id || paper.openalex_id || "";
   const pdf_url = paper.pdf_url || paper.oa_url || "";
   const is_open_access = paper.is_open_access || false;
+
   try {
     const response = await fetch("/api/extract-pdf/", {
       method: "POST",
@@ -2139,11 +2139,12 @@ DOMManager.prototype._loadPaperPDF = async function(paper) {
         "Content-Type": "application/json",
         "X-CSRFToken": csrfToken,
       },
-      body: JSON.stringify({ openalex_id, pdf_url, is_open_access}),
+      body: JSON.stringify({ openalex_id, pdf_url, is_open_access }),
     });
 
     if (!response.ok) {
-      throw new Error(`Extraction error ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${response.status}`);
     }
 
     const data = await response.json();
@@ -2159,10 +2160,9 @@ DOMManager.prototype._loadPaperPDF = async function(paper) {
     }
 
   } catch (err) {
-    // Fall back to unavailable state — still allow QA using abstract
     this._showPaperState("unavailable");
     if (this.elements.paperQAStatus) {
-      this.elements.paperQAStatus.textContent = "Using abstract (extraction failed)";
+      this.elements.paperQAStatus.textContent = `Using abstract (${err.message || "extraction failed"})`;
     }
   }
 };

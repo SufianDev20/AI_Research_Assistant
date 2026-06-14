@@ -2,7 +2,7 @@
 Extract Metadata and Related information from OpenAlex
 Converts raw API responses into structured data for storage and LLM processing.
 
-OpenAlex Work object reference: https://docs.openalex.org/api-entities/works/work-object
+OpenAlex Work object reference: https://developers.openalex.org
 """
 
 from typing import Dict, List, Optional
@@ -23,7 +23,7 @@ class ExtractionService:
             Structured metadata dict.
 
         Reference:
-            https://docs.openalex.org/api-entities/works/work-object
+            https://developers.openalex.org
         """
         return {
             "openalex_id": work.get("id", ""),
@@ -34,17 +34,29 @@ class ExtractionService:
             "doi": work.get("doi", ""),
             "cited_by_count": work.get("cited_by_count", 0),
             "concepts": ExtractionService._extract_concepts(work),
-            "source": work.get("primary_location", {})
-            .get("source", {})
-            .get("display_name") if work.get("primary_location") and work.get("primary_location", {}).get("source") else None,
+            "source": (
+                work.get("primary_location", {}).get("source", {}).get("display_name")
+                if work.get("primary_location")
+                and work.get("primary_location", {}).get("source")
+                else None
+            ),
             "is_open_access": work.get("open_access", {}).get("is_oa", False),
             "oa_status": work.get("open_access", {}).get("oa_status"),
             "full_text_url": ExtractionService._extract_full_text_url(work),
             "referenced_works": ExtractionService._extract_referenced_works(work),
             "referenced_works_count": len(work.get("referenced_works", [])),
-            "pdf_url":work.get("primary_location",{}).get("pdf_url") or None,
-            "oa_url":work.get("primary_location",{}).get("oa_url") or None
-       }
+            "pdf_url": (
+                (work.get("best_oa_location") or {}).get("pdf_url")
+                or (work.get("primary_location") or {}).get("pdf_url")
+                or None
+            ),
+            "oa_url": (
+                (work.get("best_oa_location") or {}).get("landing_page_url")
+                or (work.get("open_access") or {}).get("oa_url")
+                or (work.get("primary_location") or {}).get("landing_page_url")
+                or None
+            ),
+        }
 
     @staticmethod
     def _extract_authors(work: Dict) -> List[Dict]:
@@ -117,15 +129,15 @@ class ExtractionService:
         """
         Extract referenced works (papers that this paper cites).
         Reference: https://docs.openalex.org/api-entities/works/work-object#referenced_works
-        
+
         Returns: List of OpenAlex ID strings
         """
         referenced_works = work.get("referenced_works", [])
-        
+
         # Handle missing or invalid referenced_works field
         if not referenced_works or not isinstance(referenced_works, list):
             return []
-        
+
         # referenced_works contains OpenAlex ID strings, not objects with metadata
         return referenced_works[:10]  # Limit to first 10 references
 
