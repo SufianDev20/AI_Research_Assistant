@@ -62,7 +62,7 @@ class ExtractionService:
     def _extract_authors(work: Dict) -> List[Dict]:
         """
         Extract author names and institutions.
-        Reference: https://docs.openalex.org/api-entities/works/work-object#authorships
+        Reference: https://developers.openalex.org
         """
         authors = []
         for authorship in work.get("authorships", []):
@@ -83,7 +83,7 @@ class ExtractionService:
     def _reconstruct_abstract(work: Dict) -> str:
         """
         Reconstruct abstract from inverted index.
-        Reference: https://docs.openalex.org/api-entities/works/work-object#abstract_inverted_index
+        Reference: https://developers.openalex.org
         """
         inverted = work.get("abstract_inverted_index")
         if not inverted or not isinstance(inverted, dict):
@@ -101,7 +101,7 @@ class ExtractionService:
     def _extract_full_text_url(work: Dict) -> Optional[str]:
         """
         Extract open-access full text URL if available.
-        Reference: https://docs.openalex.org/api-entities/works/work-object#best_oa_location
+        Reference: https://developers.openalex.org
         """
         best_oa = work.get("best_oa_location")
         if best_oa:
@@ -128,7 +128,7 @@ class ExtractionService:
     def _extract_referenced_works(work: Dict) -> List[str]:
         """
         Extract referenced works (papers that this paper cites).
-        Reference: https://docs.openalex.org/api-entities/works/work-object#referenced_works
+        Reference: https://developers.openalex.org
 
         Returns: List of OpenAlex ID strings
         """
@@ -145,7 +145,7 @@ class ExtractionService:
     def _extract_concepts(work: Dict) -> List[Dict]:
         """
         Extract research concepts/topics.
-        Reference: https://docs.openalex.org/api-entities/works/work-object#concepts
+        Reference: https://developers.openalex.org
         """
         return [
             {"name": concept.get("display_name"), "score": concept.get("score")}
