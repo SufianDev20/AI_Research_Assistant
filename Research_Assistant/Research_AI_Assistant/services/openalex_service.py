@@ -10,8 +10,12 @@ import logging
 
 # Configure PyAlex API key if available
 try:
-    if hasattr(settings, 'OPENALEX_API_KEY') and settings.OPENALEX_API_KEY:
+    if (hasattr(settings, "OPENALEX_API_KEY") and settings.OPENALEX_API_KEY) or (
+        hasattr(settings, "OPENALEX_EMAIL") and settings.OPENALEX_EMAIL
+    ):
         import pyalex
+
+        pyalex.config.email = settings.OPENALEX_EMAIL
         pyalex.config.api_key = settings.OPENALEX_API_KEY
         logger = logging.getLogger(__name__)
         logger.info("PyAlex API key configured")
@@ -75,12 +79,16 @@ class OpenAlexService:
             raise ValueError(f"oa_status must be one of {valid_oa_statuses} or None")
 
         # Validate year parameters
-        if min_year is not None and (not isinstance(min_year, int) or min_year < 1900 or min_year > 2026):
+        if min_year is not None and (
+            not isinstance(min_year, int) or min_year < 1900 or min_year > 2026
+        ):
             raise ValueError("min_year must be an integer between 1900 and 2026")
-        
-        if max_year is not None and (not isinstance(max_year, int) or max_year < 1900 or max_year > 2026):
+
+        if max_year is not None and (
+            not isinstance(max_year, int) or max_year < 1900 or max_year > 2026
+        ):
             raise ValueError("max_year must be an integer between 1900 and 2026")
-        
+
         if min_year is not None and max_year is not None and min_year > max_year:
             raise ValueError("min_year cannot be greater than max_year")
 
@@ -98,10 +106,14 @@ class OpenAlexService:
 
             # Add year filters
             if min_year is not None:
-                works_query = works_query.filter(from_publication_date=f"{min_year}-01-01")
-            
+                works_query = works_query.filter(
+                    from_publication_date=f"{min_year}-01-01"
+                )
+
             if max_year is not None:
-                works_query = works_query.filter(to_publication_date=f"{max_year}-12-31")
+                works_query = works_query.filter(
+                    to_publication_date=f"{max_year}-12-31"
+                )
 
             # Cursor paging (OpenAlex documented) OR sampling mode (OpenAlex documented)
             #
@@ -144,11 +156,11 @@ class OpenAlexService:
                 )
 
             return {
-                'results': list(results_list),
-                'meta': {
-                    'count': meta.get('count', 0),
-                    'next_cursor': meta.get('next_cursor')
-                }
+                "results": list(results_list),
+                "meta": {
+                    "count": meta.get("count", 0),
+                    "next_cursor": meta.get("next_cursor"),
+                },
             }
 
         except Exception as e:

@@ -1525,22 +1525,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ==================== UTILITY METHODS ====================
-    markdownToHtml(text) {
+markdownToHtml(text) {
   if (!text) return "";
 
-  let processedText = text;
+  const imagePlaceholders = [];
 
-  return processedText
+  let processedText = text
     .replace(/```(?:\s*\w+)?\s*\n([\s\S]*?)\n```/g, (match, p1) => {
       const code = this.escapeHtml(p1.trim());
       return `<pre class="code-block"><code>${code}</code></pre>`;
     })
-    // Images BEFORE emphasis/underscore replacements, so paths like fig_1.png survive intact
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
       const url = src.startsWith("http") || src.startsWith("/")
         ? src
         : `/media/${src}`;
-      return `<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;margin:1rem 0;">`;
+      const imgTag = `<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;margin:1rem 0;">`;
+      const token = `@@IMG${imagePlaceholders.length}@@`;
+      imagePlaceholders.push(imgTag);
+      return token;
     })
     .replace(/^### (.+)$/gm, "<h4>$1</h4>")
     .replace(/^## (.+)$/gm, "<h3>$1</h3>")
@@ -1552,8 +1554,13 @@ document.addEventListener("DOMContentLoaded", function () {
     .replace(/`([^`\r\n]+)`/g, "<code>$1</code>")
     .replace(/^\s*[-*+]\s+/gm, "• ")
     .replace(/\n/g, "<br>");
-}
 
+  imagePlaceholders.forEach((tag, i) => {
+    processedText = processedText.replace(`@@IMG${i}@@`, tag);
+  });
+
+  return processedText;
+}
     escapeHtml(unsafe) {
       return unsafe
         .replace(/&/g, "&amp;")

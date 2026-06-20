@@ -531,10 +531,17 @@ def extract_pdf(request):
     )
 
     if not created and record.extraction_success == "pending":
-        return Response(
-            {"error": "Extraction already in progress."},
-            status=status.HTTP_409_CONFLICT,
-        )
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if timezone.now() - record.created_at > timedelta(minutes=2):
+            record.extraction_success = "pending"
+            record.save(update_fields=["extraction_success"])
+        else:
+            return Response(
+                {"error": "Extraction already in progress."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
     # If a previous attempt failed, allow retry by resetting to pending
     if not created and record.extraction_success == "failed":

@@ -9,6 +9,7 @@ References:
 
 import logging
 import os
+import re
 import tempfile
 
 import requests
@@ -40,7 +41,10 @@ class PDFService:
             response = requests.get(
                 pdf_url,
                 timeout=FETCH_TIMEOUT,
-                headers={"User-Agent": "AIResearchAssistant/1.0"},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                    "Accept": "application/pdf,*/*",
+                },
                 stream=True,
             )
             response.raise_for_status()
@@ -59,7 +63,9 @@ class PDFService:
             raise PDFExtractionError(f"Failed to fetch PDF: {exc}") from exc
 
         # 2) Prepare output dirs + temp file
-        safe_id = openalex_id.replace("/", "_")
+        safe_id = re.sub(
+            r"[^A-Za-z0-9_-]", "_", openalex_id.split("/")[-1]
+        )  # This turns https://openalex.org/W4362579589 into W4362579589, which is shorter, cleaner, and avoids any character-escaping edge cases entirely.
         image_dir = os.path.join(settings.MEDIA_ROOT, "paper_images", safe_id)
         os.makedirs(image_dir, exist_ok=True)
 
@@ -85,7 +91,9 @@ class PDFService:
                 image_format="png",
                 dpi=160,
             )
-
+            media_root_str = str(settings.MEDIA_ROOT).replace("\\", "/")
+            md_content = md_content.replace("\\", "/")
+            md_content = md_content.replace(media_root_str + "/", "")
             # Page count is best-effort.
             page_count = 0
             try:
