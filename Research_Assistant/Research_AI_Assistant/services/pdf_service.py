@@ -97,7 +97,7 @@ class PDFService:
             # Page count is best-effort.
             page_count = 0
             try:
-                import pymupdf as pm
+                import fitz as pm
 
                 doc = pm.open(tmp_path)
                 page_count = doc.page_count
