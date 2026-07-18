@@ -1,0 +1,55 @@
+    <!-- FULL-SCREEN RESEARCH VIEW -->
+    <div id="researchView" class="research-view">
+      <!-- Top Bar -->
+      <div class="research-top-bar">
+        <div class="research-top-left">
+          <button id="researchBackBtn" class="research-back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+          <div id="researchQuery" class="research-query"></div>
+        </div>
+        <div class="research-top-right">
+          <button id="saveToBinderBtn" class="save-to-binder-btn" style="display: none">
+            <i class="fa-solid fa-bookmark"></i>
+            <span>Save to Binder</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat/Response Area -->
+      <div class="research-chat-area">
+        <div class="research-main-content">
+          <div id="researchChatContainer" class="research-chat-container"></div>
+
+          <!-- Load More Button Container -->
+          <div id="loadMoreContainer" class="load-more-container" style="display: none">
+            <button id="loadMoreBtn" class="load-more-btn">
+              <i class="fa-solid fa-plus-circle"></i>
+              <span>Load More Papers</span>
+            </button>
+            <div id="loadMoreStatus" class="load-more-status"></div>
+          </div>
+        </div>
+
+        <!-- Right Side References Panel -->
+        <div id="referencesPanel" class="references-panel">
+          <div class="references-header">
+            <h3 class="references-title">References</h3>
+            <div class="references-filters">
+              <button class="filter-btn active" data-filter="relevance">Relevance</button>
+              <button class="filter-btn" data-filter="cited_by_count">Most Cited</button>
+            </div>
+          </div>
+          <div id="referencesList" class="references-list"></div>
+        </div>
+      </div>
+
+      <!-- Bottom Input Bar -->
+      <div class="research-input-bar">
+        <div class="research-input-section">
+          <input id="research-input" type="text" placeholder="Ask follow-up questions... (Enter to send)" class="research-input" />
+          <button id="research-send-btn" class="research-send-button">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Send</span>
+          </button>
+        </div>
+      </div>
+    </div>

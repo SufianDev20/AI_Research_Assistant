@@ -1,0 +1,29 @@
+    <div id="modalOverlay" onclick="if (event.target.id === 'modalOverlay') closeModal();" class="modal-overlay">
+      <div onclick="event.stopImmediatePropagation()" class="modal">
+        <div class="modal-header">
+          <div class="modal-title-section">
+            <div id="modalBinderColor" class="modal-binder-color"></div>
+            <input id="modalBinderName" onblur="if(appState.currentOpenBinderId) saveBinderName(appState.currentOpenBinderId, this.value)" class="modal-title-input" />
+          </div>
+
+          <div class="modal-close-section">
+            <button onclick="closeModal()" class="modal-close-button">✕</button>
+          </div>
+        </div>
+
+        <div class="modal-content">
+          <div id="modalChatContainer" class="modal-chat"></div>
+        </div>
+
+        <div class="modal-footer">
+          <div class="modal-input-section">
+            <input id="modal-input" type="text" placeholder="Continue your research... (Enter to send)" class="modal-input" />
+            <button id="modal-send-btn" class="modal-send-button">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Send</span>
+            </button>
+          </div>
+          <div class="modal-footer-text">BRAIN AI Research Assistant</div>
+        </div>
+      </div>
+    </div>

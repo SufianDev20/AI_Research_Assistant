@@ -1,0 +1,65 @@
+    <div class="main-container">
+      <!-- HERO INPUT WITH INTEGRATED FILTERS -->
+      <div class="hero-section">
+        <div class="hero-container">
+          <div class="hero-label">
+            <i class="fa-solid fa-brain"></i>
+            <span>ASK BRAIN ANYTHING</span>
+          </div>
+
+          <!-- Main Search Container -->
+          <div class="search-card">
+            <div class="search-input-section">
+              <input id="queryInput" type="text" placeholder="What breakthrough in quantum computing happened in the last 5 years?" class="search-input" />
+
+              <button onclick="performSearch()" class="search-button">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>RESEARCH</span>
+              </button>
+            </div>
+
+            <div class="filters-section">
+              <div class="filters-container">
+                <div class="year-range">
+                  <label class="filter-label">YEARS</label>
+                  <div class="dual-slider-wrapper">
+                    <div class="slider-display-labels">
+                      <span id="minYearDisplay">1900</span>
+                      <span id="maxYearDisplay">2026</span>
+                    </div>
+                    <div class="dual-slider-track">
+                      <div class="slider-track-base"></div>
+                      <div class="slider-fill" id="sliderFill"></div>
+                      <input type="range" id="yearMin" min="1900" max="2026" value="1900" class="year-slider thumb-min" />
+                      <input type="range" id="yearMax" min="1900" max="2026" value="2026" class="year-slider thumb-max" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="filter-dropdown">
+                  <label class="filter-label">SEARCH BY</label>
+                  <select id="searchBy" class="filter-select">
+                    <option value="relevance">Relevance</option>
+                    <option value="open_access">Open Access</option>
+                    <option value="best_match" selected>Best Match</option>
+                  </select>
+                </div>
+
+                <div class="filter-dropdown">
+                  <label class="filter-label">Number of Papers (Default:5)</label>
+                  <select id="quota" class="filter-select">
+                    <option value="5" selected>5 papers</option>
+                    <option value="10">10 papers</option>
+                    <option value="15">15 papers</option>
+                    <option value="20">20 papers</option>
+                  </select>
+                </div>
+
+                <div>
+                  <button onclick="resetFilters()" class="reset-button">RESET</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>

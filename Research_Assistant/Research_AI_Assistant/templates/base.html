@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BRAIN - AI Research &amp; Citation Assistant</title>
+    {% csrf_token %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
+    <link rel="stylesheet" href="{% static 'styles.css' %}" />
+  </head>
+  <body class="app-body">
+    {% csrf_token %}
+    <!-- NAVBAR -->
+    <nav class="navbar">
+      <div class="navbar-container">
+        <!-- Title -->
+        <div class="navbar-title">
+          <div class="logo">
+            <span class="logo-text">B</span>
+          </div>
+          <div>
+            <h1 class="app-title">BRAIN</h1>
+            <p class="app-subtitle">AI RESEARCH &amp; CITATION ASSISTANT</p>
+          </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="profile-section">
+          <button onclick="toggleProfileDropdown()" class="profile-button">
+            <div class="profile-avatar">S</div>
+            <div class="profile-info">
+              <p class="profile-name">Silver</p>
+              <p class="profile-role">Premium Researcher</p>
+            </div>
+            <i class="fa-solid fa-chevron-down profile-chevron"></i>
+          </button>
+
+          <!-- Dropdown -->
+          <div id="profileDropdown" class="profile-dropdown">
+            <a onclick="logout()" class="profile-logout">
+              <i class="fa-solid fa-arrow-right-from-bracket logout-icon"></i>
+              <span>Log out</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="nav-spacer"></div>
+    <script type="module" src="{% static 'js/state.js' %}"></script>
+    <script type="module" src="{% static 'js/globals.js' %}"></script>
+    <script type="module" src="{% static 'js/core.js' %}"></script>
+    <script type="module" src="{% static 'js/search.js' %}"></script>
+    <script type="module" src="{% static 'js/binders.js' %}"></script>
+    <script type="module" src="{% static 'js/modal.js' %}"></script>
+    <script type="module" src="{% static 'js/research.js' %}"></script>
+    <script type="module" src="{% static 'js/paper.js' %}"></script>
+  </body>
+</html>
