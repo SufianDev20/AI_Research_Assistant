@@ -32,7 +32,7 @@ let domManager;
 function toggleProfileDropdown() {
   const dropdown = document.getElementById("profileDropdown");
   if (dropdown) {
-    dropdown.classList.toggle("show");
+    dropdown.classList.toggle("show);
   }
 }
 
