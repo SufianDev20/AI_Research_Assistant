@@ -5,7 +5,7 @@ Converts raw API responses into structured data for storage and LLM processing.
 OpenAlex Work object reference: https://developers.openalex.org
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List,Optional
 
 
 class ExtractionService:
