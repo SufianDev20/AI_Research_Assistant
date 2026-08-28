@@ -26,6 +26,20 @@ DOMManager.prototype.hidePaperView = function() {
   }
 };
 
+// Returns a badge for the sidebar list item based on OA / PDF-link state.
+// This is the pre-fetch, best-guess state from OpenAlex metadata only.
+// It never claims extraction succeeded, only that the paper is marked OA
+// by OpenAlex and/or a PDF URL was found in its metadata.
+DOMManager.prototype._getSidebarBadgeHtml = function(paper) {
+  if (paper.is_open_access && paper.has_pdf_link) {
+    return `<span class="paper-sidebar-oa" title="Open access, PDF link found">OA · PDF</span>`;
+  }
+  if (paper.is_open_access) {
+    return `<span class="paper-sidebar-oa" title="Open access, no direct PDF link">OA</span>`;
+  }
+  return "";
+};
+
 DOMManager.prototype._renderPaperSidebar = function(papers, sortMode) {
   if (!this.elements.paperSidebarList) return;
 
@@ -42,9 +56,7 @@ DOMManager.prototype._renderPaperSidebar = function(papers, sortMode) {
     item.className = "paper-sidebar-item";
     item.dataset.index = i;
 
-    const oaBadge = paper.is_open_access
-      ? `<span class="paper-sidebar-oa">OA</span>`
-      : "";
+    const oaBadge = this._getSidebarBadgeHtml(paper);
     const citations = paper.cited_by_count
       ? `<span class="paper-sidebar-citations">${paper.cited_by_count.toLocaleString()} cit.</span>`
       : "";
@@ -83,6 +95,28 @@ DOMManager.prototype._setupPaperSidebarFilters = function() {
   });
 };
 
+// Sets the top-bar badge to one of four states: none, oa, oa-pdf, degraded.
+// Always resets classes and text first so stale state from a previous
+// paper selection never leaks into the current one.
+DOMManager.prototype._setTopBarBadge = function(state, label) {
+  const badge = this.elements.paperOABadge;
+  if (!badge) return;
+
+  badge.classList.remove("paper-badge-degraded", "paper-badge-oa", "paper-badge-oa-pdf");
+
+  if (state === "none") {
+    badge.style.display = "none";
+    return;
+  }
+
+  badge.style.display = "inline-flex";
+  badge.textContent = label;
+
+  if (state === "oa") badge.classList.add("paper-badge-oa");
+  if (state === "oa-pdf") badge.classList.add("paper-badge-oa-pdf");
+  if (state === "degraded") badge.classList.add("paper-badge-degraded");
+};
+
 DOMManager.prototype._selectPaper = function(paper, index) {
   window.appState.currentPaperViewSelected = paper;
 
@@ -97,11 +131,17 @@ DOMManager.prototype._selectPaper = function(paper, index) {
       [authors, year].filter(Boolean).join(" · ");
   }
 
-  // OA badge and PDF link
-  if (this.elements.paperOABadge) {
-    this.elements.paperOABadge.style.display =
-      paper.is_open_access ? "inline-flex" : "none";
+  // Reset badge to the pre-fetch state before any extraction attempt.
+  // This clears any "Abstract only" / degraded state left over from a
+  // previously selected paper.
+  if (paper.is_open_access && paper.has_pdf_link) {
+    this._setTopBarBadge("oa-pdf", "OA · PDF");
+  } else if (paper.is_open_access) {
+    this._setTopBarBadge("oa", "Open Access");
+  } else {
+    this._setTopBarBadge("none");
   }
+
   if (this.elements.paperDOILink) {
     const pdfUrl = paper.pdf_url || (paper.doi ? `https://doi.org/${paper.doi}` : null);
     if (pdfUrl) {
@@ -120,9 +160,30 @@ DOMManager.prototype._selectPaper = function(paper, index) {
     this.elements.paperQAStatus.textContent = "";
   }
 
-  // Decide content state
-  if (paper.is_open_access && (paper.pdf_url || paper.oa_url)) {
+  // Reset unavailable-state copy to generic defaults before any attempt.
+  if (this.elements.paperUnavailableTitle) {
+    this.elements.paperUnavailableTitle.textContent = "Full text not available.";
+  }
+  if (this.elements.paperUnavailableSub) {
+    this.elements.paperUnavailableSub.textContent =
+      "You can still ask general questions using the summary below.";
+  }
+
+  // Only attempt extraction if a PDF link actually exists.
+  // is_open_access alone is not enough: a green-OA paper can have
+  // only a landing_page_url and no fetchable PDF.
+  if (paper.has_pdf_link && (paper.pdf_url || paper.oa_url)) {
     this._loadPaperPDF(paper);
+  } else if (paper.is_open_access) {
+    // Open access per OpenAlex, but no direct PDF link to fetch.
+    this._showPaperState("unavailable");
+    if (this.elements.paperUnavailableSub) {
+      this.elements.paperUnavailableSub.textContent =
+        "This paper is open access, but no direct PDF link was found. Using abstract.";
+    }
+    if (this.elements.paperQAStatus) {
+      this.elements.paperQAStatus.textContent = "Using abstract";
+    }
   } else {
     this._showPaperState("unavailable");
     if (this.elements.paperQAStatus) {
@@ -175,11 +236,38 @@ DOMManager.prototype._loadPaperPDF = async function(paper) {
     }
 
     const data = await response.json();
+    if (!data.success || !data.markdown) {
+      this._showPaperState("unavailable");
+      if (this.elements.paperUnavailableSub) {
+        this.elements.paperUnavailableSub.textContent =
+          data.error || "This publisher blocks automated access.";
+      }
+      this._setTopBarBadge("degraded", "Abstract only");
+      if (this.elements.paperQAStatus) {
+        this.elements.paperQAStatus.textContent = `Using abstract (${data.error || "extraction failed"})`;
+      }
+      return;
+    }
 
+    // Instead of rendering full text, show a clean readiness card
     if (this.elements.paperMarkdown) {
-      this.elements.paperMarkdown.innerHTML = this.markdownToHtml(data.markdown || "");
+      this.elements.paperMarkdown.innerHTML = `
+        <div style="padding: 2rem; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; text-align: center;">
+          <i class="fa-solid fa-circle-check" style="font-size: 2.5rem; color: #22c55e; margin-bottom: 1rem;"></i>
+          <h3 style="font-size: 1.25rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.5rem;">Paper Processed Successfully</h3>
+          <p style="color: #94a3b8; font-size: 0.9rem; max-width: 400px; margin: 0 auto 1rem;">
+            Full text (${data.page_count || "?"} pages) indexed and cached in the database.
+          </p>
+          <div style="font-size: 0.85rem; color: #64748b; background: rgba(0,0,0,0.2); padding: 0.5rem 1rem; border-radius: 0.375rem; display: inline-block;">
+            💡 Use the side panel to chat or ask questions about this paper.
+          </div>
+        </div>
+      `;
     }
     this._showPaperState("extracted");
+
+    // Extraction verified: upgrade badge to reflect confirmed full text.
+    this._setTopBarBadge("oa-pdf", "Full Text");
 
     if (this.elements.paperQAStatus) {
       this.elements.paperQAStatus.textContent =
@@ -188,6 +276,10 @@ DOMManager.prototype._loadPaperPDF = async function(paper) {
 
   } catch (err) {
     this._showPaperState("unavailable");
+    if (this.elements.paperUnavailableSub) {
+      this.elements.paperUnavailableSub.textContent = err.message || "Extraction failed.";
+    }
+    this._setTopBarBadge("degraded", "Abstract only");
     if (this.elements.paperQAStatus) {
       this.elements.paperQAStatus.textContent = `Using abstract (${err.message || "extraction failed"})`;
     }
@@ -213,9 +305,8 @@ DOMManager.prototype.handlePaperQA = async function() {
 
   // Add thinking bubble
   const thinkingBubble = document.createElement("div");
-  thinkingBubble.className = "paper-qa-bubble-thinking";
-  thinkingBubble.innerHTML =
-    `<i class="fa-solid fa-brain" style="animation: pulse 2s infinite; color:#60a5fa"></i><span>Thinking...</span>`;
+  thinkingBubble.className = "paper-qa-bubble-ai";
+  thinkingBubble.textContent = "Thinking...";
   this.elements.paperQAChat.appendChild(thinkingBubble);
   this.elements.paperQAChat.scrollTop = this.elements.paperQAChat.scrollHeight;
 
@@ -444,7 +535,7 @@ DOMManager.prototype.generateTitle = async function(binder) {
     if (suggestedTitle.length > 5 && suggestedTitle.length < 60) {
       binder.name = suggestedTitle;
       this.renderBinders();
-      console.log(`✅ Auto-titled: ${suggestedTitle}`);
+      console.log(`Auto-titled: ${suggestedTitle}`);
     }
   } catch (err) {
     console.warn("Auto-title failed:", err);

@@ -506,7 +506,7 @@ DOMManager.prototype.updatePaginationInfo = function() {
   this.ensureElements();
 
   const totalLoaded = window.appState.currentResearchBinder.papers?.length || 0;
-  const totalCount = window.appState.totalCount;
+  const totalCount = window.appState.totalCount || 0;;
 
   // Find or create pagination info element
   let infoElement = document.querySelector(".pagination-info");

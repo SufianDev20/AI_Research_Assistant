@@ -5,7 +5,7 @@ Converts raw API responses into structured data for storage and LLM processing.
 OpenAlex Work object reference: https://developers.openalex.org
 """
 
-from typing import Dict, List,Optional
+from typing import Dict, List, Optional, Tuple
 
 
 class ExtractionService:
@@ -25,6 +25,8 @@ class ExtractionService:
         Reference:
             https://developers.openalex.org
         """
+        pdf_url, oa_url = ExtractionService._extract_pdf_and_oa_urls(work)
+
         return {
             "openalex_id": work.get("id", ""),
             "title": work.get("title", ""),
@@ -40,22 +42,20 @@ class ExtractionService:
                 and work.get("primary_location", {}).get("source")
                 else None
             ),
-            "is_open_access": work.get("open_access", {}).get("is_oa", False),
+            # is_open_access reflects OpenAlex's own OA determination (open_access.is_oa),
+            # NOT whether a PDF link exists. A green-OA paper can be OA with only a
+            # landing_page_url and no direct pdf_url. Do not conflate the two.
+            "is_open_access": bool(work.get("open_access", {}).get("is_oa", False)),
             "oa_status": work.get("open_access", {}).get("oa_status"),
-            "full_text_url": ExtractionService._extract_full_text_url(work),
+            # has_pdf_link means a direct PDF URL was found in metadata.
+            # This does NOT mean the URL is fetchable (publishers can still 403 it).
+            # Use this field, not is_open_access, to decide whether to attempt extraction.
+            "has_pdf_link": bool(pdf_url),
+            "full_text_url": pdf_url or oa_url,
+            "pdf_url": pdf_url,
+            "oa_url": oa_url,
             "referenced_works": ExtractionService._extract_referenced_works(work),
             "referenced_works_count": len(work.get("referenced_works", [])),
-            "pdf_url": (
-                (work.get("best_oa_location") or {}).get("pdf_url")
-                or (work.get("primary_location") or {}).get("pdf_url")
-                or None
-            ),
-            "oa_url": (
-                (work.get("best_oa_location") or {}).get("landing_page_url")
-                or (work.get("open_access") or {}).get("oa_url")
-                or (work.get("primary_location") or {}).get("landing_page_url")
-                or None
-            ),
         }
 
     @staticmethod
@@ -123,6 +123,49 @@ class ExtractionService:
                 return pdf_url
 
         return None
+
+    @staticmethod
+    def _extract_pdf_and_oa_urls(work: Dict) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Iterates across best_oa_location, primary_location, content_urls, and all locations
+        to find direct PDF links and fallback landing pages.
+        """
+        pdf_url = None
+        landing_page = None
+
+        # 1. Best OA Location
+        best_oa = work.get("best_oa_location") or {}
+        if best_oa.get("pdf_url"):
+            pdf_url = best_oa.get("pdf_url")
+        landing_page = best_oa.get("landing_page_url")
+
+        # 2. Primary Location Fallback
+        primary = work.get("primary_location") or {}
+        if not pdf_url and primary.get("pdf_url"):
+            pdf_url = primary.get("pdf_url")
+        if not landing_page:
+            landing_page = primary.get("landing_page_url")
+
+        # 3. Deep search: Check all locations array for a direct pdf_url
+        if not pdf_url:
+            locations = work.get("locations", [])
+            if isinstance(locations, list):
+                for loc in locations:
+                    if isinstance(loc, dict) and loc.get("pdf_url"):
+                        pdf_url = loc.get("pdf_url")
+                        break
+
+        # 4. Fallback content_urls
+        if not pdf_url:
+            content_urls = work.get("content_urls") or {}
+            if isinstance(content_urls, dict):
+                pdf_url = content_urls.get("pdf")
+
+        # 5. Open Access Landing Page Fallback
+        if not landing_page:
+            landing_page = (work.get("open_access") or {}).get("oa_url")
+
+        return pdf_url, landing_page
 
     @staticmethod
     def _extract_referenced_works(work: Dict) -> List[str]:

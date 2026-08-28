@@ -22,21 +22,22 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Default free model.
 # Browse free models at https://openrouter.ai/models?max_price=0
-DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+DEFAULT_MODEL = "openrouter/free"
 
 # List of all available free models for fallback
 FREE_MODELS = [
-    "qwen/qwen3-coder:free",
+    "openrouter/free",
     "nousresearch/hermes-3-llama-3.1-405b:free",
     "google/gemma-3-4b-it:free",
     "nvidia/nemotron-nano-9b-v2:free",
     "poolside/laguna-m.1:free",
     "z-ai/glm-4.5-air:free",
+    "nvidia/nemotron-3.5-lightning:free",
     "nvidia/nemotron-3-nano-30b-a3b:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "openai/gpt-oss-120b:free",
+    "thinkingmachines/inkling-small:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "inclusionai/ling-3.0-flash-fin:free",
 ]
 
 

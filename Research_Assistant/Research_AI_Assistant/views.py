@@ -498,30 +498,41 @@ def extract_pdf(request):
     openalex_id = request.data.get("openalex_id", "").strip()
     pdf_url = request.data.get("pdf_url", "").strip()
     open_access = request.data.get("is_open_access", False)
-    if not openalex_id or not pdf_url:
+
+    if not openalex_id:
         return Response(
-            {"error": "Both 'openalex_id' and 'pdf_url' are required."},
+            {"error": "openalex_id is required."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if not open_access:
+
+    if not pdf_url or not open_access:
         return Response(
-            {"error": "cannot extract this paper is not open access"},
-            status=status.HTTP_403_FORBIDDEN,
+            {
+                "success": False,
+                "error": "Full text PDF unavailable for extraction.",
+                "fallback_to_abstract": True,
+                "markdown": "",
+                "page_count": 0,
+                "image_paths": [],
+            },
+            status=status.HTTP_200_OK,
         )
 
-    # Return cached result — filter on the actual DB column name
+    # Return cached result
     cached = PaperPDF.objects.filter(
         openalex_id=openalex_id, extraction_success="success"
     ).first()
     if cached:
         return Response(
             {
+                "success": True,
                 "openalex_id": openalex_id,
                 "markdown": cached.markdown_content,
                 "page_count": cached.page_count,
                 "image_paths": cached.image_paths,
                 "cached": True,
-            }
+            },
+            status=status.HTTP_200_OK,
         )
 
     # Prevent duplicate concurrent fetches
@@ -543,7 +554,6 @@ def extract_pdf(request):
                 status=status.HTTP_409_CONFLICT,
             )
 
-    # If a previous attempt failed, allow retry by resetting to pending
     if not created and record.extraction_success == "failed":
         record.extraction_success = "pending"
         record.pdf_url = pdf_url
@@ -562,22 +572,33 @@ def extract_pdf(request):
 
         return Response(
             {
+                "success": True,
                 "openalex_id": openalex_id,
                 "markdown": result["markdown"],
                 "page_count": result["page_count"],
                 "image_paths": result["image_paths"],
                 "cached": False,
-            }
+            },
+            status=status.HTTP_200_OK,
         )
 
     except PDFExtractionError as exc:
         record.extraction_success = "failed"
         record.error_message = str(exc)
         record.save(update_fields=["extraction_success", "error_message"])
-        logger.error("PDF extraction failed for %s: %s", openalex_id, exc)
+        logger.warning("PDF extraction failed for %s: %s", openalex_id, exc)
+
+        # Graceful response so frontend falls back to abstract instead of 502ing
         return Response(
-            {"error": str(exc)},
-            status=status.HTTP_502_BAD_GATEWAY,
+            {
+                "success": False,
+                "error": f"Publisher blocked automated PDF access ({str(exc)})",
+                "fallback_to_abstract": True,
+                "markdown": "",
+                "page_count": 0,
+                "image_paths": [],
+            },
+            status=status.HTTP_200_OK,
         )
 
 
