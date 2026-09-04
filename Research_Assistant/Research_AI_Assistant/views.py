@@ -22,6 +22,18 @@ from .services.openrouter_service import OpenRouterAPIError, OpenRouterService
 from .services.prompt_builder import system_prompt, build_user_message
 from .services.pdf_service import PDFService, PDFExtractionError
 
+# Multi-Paper Q&A backend (separate feature from ask_paper above:
+# multi-paper, page-level citations, deterministic citation validation).
+from .services.qa_pipeline import (
+    QAChunkError,
+    QAChunkService,
+    QAContextError,
+    QAContextService,
+    QACitationValidator,
+)
+from .services.qa_llm import QACompletionError, QACompletionService
+from .serializers import QARequestSerializer
+
 logger = logging.getLogger(__name__)
 
 openalex_service = OpenAlexService()
@@ -656,3 +668,126 @@ def ask_paper(request):
             {"error": "Internal server error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+class MultiPaperQAThrottle(AnonRateThrottle):
+    rate = "10/m"  # Same cost profile as SummariseThrottle: PDF fetch + LLM call
+
+
+@api_view(["POST"])
+@throttle_classes([MultiPaperQAThrottle])
+def multi_paper_qa(request):
+    """
+    POST /api/multi-paper-qa/
+    Body: {
+        "paper_ids": ["https://openalex.org/W123", "https://openalex.org/W456"],
+        "question": "What method did the authors use?",
+        "pdf_urls": {
+            "https://openalex.org/W123": "https://.../paper1.pdf",
+            "https://openalex.org/W456": "https://.../paper2.pdf"
+        }
+    }
+
+    Multi-paper Q&A scoped to user-selected papers, with page-level
+    citations validated deterministically (page-exists + text-overlap
+    check) before being returned. Distinct from ask_paper() above, which
+    answers against a single already-extracted paper with no citation
+    validation.
+
+    Failure isolation: each paper is chunked independently. One paper's
+    PDF failing to fetch does not block the others; failures are reported
+    per-paper in "paper_errors" and the request still answers from
+    whatever papers succeeded.
+
+    Returns JSON (200):
+    {
+        "answer": "...",
+        "citations": [
+            {
+                "paper_id": "...", "page": 4, "quoted_snippet": "...",
+                "page_exists": true, "text_verified": true
+            }
+        ],
+        "paper_errors": {"<paper_id>": "<reason>", ...}
+    }
+
+    Error responses:
+        400 - request validation failed
+        413 - selected papers exceed the model's context window
+        422 - every selected paper failed to chunk; nothing to answer from
+        502 - the LLM call failed or returned unparseable output
+    """
+    serializer = QARequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(
+            {"error": "Invalid request.", "details": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    validated = serializer.validated_data
+    paper_ids = validated["paper_ids"]
+    question = validated["question"]
+    pdf_urls = validated["pdf_urls"]
+
+    papers_chunks = {}
+    paper_errors = {}
+
+    # Chunk each paper independently so one bad PDF does not stop the rest.
+    for paper_id in paper_ids:
+        try:
+            result = QAChunkService.fetch_and_chunk(pdf_urls[paper_id], paper_id)
+            papers_chunks[paper_id] = result["chunks"]
+        except QAChunkError as exc:
+            logger.warning("Chunking failed for %s: %s", paper_id, exc)
+            paper_errors[paper_id] = str(exc)
+        except Exception as exc:
+            logger.exception("Unexpected chunking error for %s", paper_id)
+            paper_errors[paper_id] = f"Unexpected error: {exc}"
+
+    if not papers_chunks:
+        return Response(
+            {
+                "error": "All selected papers failed to process.",
+                "paper_errors": paper_errors,
+            },
+            status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    try:
+        context_chunks = QAContextService.build_context(papers_chunks)
+    except QAContextError as exc:
+        return Response(
+            {"error": str(exc), "paper_errors": paper_errors},
+            status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        )
+
+    try:
+        openrouter_service = OpenRouterService()
+        llm_result = QACompletionService.ask(
+            openrouter_service, context_chunks, question
+        )
+    except QACompletionError as exc:
+        logger.error("Multi-paper Q&A completion failed: %s", exc)
+        return Response(
+            {"error": f"LLM request failed: {exc}", "paper_errors": paper_errors},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except Exception as exc:
+        logger.exception("Unexpected error during multi-paper Q&A completion")
+        return Response(
+            {"error": f"Internal server error: {exc}", "paper_errors": paper_errors},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    validated_citations = QACitationValidator.validate_citations(
+        llm_result["citations"], context_chunks
+    )
+
+    return Response(
+        {
+            "answer": llm_result["answer"],
+            "citations": validated_citations,
+            "paper_errors": paper_errors,
+        },
+        status=status.HTTP_200_OK,
+    )
