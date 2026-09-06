@@ -5,6 +5,7 @@ Django models reference: https://docs.djangoproject.com/en/6.0/topics/db/models/
 
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 
 
 class QueryLog(models.Model):
@@ -247,3 +248,13 @@ class PaperPDF(models.Model):
     @extraction_status.setter
     def extraction_status(self, value):
         self.extraction_success = value
+
+
+class User(AbstractBaseUser, PermissionsMixin):
+    clerk_id = models.CharField(max_length=255, unique=True, db_index=True)
+    email = models.EmailField(blank=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+
+    USERNAME_FIELD = "clerk_id"
+    REQUIRED_FIELDS = []

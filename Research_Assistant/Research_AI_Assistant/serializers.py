@@ -11,7 +11,7 @@ class QueryLogSerializer(serializers.ModelSerializer):
 class ModelPerformanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelPerformance
-        fields = ["__all__"]
+        fields = "__all__"
 
 
 class ResponseLogSerializer(serializers.ModelSerializer):
