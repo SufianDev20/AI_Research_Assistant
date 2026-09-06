@@ -1,0 +1,225 @@
+{% load static %}
+<div id="features">
+  <!-- 01 · Source-aware paper discovery -->
+  <section class="sch-block sch-feat" aria-labelledby="sch-feat-1">
+    <div class="sch-wrap sch-feat__grid">
+      <div class="sch-feat__copy" data-reveal>
+        <p class="sch-feat__index">01</p>
+        <p class="sch-kicker sch-feat__kicker">Source-aware discovery</p>
+        <h3 id="sch-feat-1">Search by the question, not the keyword</h3>
+        <p>
+          Scholara ranks a scholarly index against what you actually asked, and
+          every result keeps its provenance: venue, year, citation count, and
+          whether a full text is openly available.
+        </p>
+        <ul class="sch-feat__pts">
+          <li>{% include "landing/_icon.html" with name="check" %} Relevance, open-access, and best-match ranking</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Year and availability filters, citation-graph links</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Each hit links straight to its record and DOI</li>
+        </ul>
+      </div>
+      <div class="sch-feat__visual sch-feat__visual--crop" data-reveal style="--d:90ms">
+        <div class="sch-card">
+          <div class="sch-card__bar">
+            {% include "landing/_icon.html" with name="search" %} results · "worked examples vs. problem solving in algebra"
+          </div>
+          <div class="sch-card__body">
+            <article class="sch-lrow">
+              <span class="sch-lrow__n">01</span>
+              <span>
+                The worked-example effect and cognitive load in early algebra
+                <span class="sch-prov"><span>J. Educational Psychology</span><span>2018</span><span class="oa">open access</span><span>142 cites</span></span>
+              </span>
+              <span class="sch-lrow__m">0.92</span>
+            </article>
+            <article class="sch-lrow">
+              <span class="sch-lrow__n">02</span>
+              <span>
+                When problem solving beats studying examples: a boundary condition
+                <span class="sch-prov"><span>Learning &amp; Instruction</span><span>2020</span><span>63 cites</span></span>
+              </span>
+              <span class="sch-lrow__m">0.88</span>
+            </article>
+            <p class="sch-why">
+              {% include "landing/_icon.html" with name="corner-down-right" %}
+              matched on <em>worked example</em>, <em>cognitive load</em>, and <em>algebra</em> in the abstract and methods.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · Plain-language summaries and paper Q&A -->
+  <section class="sch-block sch-feat sch-invert sch-feat--flip" aria-labelledby="sch-feat-2">
+    <span class="sch-grain" aria-hidden="true"></span>
+    <div class="sch-wrap sch-feat__grid">
+      <div class="sch-feat__copy" data-reveal>
+        <p class="sch-feat__index">02</p>
+        <p class="sch-kicker sch-feat__kicker">Summaries &amp; Q&amp;A</p>
+        <h3 id="sch-feat-2">Read the shape of a paper first</h3>
+        <p>
+          A consistent structured summary, plus a plain-language mode that
+          restates dense passages without losing the technical meaning &mdash;
+          and answers questions from the paper&rsquo;s own text.
+        </p>
+        <ul class="sch-feat__pts">
+          <li>{% include "landing/_icon.html" with name="check" %} Aim, method, findings, and limitations every time</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Plain-language rewriting for hard sections</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Follow-up questions grounded in the source</li>
+        </ul>
+      </div>
+      <div class="sch-feat__visual" data-reveal style="--d:90ms">
+        <div class="sch-slab">
+          <div class="sch-slab__bar">
+            {% include "landing/_icon.html" with name="book" %} explain · Sweller (1988), §4
+          </div>
+          <div class="sch-slab__body">
+            <div class="sch-seg">
+              <h5>Original</h5>
+              <p>&ldquo;Element interactivity imposes intrinsic load that is irreducible without a change in the learner&rsquo;s schema-based knowledge.&rdquo;</p>
+            </div>
+            <div class="sch-seg">
+              <h5>Plain language</h5>
+              <p>Some material is hard because its parts only make sense together. That difficulty only drops once the learner has built the right mental model.</p>
+            </div>
+            <div class="sch-row"><span class="sch-row__k">Q</span><span>Does this apply to novices and experts equally?</span><span class="sch-row__m">&mdash;</span></div>
+            <div class="sch-row"><span class="sch-row__k">A</span><span>No &mdash; the paper argues load is higher for novices who lack schemas.</span><span class="sch-row__m">§4.2</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 · Cross-paper comparison -->
+  <section class="sch-block sch-feat" aria-labelledby="sch-feat-3">
+    <div class="sch-wrap sch-feat__grid">
+      <div class="sch-feat__copy" data-reveal>
+        <p class="sch-feat__index">03</p>
+        <p class="sch-kicker sch-feat__kicker">Cross-paper comparison</p>
+        <h3 id="sch-feat-3">See where sources agree &mdash; and where they don&rsquo;t</h3>
+        <p>
+          Line up methods, samples, and outcomes in one frame. Scholara marks
+          passages where papers seem to reach different conclusions so you can
+          go and check them yourself.
+        </p>
+        <ul class="sch-feat__pts">
+          <li>{% include "landing/_icon.html" with name="check" %} Shared columns for design, sample, and result</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Divergences shown with the quote from each side</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Fully automatic contradiction detection is <em>roadmap</em>, not a claim today</li>
+        </ul>
+      </div>
+      <div class="sch-feat__visual sch-feat__visual--crop" data-reveal style="--d:90ms">
+        <div class="sch-card">
+          <div class="sch-card__bar">
+            {% include "landing/_icon.html" with name="compare" %} compare · feedback timing &amp; retention
+          </div>
+          <div class="sch-card__body">
+            <article class="sch-lrow">
+              <span class="sch-lrow__n">A</span>
+              <span>Immediate feedback improved retention in a lab vocabulary task
+                <span class="sch-prov"><span>experiment</span><span>n = 96</span></span>
+              </span>
+              <span class="sch-lrow__m">2007</span>
+            </article>
+            <article class="sch-lrow">
+              <span class="sch-lrow__n">B</span>
+              <span>Delayed feedback outperformed immediate on a week-later test
+                <span class="sch-prov"><span>field study</span><span>n = 312</span></span>
+              </span>
+              <span class="sch-lrow__m">2013</span>
+            </article>
+            <p class="sch-margin">
+              Sources diverge on feedback timing &mdash; likely moderated by test
+              delay and task type. Worth a paragraph in the review.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · Research binders and notes -->
+  <section class="sch-block sch-feat sch-invert sch-feat--flip" aria-labelledby="sch-feat-4">
+    <span class="sch-grain" aria-hidden="true"></span>
+    <div class="sch-wrap sch-feat__grid">
+      <div class="sch-feat__copy" data-reveal>
+        <p class="sch-feat__index">04</p>
+        <p class="sch-kicker sch-feat__kicker">Binders &amp; notes</p>
+        <h3 id="sch-feat-4">Everything for one question, kept together</h3>
+        <p>
+          Highlight an excerpt, attach a note, and it stays with its source in a
+          research binder. Close the tab; the thread is still there when you come
+          back.
+        </p>
+        <ul class="sch-feat__pts">
+          <li>{% include "landing/_icon.html" with name="check" %} Group sources, excerpts, and notes by project</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Generated insights saved beside their evidence</li>
+          <li>{% include "landing/_icon.html" with name="check" %} Pick up a research thread without rebuilding context</li>
+        </ul>
+      </div>
+      <div class="sch-feat__visual" data-reveal style="--d:90ms">
+        <div class="sch-slab">
+          <div class="sch-slab__bar">
+            {% include "landing/_icon.html" with name="highlight" %} excerpt · Bjork &amp; Bjork (2011)
+          </div>
+          <div class="sch-slab__body">
+            <p class="sch-excerpt">
+              &ldquo;Conditions of learning that make performance improve rapidly
+              often fail to support long-term retention, whereas
+              <mark>conditions that create difficulties for the learner</mark>
+              &hellip; often optimise long-term retention.&rdquo;
+            </p>
+            <div class="sch-attach">
+              {% include "landing/_icon.html" with name="pen" %}
+              Note &mdash; this is the &ldquo;desirable difficulties&rdquo; framing for §1 of the review.
+            </div>
+            <div class="sch-row"><span class="sch-row__k">tag</span><span>desirable difficulties &middot; retention &middot; §1</span><span class="sch-row__m">binder</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · Citation export -->
+  <section class="sch-block sch-feat" aria-labelledby="sch-feat-5">
+    <div class="sch-wrap sch-feat__grid">
+      <div class="sch-feat__copy" data-reveal>
+        <p class="sch-feat__index">05</p>
+        <p class="sch-kicker sch-feat__kicker">Citation export</p>
+        <h3 id="sch-feat-5">Keep the reference attached to the note</h3>
+        <p>
+          When you save a finding, its citation comes with it. Export a formatted
+          reference in the style you write in, or copy a BibTeX entry into your
+          manager &mdash; DOI and source link intact.
+        </p>
+        <ul class="sch-feat__pts">
+          <li>{% include "landing/_icon.html" with name="check" %} APA, MLA, and BibTeX from the paper&rsquo;s metadata</li>
+          <li>{% include "landing/_icon.html" with name="check" %} References travel with saved notes and summaries</li>
+          <li>{% include "landing/_icon.html" with name="check" %} DOI and record link preserved per entry</li>
+        </ul>
+      </div>
+      <div class="sch-feat__visual sch-feat__visual--crop" data-reveal style="--d:90ms">
+        <div class="sch-card">
+          <div class="sch-card__bar">
+            {% include "landing/_icon.html" with name="quote" %} citation · Roediger &amp; Karpicke, 2006
+          </div>
+          <div class="sch-card__body">
+            <div class="sch-tabs" role="tablist" aria-label="Citation format">
+              <button role="tab" aria-selected="true">APA</button>
+              <button role="tab" aria-selected="false" tabindex="-1">MLA</button>
+              <button role="tab" aria-selected="false" tabindex="-1">BibTeX</button>
+            </div>
+            <p class="sch-cslot">Roediger, H. L., &amp; Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. <em>Psychological Science, 17</em>(3), 249&ndash;255. https://doi.org/10.1111/j.1467-9280.2006.01693.x</p>
+            <p class="sch-cslot"><span class="k">@article</span>{roediger2006test,
+  <span class="k">title</span>   = <span class="s">{Test-enhanced learning}</span>,
+  <span class="k">author</span>  = <span class="s">{Roediger, Henry L. and Karpicke, Jeffrey D.}</span>,
+  <span class="k">journal</span> = <span class="s">{Psychological Science}</span>,
+  <span class="k">year</span>    = <span class="s">{2006}</span>
+}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

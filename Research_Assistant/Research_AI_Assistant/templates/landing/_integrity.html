@@ -1,0 +1,61 @@
+{% load static %}
+<section class="sch-block sch-trust" id="integrity" aria-labelledby="sch-trust-h">
+  <div class="sch-wrap sch-trust__grid">
+    <div data-reveal>
+      <p class="sch-kicker">Integrity</p>
+      <h2 class="sch-h2" id="sch-trust-h">
+        Assistance you can <em>show your supervisor</em>
+      </h2>
+      <p class="sch-lede" style="margin-top:20px">
+        Scholara supports academic work; it does not stand in for it. The aim is
+        that any sentence can be traced back to where it came from &mdash; and
+        that ideas still in progress are labelled as such.
+      </p>
+    </div>
+
+    <div class="sch-trust__list" data-reveal style="--d:80ms">
+      <div class="sch-trust__item">
+        {% include "landing/_icon.html" with name="link" %}
+        <div>
+          <h3>Traceable to the source</h3>
+          <p>Summaries and syntheses stay tied to the specific papers and passages they draw on, so a claim can be checked, not just trusted.</p>
+        </div>
+      </div>
+      <div class="sch-trust__item">
+        {% include "landing/_icon.html" with name="quote" %}
+        <div>
+          <h3>Citations you carry forward</h3>
+          <p>Every saved source keeps its full reference and DOI, ready for your own bibliography in your chosen style.</p>
+        </div>
+      </div>
+      <div class="sch-trust__item">
+        {% include "landing/_icon.html" with name="eye" %}
+        <div>
+          <h3>Transparent about the AI</h3>
+          <p>Generated text is labelled as a draft for you to verify and rewrite in your own voice &mdash; not a finished answer.</p>
+        </div>
+      </div>
+      <div class="sch-trust__item">
+        {% include "landing/_icon.html" with name="scale" %}
+        <div>
+          <h3>Human judgment stays central</h3>
+          <p>Scholara organises evidence and surfaces disagreement; deciding what it means is still your work.</p>
+        </div>
+      </div>
+      <div class="sch-trust__item" data-tag="In development">
+        {% include "landing/_icon.html" with name="compare" %}
+        <div>
+          <h3>Automatic contradiction detection</h3>
+          <p>Today Scholara flags likely divergences for review. Detecting contradictions without a human in the loop is being worked on.</p>
+        </div>
+      </div>
+      <div class="sch-trust__item" data-tag="Roadmap">
+        {% include "landing/_icon.html" with name="download" %}
+        <div>
+          <h3>Reference-manager sync</h3>
+          <p>Direct two-way sync with Zotero and others is planned. For now, export APA, MLA, or BibTeX.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

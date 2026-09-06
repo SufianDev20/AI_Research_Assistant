@@ -1,0 +1,130 @@
+{% load static %}
+<section class="sch-story sch-invert" id="story" aria-labelledby="sch-story-h">
+  <span class="sch-grain" aria-hidden="true"></span>
+  <div class="sch-story__track" data-story-track>
+    <div class="sch-story__pin sch-wrap">
+      <div class="sch-story__top">
+        <p class="sch-kicker" id="sch-story-h">How Scholara works</p>
+        <p class="sch-story__count" data-story-count><b>01</b>&nbsp;/&nbsp;04</p>
+      </div>
+
+      <div class="sch-story__rail" aria-hidden="true">
+        <i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i>
+      </div>
+
+      <div class="sch-story__stages">
+        <!-- Stage 1 -->
+        <article class="sch-story__stage sch-spanel is-active">
+          <div class="sch-story__copy">
+            <p class="sch-kicker">Stage 01</p>
+            <h3>Search trusted academic literature</h3>
+            <p>
+              Start from a question. Scholara queries a scholarly index, ranks
+              results for relevance, and keeps the venue, year, and open-access
+              status attached to every hit.
+            </p>
+          </div>
+          <div class="sch-story__viz">
+            <div class="sch-slab">
+              <div class="sch-slab__bar">
+                {% include "landing/_icon.html" with name="search" %}
+                query &middot; retrieval practice AND exam performance
+              </div>
+              <div class="sch-slab__body">
+                <div class="sch-row"><span class="sch-row__k">0.93</span><span>Test-enhanced learning in a middle-school science class</span><span class="sch-row__m">2011 · OA</span></div>
+                <div class="sch-row"><span class="sch-row__k">0.89</span><span>Retrieval practice and the maintenance of knowledge</span><span class="sch-row__m">1992</span></div>
+                <div class="sch-row"><span class="sch-row__k">0.86</span><span>The power of testing memory: basic research &amp; implications</span><span class="sch-row__m">2006 · OA</span></div>
+                <p class="sch-note-meta" style="margin-top:4px">filters &nbsp;·&nbsp; 2005&ndash;2025 &nbsp;·&nbsp; open access &nbsp;·&nbsp; peer-reviewed</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Stage 2 -->
+        <article class="sch-story__stage sch-spanel">
+          <div class="sch-story__copy">
+            <p class="sch-kicker">Stage 02</p>
+            <h3>Understand papers through clear AI explanations</h3>
+            <p>
+              Each paper gets a structured read &mdash; aim, method, findings,
+              limitations &mdash; and you can ask follow-up questions answered
+              from the paper&rsquo;s own text.
+            </p>
+          </div>
+          <div class="sch-story__viz">
+            <div class="sch-slab">
+              <div class="sch-slab__bar">
+                {% include "landing/_icon.html" with name="book" %}
+                summary &middot; Roediger &amp; Karpicke, 2006
+              </div>
+              <div class="sch-slab__body">
+                <div class="sch-seg"><h5>Method</h5><p>Two experiments; students studied prose then either re-read it or took free-recall tests. Final test at 5&nbsp;minutes and 1&nbsp;week.</p></div>
+                <div class="sch-seg"><h5>Findings</h5><p>Repeated testing produced much better week-later recall than repeated studying, despite lower confidence at the time.</p></div>
+                <div class="sch-seg"><h5>Limitations</h5><p>Prose passages in a lab; transfer to open-ended exam formats is left to later work.</p></div>
+                <div class="sch-row"><span class="sch-row__k">Q</span><span>What was the retention interval?</span><span class="sch-row__m">&mdash;</span></div>
+                <div class="sch-row"><span class="sch-row__k">A</span><span>Five minutes and one week after study &mdash; see Experiment&nbsp;1.</span><span class="sch-row__m">&sect;2.1</span></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Stage 3 -->
+        <article class="sch-story__stage sch-spanel">
+          <div class="sch-story__copy">
+            <p class="sch-kicker">Stage 03</p>
+            <h3>Compare findings, methods, and limitations</h3>
+            <p>
+              Put several papers on one question side by side. Scholara lays out
+              their designs and results in a shared frame and marks where the
+              sources appear to diverge.
+            </p>
+          </div>
+          <div class="sch-story__viz">
+            <div class="sch-slab">
+              <div class="sch-slab__bar">
+                {% include "landing/_icon.html" with name="compare" %}
+                compare &middot; 3 papers &middot; spacing interval
+              </div>
+              <div class="sch-slab__body">
+                <table class="sch-cmp">
+                  <thead><tr><th>Paper</th><th>Design</th><th>On long gaps</th></tr></thead>
+                  <tbody>
+                    <tr><td>Cepeda 2006</td><td>Meta-analysis, 254 studies</td><td>Help as test delay grows</td></tr>
+                    <tr><td>Tabibian 2019</td><td>Field study, SR app</td><td>Adaptive beats any fixed gap</td></tr>
+                    <tr><td>Kang 2016</td><td>Narrative review</td><td>Depends on material &amp; goal</td></tr>
+                  </tbody>
+                </table>
+                <p class="sch-note-meta" style="margin-top:6px">&#9873; flagged &middot; fixed vs. adaptive intervals &mdash; read side by side</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Stage 4 -->
+        <article class="sch-story__stage sch-spanel">
+          <div class="sch-story__copy">
+            <p class="sch-kicker">Stage 04</p>
+            <h3>Turn evidence into structured notes and citations</h3>
+            <p>
+              Save a finding and its citation travels with it. Notes, excerpts,
+              and references stay grouped in a research binder you can return to.
+            </p>
+          </div>
+          <div class="sch-story__viz">
+            <div class="sch-slab">
+              <div class="sch-slab__bar">
+                {% include "landing/_icon.html" with name="folder" %}
+                binder &middot; "Spaced practice in higher ed"
+              </div>
+              <div class="sch-slab__body">
+                <div class="sch-row"><span class="sch-row__k">note</span><span>Spacing gains scale with retention interval</span><span class="sch-row__m">3 sources</span></div>
+                <div class="sch-row"><span class="sch-row__k">quote</span><span>&ldquo;&hellip;the advantage of spaced over massed practice increased&rdquo;</span><span class="sch-row__m">p.363</span></div>
+                <div class="sch-seg"><h5>Citation attached</h5><p>Cepeda, N.&nbsp;J., et&nbsp;al. (2006). Distributed practice in verbal recall tasks. <em>Psychological Bulletin, 132</em>(3), 354&ndash;380.</p></div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>

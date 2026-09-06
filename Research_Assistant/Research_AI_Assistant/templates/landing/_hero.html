@@ -1,0 +1,90 @@
+{% load static %}
+<section class="sch-hero" id="hero" aria-labelledby="sch-hero-h">
+  <div class="sch-hero__glow" aria-hidden="true"></div>
+  <div class="sch-wrap sch-hero__inner">
+    <div class="sch-hero__copy">
+      <p class="sch-hero__eyebrow">
+        {% include "landing/_icon.html" with name="cap" %}
+        University of Sharjah · Senior Project
+      </p>
+      <h1 id="sch-hero-h">
+        Research with clarity.
+        <span class="l2">Build knowledge with confidence.</span>
+      </h1>
+      <p class="sch-hero__lede">
+        Scholara is an AI research assistant for finding, understanding,
+        comparing, and organising academic papers &mdash; with every claim tied
+        back to the source it came from.
+      </p>
+      <div class="sch-hero__cta">
+        <a href="/workspace/" class="sch-btn sch-btn--solid">
+          Start Researching {% include "landing/_icon.html" with name="arrow-right" %}
+        </a>
+        <a href="#story" class="sch-btn sch-btn--line">Explore Scholara</a>
+      </div>
+      <div class="sch-hero__foot">
+        <span>{% include "landing/_icon.html" with name="database" %} Scholarly index via OpenAlex</span>
+        <span>{% include "landing/_icon.html" with name="quote" %} Source-linked synthesis</span>
+        <span>{% include "landing/_icon.html" with name="folder" %} One research workspace</span>
+      </div>
+    </div>
+
+    <div class="sch-desk" data-parallax-scene>
+      <div class="sch-desk__paper" data-desk>
+        <div class="sch-desk__rail" aria-hidden="true"></div>
+        <div class="sch-desk__body">
+          <p class="sch-desk__q">
+            Does spaced practice improve long-term retention for
+            undergraduate students?<span class="cur" aria-hidden="true"></span>
+          </p>
+
+          <p class="sch-desk__stage">
+            {% include "landing/_icon.html" with name="search" %} Discovering &middot; 214 papers matched
+          </p>
+
+          <div class="sch-desk__list">
+            <article class="sch-hit">
+              <span class="sch-hit__n">01</span>
+              <span class="sch-hit__t">Distributed practice in verbal recall tasks: a review and quantitative synthesis</span>
+              <span class="sch-hit__m">Cepeda et&nbsp;al. · 2006</span>
+            </article>
+            <article class="sch-hit">
+              <span class="sch-hit__n">02</span>
+              <span class="sch-hit__t">Enhancing human learning via spaced repetition optimization</span>
+              <span class="sch-hit__m">Tabibian et&nbsp;al. · 2019</span>
+            </article>
+            <article class="sch-hit">
+              <span class="sch-hit__n">03</span>
+              <span class="sch-hit__t">The critical importance of retrieval for learning</span>
+              <span class="sch-hit__m">Karpicke &amp; Roediger · 2008</span>
+            </article>
+          </div>
+
+          <p class="sch-desk__synth">
+            Across these sources, spacing the same study time across sessions
+            produces <mark>larger long-term retention</mark> than massed study
+            <span class="sch-cite">[1]</span>, and the benefit
+            <mark>grows as the delay before testing lengthens</mark>
+            <span class="sch-cite">[1,2]</span>. Gains are strongest when spacing
+            is paired with active retrieval rather than re-reading
+            <span class="sch-cite">[3]</span>.
+          </p>
+        </div>
+
+        <svg class="sch-threads" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M400 34 C 384 74, 366 118, 346 150" />
+          <path d="M0 344 C 26 332, 46 316, 66 298" />
+        </svg>
+      </div>
+
+      <aside class="sch-desk__float sch-desk__float--a" data-parallax="0.05" aria-hidden="true">
+        <h4>Cepeda, Pashler, Vul, Wixted &amp; Rohrer</h4>
+        <p>Psychological Bulletin · 2006 · meta-analysis · 839 cites</p>
+      </aside>
+      <aside class="sch-desk__float sch-desk__float--b" data-parallax="0.08" aria-hidden="true">
+        <h4>Tabibian et al.</h4>
+        <p>PNAS · 2019 · field study · open access</p>
+      </aside>
+    </div>
+  </div>
+</section>
