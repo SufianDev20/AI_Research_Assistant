@@ -336,9 +336,16 @@ def generate_title(request):
         )
 
 
+def landing(request):
+    """
+    Render the Scholara marketing landing page.
+    """
+    return render(request, "landing/landing.html")
+
+
 def frontend(request):
     """
-    Render the frontend HTML template for BRAIN AI Research Assistant.
+    Render the frontend HTML template for the Scholara research workspace.
     """
     return render(request, "index.html")
 

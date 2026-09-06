@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scholara — Research with clarity, build knowledge with confidence</title>
+    <meta
+      name="description"
+      content="Scholara is an AI research assistant for finding, understanding, comparing, and organising academic papers. A University of Sharjah senior project."
+    />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f4f2e9" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'landing.css' %}" />
+  </head>
+  <body class="scholara" id="top">
+    {% include "landing/_sprite.html" %}
+    <a class="sch-skip" href="#hero">Skip to content</a>
+
+    {% include "landing/_nav.html" %}
+
+    <main>
+      {% include "landing/_hero.html" %}
+      {% include "landing/_workflow.html" %}
+      {% include "landing/_struggle.html" %}
+      {% include "landing/_story.html" %}
+      {% include "landing/_features.html" %}
+      {% include "landing/_integrity.html" %}
+      {% include "landing/_universe.html" %}
+    </main>
+
+    {% include "landing/_footer.html" %}
+
+    <script src="{% static 'js/landing.js' %}" defer></script>
+  </body>
+</html>

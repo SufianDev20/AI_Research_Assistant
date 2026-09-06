@@ -1,0 +1,33 @@
+{% load static %}
+<header class="sch-nav" data-nav>
+  <div class="sch-wrap sch-nav__row">
+    <a href="#top" class="sch-word" aria-label="Scholara — home">
+      <b>Scholara</b><span>UOS</span>
+    </a>
+
+    <nav class="sch-nav__links" id="sch-nav-links" aria-label="Sections">
+      <a href="#workflow">Workflow</a>
+      <a href="#story">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#integrity">Integrity</a>
+      <a href="/workspace/">Research Workspace</a>
+    </nav>
+
+    <div class="sch-nav__end">
+      <a href="/workspace/" class="sch-btn sch-btn--solid">
+        Start Researching {% include "landing/_icon.html" with name="arrow-right" %}
+      </a>
+      <button
+        class="sch-nav__toggle"
+        type="button"
+        data-nav-toggle
+        aria-expanded="false"
+        aria-controls="sch-nav-links"
+        aria-label="Toggle menu"
+      >
+        {% include "landing/_icon.html" with name="menu" cls="js-i-open" %}
+        {% include "landing/_icon.html" with name="x" cls="js-i-close" %}
+      </button>
+    </div>
+  </div>
+</header>
