@@ -11,13 +11,13 @@ the LLM call:
 The LLM-specific code remains in qa_llm.py.
 """
 
-import logging, re, os, tempfile, requests
+import logging, re, os, tempfile
 from difflib import SequenceMatcher
 from typing import Dict, List
 
+from .pdf_service import PDFExtractionError, fetch_pdf_bytes
+
 # Configurations / Constants
-MAX_PDF_BYTES = 50 * 1024 * 1024
-FETCH_TIMEOUT = 30
 MIN_CHUNK_TOKENS = 300
 MAX_CHUNK_TOKENS = 500
 CHARS_PER_TOKEN = 4
@@ -68,7 +68,10 @@ class QAChunkService:
             raise QAChunkError(
                 f"No direct pdf_url available for {openalex_id} cannot chunk a page for citation without a fetchable PDF."
             )
-        pdf_bytes = QAChunkService.fetch_and_chunk(pdf_url, openalex_id)
+        try:
+            pdf_bytes = fetch_pdf_bytes(pdf_url, openalex_id)
+        except PDFExtractionError as exc:
+            raise QAChunkError(str(exc)) from exc
         try:
             import pymupdf4llm as pm4
         except ModuleNotFoundError as exc:
@@ -131,44 +134,6 @@ class QAChunkService:
                     pass
 
     @staticmethod
-    def _fetch_pdf_bytes(pdf_url: str, openalex_id: str) -> bytes:
-        """
-        Download PDF bytes with the same size guard
-        """
-        try:
-            response = requests.get(
-                pdf_url,
-                timeout=FETCH_TIMEOUT,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/127.0.0.0 Safari/537.36"
-                    ),
-                    "Accept": "application/pdf,*/*",
-                },
-                stream=True,
-            )
-            response.raise_for_status()
-            content_length = int(response.headers.get("Content-Length", 0))
-            if content_length > MAX_PDF_BYTES:
-                raise QAChunkError(
-                    f"PDF too large for {openalex_id}: {content_length} bytes "
-                    f"(limit {MAX_PDF_BYTES})"
-                )
-
-            pdf_bytes = response.content
-
-            if len(pdf_bytes) > MAX_PDF_BYTES:
-                raise QAChunkError(
-                    f"PDF for {openalex_id} exceeds 50MB limit after download."
-                )
-
-            return pdf_bytes
-        except requests.RequestException as exc:
-            raise QAChunkError(f"Failed to fetch PDF for {openalex_id}: {exc}") from exc
-
-    @staticmethod
     def _estimate_tokens(text: str) -> int:
         """Approximate token count using the ~4 chars/token heuristic."""
         return max(1, len(text) // CHARS_PER_TOKEN)
@@ -209,7 +174,15 @@ class QAChunkService:
         if current:
             chunks.append("\n\n".join(current))
 
-        return chunks
+        minimum_chars = MIN_CHUNK_TOKENS * CHARS_PER_TOKEN
+        merged_chunks: List[str] = []
+        for chunk in chunks:
+            if merged_chunks and len(chunk) < minimum_chars:
+                merged_chunks[-1] = f"{merged_chunks[-1]}\n\n{chunk}"
+            else:
+                merged_chunks.append(chunk)
+
+        return merged_chunks
 
 
 # Context Building

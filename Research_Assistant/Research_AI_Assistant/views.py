@@ -42,7 +42,7 @@ openalex_service = OpenAlexService()
 class SearchRateThrottle(AnonRateThrottle):
     """Rate throttle for search requests for Annonymous users"""
 
-    rate = "100/s"
+    rate = "60/m"
 
 
 class GenerateTitle(AnonRateThrottle):
