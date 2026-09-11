@@ -18,6 +18,12 @@ import environ
 
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
+# settings.py
+CLERK_SECRET_KEY = env("CLERK_SECRET_KEY")
+CLERK_AUTHORIZED_PARTIES = env.list(
+    "CLERK_AUTHORIZED_PARTIES",
+    default=["http://localhost:8080"],
+)
 
 OPENALEX_EMAIL = env("OPENALEX_EMAIL")
 OPENALEX_API_KEY = env("OPENALEX_API_KEY", default=None)
@@ -33,9 +39,8 @@ OPENROUTER_SITE_NAME = "Research_AI_Assistant"
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+DEBUG = env.bool("DEBUG", default=False)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 
 # Application definition
@@ -62,6 +67,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "Research_Assistant.urls"
+
+AUTH_USER_MODEL = "Research_AI_Assistant.User"
 
 TEMPLATES = [
     {
@@ -145,6 +152,12 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/min",
     },
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "Research_AI_Assistant.authentication.ClerkAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }
 import os
 
