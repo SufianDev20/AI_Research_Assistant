@@ -46,6 +46,7 @@
   --gutter: clamp(20px, 5vw, 72px);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sch-nav-h: 74px;
 
   margin: 0;
   background: var(--paper);
@@ -239,6 +240,88 @@
     linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   opacity: 0.35;
+}
+
+/* visually-hidden but screen-reader-readable (live-region announcements) */
+.sch-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Shared circular nav-arrow button, used by the story section's Prev/Next
+   controls below. (An older horizontal scroll-track + edge-fade mask this
+   once carried is gone for good — that mask faded real page text near the
+   left/right edges any time there was "more to scroll," which was always,
+   on a full-width slide. Stages now advance only via explicit controls.)
+   -------------------------------------------------------------------------- */
+
+.sch-hcar__arrow {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease),
+    opacity 0.2s var(--ease), transform 0.15s var(--ease);
+}
+.sch-hcar__arrow .sch-ico { width: 16px; height: 16px; }
+.sch-hcar__arrow--prev .sch-ico { transform: rotate(180deg); }
+.sch-hcar__arrow:hover:not(:disabled) { border-color: var(--forest); background: var(--panel); }
+.sch-hcar__arrow:active:not(:disabled) { transform: scale(0.92); }
+.sch-hcar__arrow:disabled { opacity: 0.3; cursor: default; }
+.sch-hcar__arrow:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.sch-invert .sch-hcar__arrow {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef3ec;
+}
+.sch-invert .sch-hcar__arrow:hover:not(:disabled) { border-color: var(--mint); background: rgba(255, 255, 255, 0.08); }
+.sch-invert .sch-hcar__arrow:focus-visible { outline-color: var(--mint); }
+
+/* "drag or use the arrows" hint */
+.sch-hcar__hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+}
+.sch-invert .sch-hcar__hint { color: rgba(238, 243, 236, 0.5); }
+.sch-hcar__hint-rule { flex: none; width: 28px; height: 1px; background: currentColor; opacity: 0.7; }
+.sch-hcar__hint-arrow { flex: none; font-size: 0.85rem; line-height: 1; color: var(--emerald); }
+.sch-invert .sch-hcar__hint-arrow { color: var(--mint); }
+.sch-hcar__hint-short { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .sch-hcar__hint.is-armed .sch-hcar__hint-arrow { animation: sch-hint-nudge 1.6s var(--ease) 1; }
+}
+@keyframes sch-hint-nudge {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  82% { transform: translateX(1px); }
+}
+@media (max-width: 640px) {
+  .sch-hcar__hint-full { display: none; }
+  .sch-hcar__hint-short { display: inline; }
 }
 
 /* ============================================================================
@@ -583,7 +666,12 @@
 @keyframes sch-draw { to { stroke-dashoffset: 0; } }
 
 /* ============================================================================
-   3 · Workflow strip
+   3 · Workflow strip — original spacious presentation, normal document flow
+   Question -> Discover -> Read -> Compare -> Synthesize -> Cite, as one even
+   six-column row (this never scrolls or overflows at any width the row
+   itself is responsible for; below 860px it becomes a vertical list
+   instead). Nothing here pins the viewport or reads scroll position beyond
+   the same passive, ambient fill every other section on the page uses.
    ========================================================================== */
 
 .sch-flow {
@@ -631,7 +719,17 @@
   background: var(--emerald);
   transition: width 0.5s var(--ease);
 }
+/* stage buttons are reset to look exactly like the original plain markup;
+   the interactivity is additive, the appearance is not */
 .sch-stage {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
   position: relative;
   padding-top: 34px;
 }
@@ -667,6 +765,12 @@
   transform: scale(1.15);
 }
 .sch-stage.is-on .sch-stage__t { opacity: 1; }
+.sch-flow__line:focus-visible,
+.sch-stage:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
 
 /* ============================================================================
    4 · The research struggle
@@ -772,32 +876,26 @@
 .sch-struggle.is-armed .sch-board__col:nth-child(3) .sch-board__card { transition-delay: 0.2s; }
 
 /* ============================================================================
-   5 · Pinned scroll story
+   5 · "How Scholara works" — a large open research book
+   A genuine two-page spread (StPageFlip, vendored locally — see
+   static/js/landing/vendor/page-flip/) with the original left-side copy
+   and typography on the left leaf, and a taped research sticky note on
+   the right leaf. Real diagonal page curling for Next/Previous, driven
+   only by explicit controls — the section never pins the viewport or
+   reads/redirects vertical scrolling. Below ~640px, or under
+   prefers-reduced-motion, the same 8 leaves render as a plain instant
+   pair-swap instead (see book() in landing.js); with JS unavailable
+   entirely, they render as a plain stacked reading list.
    ========================================================================== */
 
 .sch-story { position: relative; }
-.sch-story__track { position: relative; }
-.sch-story__pin {
-  position: sticky;
-  top: 0;
-  min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  padding-block: clamp(56px, 8vh, 84px) 48px;
-  overflow: hidden;
-}
+
 .sch-story__top {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
   flex-wrap: wrap;
-}
-.sch-story__rail {
-  display: flex;
-  gap: 6px;
-  margin-top: 18px;
-  margin-bottom: 8px;
 }
 .sch-story__count {
   font-family: "Newsreader", serif;
@@ -806,59 +904,143 @@
 }
 .sch-story__count b { color: #f1f5ee; font-weight: 500; }
 
-.sch-story__stages {
-  position: relative;
-  width: 100%;
-  margin: auto 0;
+/* clickable progress rail: four segments standing in for the four stages */
+.sch-story__rail {
+  display: flex;
+  gap: 6px;
+  margin-top: 18px;
+  margin-bottom: 28px;
 }
-.sch-story__stage {
-  display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-  gap: clamp(28px, 6vw, 80px);
-  align-items: center;
-  align-content: center;
-}
-.sch-story__stage.sch-spanel {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transform: translateY(26px) scale(0.99);
-  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
-  pointer-events: none;
-}
-.sch-story__stage.sch-spanel.is-active {
-  position: relative;
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-.sch-story__rail i {
-  height: 3px;
+.sch-story__seg {
+  appearance: none;
+  border: 0;
+  background: none;
   flex: 1;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 2px;
-  overflow: hidden;
+  padding-block: 9px;
+  margin-block: -9px;
+  cursor: pointer;
 }
-.sch-story__rail i b {
+.sch-story__seg b {
   display: block;
-  height: 100%;
-  width: 0;
-  background: var(--mint);
-  transition: width 0.3s linear;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.3s var(--ease);
 }
-.sch-story__copy h3 {
+.sch-story__seg.is-filled b { background: var(--mint); }
+.sch-story__seg:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Prev/Next flank the book; a deliberate replacement for the old
+   scroll-jacked progression, not a scroll listener of any kind. */
+.sch-story__nav { display: flex; align-items: center; gap: 16px; }
+.sch-story__arrow { position: relative; flex: 0 0 auto; z-index: 6; }
+
+.sch-flip-stage { position: relative; flex: 1 1 auto; min-width: 0; }
+
+/* ---------------------------------------------------------------------
+   Default content order: a plain stacked reading list. This is what
+   renders with JavaScript unavailable, and what book()'s "paged"
+   fallback mode (narrow phones, prefers-reduced-motion) also uses —
+   only the layout below changes between the two; the leaves themselves
+   never do.
+   ------------------------------------------------------------------- */
+.sch-story__leaves { display: grid; gap: 64px; }
+.sch-story__leaves[data-mode="paged"] {
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  align-items: center;
+  gap: clamp(28px, 6vw, 80px);
+}
+.sch-story__leaves[data-mode="paged"] .sch-leaf[hidden] { display: none; }
+
+.sch-leaf--copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(20px, 3vw, 40px);
+}
+.sch-leaf--copy h3 {
   font-size: clamp(1.7rem, 3.4vw, 2.6rem);
   margin-bottom: 14px;
 }
-.sch-story__copy p {
+.sch-leaf--copy p {
   color: rgba(238, 243, 236, 0.74);
   max-width: 40ch;
 }
-.sch-story__copy .sch-kicker { margin-bottom: 18px; }
+.sch-leaf--copy .sch-kicker { margin-bottom: 18px; }
+.sch-leaf--note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 2.6vw, 32px);
+}
 
-.sch-story__viz { position: relative; min-height: 340px; }
+/* ---------------------------------------------------------------------
+   The book itself: StPageFlip's own container. It moves the 8 leaves
+   into its own render structure and animates them; everything here is
+   the paper surface, page edges, and outer shadow around that.
+   ------------------------------------------------------------------- */
+.sch-flipbook {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  filter: drop-shadow(0 55px 90px rgba(0, 0, 0, 0.55));
+}
+/* StPageFlip's UI.ts adds .stf__parent directly onto the element passed
+   to its constructor — that is .sch-flipbook itself, not a descendant —
+   so this must be a compound selector, not "A B". */
+.sch-flipbook.stf__parent {
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1a3f2f, #12291f);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* a soft center valley standing in for the binding — two faint dark
+   bands with a hairline highlight beside each, not a solid divider */
+.sch-flipbook.stf__parent::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 30px), rgba(255, 255, 255, 0.05) calc(50% - 15px),
+      rgba(0, 0, 0, 0.32) calc(50% - 2px), rgba(0, 0, 0, 0.4) 50%,
+      rgba(0, 0, 0, 0.32) calc(50% + 2px), rgba(255, 255, 255, 0.05) calc(50% + 15px),
+      transparent calc(50% + 30px)
+    );
+  /* above the resting pages (the library's own z-index for a settled
+     left/right page is startZIndex+5) so the valley reads at rest, but
+     hidden the instant a turn starts (book() toggles .is-flipping) so it
+     never draws a static line across the moving, curling page. */
+  z-index: 6;
+  opacity: 1;
+  transition: opacity 0.15s var(--ease);
+}
+.sch-flipbook.is-flipping.stf__parent::after { opacity: 0; }
+.sch-flipbook .stf__item { background: transparent; }
+.sch-flipbook .sch-leaf {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* an opaque base color first (this is the actual page surface — subtly
+     lighter than the section background), gradients layered above it for
+     a soft top sheen and a faint paper grain */
+  background:
+    radial-gradient(140% 120% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 4px),
+    linear-gradient(175deg, #1d4433 0%, #17392a 55%, #123024 100%);
+}
+.sch-flipbook .sch-leaf--copy { box-shadow: inset -20px 0 30px -28px rgba(0, 0, 0, 0.6); }
+.sch-flipbook .sch-leaf--note { box-shadow: inset 20px 0 30px -28px rgba(0, 0, 0, 0.6); }
 
-/* generic dark mock surface used inside the story + deep feature sections */
+/* generic dark mock surface — shared with the deep feature sections,
+   left byte-for-byte here so _features.html is never affected */
 .sch-slab {
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -878,10 +1060,9 @@
 }
 .sch-slab__bar .sch-ico { width: 13px; height: 13px; color: var(--mint); }
 .sch-slab__body { padding: 15px; display: grid; gap: 9px; }
-
 .sch-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: baseline;
   padding: 9px 11px;
@@ -891,11 +1072,7 @@
   font-size: 0.78rem;
   color: rgba(238, 243, 236, 0.82);
 }
-.sch-row__k {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.62rem;
-  color: var(--mint);
-}
+.sch-row__k { font-family: "JetBrains Mono", monospace; font-size: 0.62rem; color: var(--mint); }
 .sch-row__m {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.6rem;
@@ -917,11 +1094,11 @@
   color: var(--mint);
 }
 .sch-seg p { font-size: 0.78rem; color: rgba(238, 243, 236, 0.72); line-height: 1.6; }
-
 .sch-cmp {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.72rem;
+  table-layout: fixed;
 }
 .sch-cmp th,
 .sch-cmp td {
@@ -940,6 +1117,123 @@
   font-weight: 500;
 }
 .sch-cmp td:first-child { color: #eef3ec; }
+
+/* ---------------------------------------------------------------------
+   The sticky note. Entirely new class names (.sch-note__*), never
+   shared with .sch-slab/.sch-row/.sch-seg/.sch-cmp above, so nothing
+   here can ever reach _features.html. Warm parchment, taped at two
+   corners, a restrained paper-fiber grain, typeset like a research
+   note rather than gridded like an admin table.
+   ------------------------------------------------------------------- */
+.sch-note {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 26px 24px 22px;
+  border-radius: 3px;
+  transform: rotate(-1.1deg);
+  background:
+    radial-gradient(rgba(60, 46, 28, 0.05) 1px, transparent 1.2px),
+    radial-gradient(rgba(60, 46, 28, 0.035) 1px, transparent 1.2px),
+    linear-gradient(175deg, #f3f0e3, #eae6d5);
+  background-size: 3px 3px, 7px 7px, auto;
+  background-position: 0 0, 2px 3px, 0 0;
+  box-shadow:
+    0 24px 48px -22px rgba(0, 0, 0, 0.55),
+    0 2px 0 rgba(255, 255, 255, 0.5) inset;
+  color: var(--ink);
+}
+.sch-flipbook .sch-leaf--note:nth-of-type(even) .sch-note,
+.sch-story__leaves .sch-leaf--note:nth-of-type(even) .sch-note { transform: rotate(0.8deg); }
+
+.sch-note__tape {
+  position: absolute;
+  top: -11px;
+  width: 54px;
+  height: 22px;
+  background: linear-gradient(180deg, rgba(201, 168, 111, 0.5), rgba(176, 137, 78, 0.38));
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+}
+.sch-note__tape::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.3), transparent 40%, transparent 60%, rgba(255, 255, 255, 0.22)),
+    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.09) 0 1px, transparent 1px 3px);
+}
+.sch-note__tape--l { left: 18px; transform: rotate(-7deg); }
+.sch-note__tape--r { right: 18px; transform: rotate(6deg); }
+
+.sch-note__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px dashed var(--rule);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-meta);
+}
+.sch-note__head .sch-ico { width: 13px; height: 13px; color: var(--emerald); flex: none; }
+
+.sch-note__list { display: grid; gap: 12px; margin: 0 0 4px; padding: 0; list-style: none; }
+.sch-note__list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 8px 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.sch-note__list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.sch-note__k {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--emerald);
+  min-width: 2.4em;
+}
+.sch-note__t { font-size: 0.86rem; line-height: 1.42; color: var(--ink); }
+.sch-note__m {
+  grid-column: 3;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.62rem;
+  color: var(--ink-meta);
+  white-space: nowrap;
+}
+.sch-note__list--qa .sch-note__t { font-style: italic; color: var(--ink-body); }
+
+.sch-note__seg { padding: 4px 0 12px; border-bottom: 1px solid var(--rule-soft); margin-bottom: 12px; }
+.sch-note__seg:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.sch-note__seg h5 {
+  margin: 0 0 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--emerald);
+}
+.sch-note__seg p { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--ink-body); }
+.sch-note__seg p em { color: var(--forest); font-style: italic; }
+
+.sch-note__cmp { width: 100%; border-collapse: collapse; font-size: 0.78rem; table-layout: fixed; }
+.sch-note__cmp th,
+.sch-note__cmp td { text-align: left; padding: 7px 8px 7px 0; vertical-align: top; border-bottom: 1px solid var(--rule-soft); color: var(--ink-body); }
+.sch-note__cmp th {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+  font-weight: 500;
+}
+.sch-note__cmp td:first-child { color: var(--ink); font-weight: 500; }
+
+.sch-note__foot { margin: 12px 0 0; font-family: "JetBrains Mono", monospace; font-size: 0.64rem; color: var(--ink-meta); }
 
 /* ============================================================================
    6 · Feature sections (alternating light / deep)
@@ -1334,22 +1628,10 @@
   .sch-hit,
   .sch-desk__synth,
   .sch-board__card { opacity: 1 !important; transform: none !important; }
-  .sch-story__stage.sch-spanel {
-    position: relative;
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-  .sch-story__stage.sch-spanel + .sch-story__stage.sch-spanel { margin-top: 56px; }
-  .sch-story__stages { min-height: 0; }
-  .sch-story__rail { display: none; }
-  .sch-story__pin {
-    position: static;
-    min-height: 0;
-    display: block;
-    padding-block: clamp(56px, 10vw, 96px);
-  }
-  .sch-story__count { display: none; }
+
+  /* the book: landing.js swaps straight to the target page instead of
+     flipping (the blanket transition-duration rule above already zeroes
+     out the flip transform, this just skips the animation bookkeeping) */
 }
 
 /* ============================================================================
@@ -1367,7 +1649,6 @@
   }
   .sch-desk__float--a, .sch-desk__float--b { inset: auto; }
   .scholara .sch-threads { display: none; }
-  .sch-story__stage { grid-template-columns: 1fr; }
   .sch-feat__grid,
   .sch-feat--flip .sch-feat__grid { direction: ltr; grid-template-columns: 1fr; }
   .sch-trust__grid { grid-template-columns: 1fr; }
@@ -1376,25 +1657,10 @@
 }
 
 @media (max-width: 860px) {
-  /* story: drop the scroll-jack, stack the stages */
-  .sch-story__track { height: auto !important; }
-  .sch-story__pin {
-    position: static;
-    min-height: 0;
-    display: block;
-    padding-block: clamp(64px, 12vw, 120px);
-  }
-  .sch-story__stages { position: static; min-height: 0; margin: 0; }
-  .sch-story__stage.sch-spanel {
-    position: static;
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-  .sch-story__stage.sch-spanel + .sch-story__stage.sch-spanel { margin-top: 64px; }
-  .sch-story__rail,
-  .sch-story__count { display: none; }
+  .sch-story__nav { gap: 10px; }
+  .sch-story__arrow { width: 38px; height: 38px; }
 
+  /* workflow: the six-column row becomes a vertical list */
   .sch-flow__line { grid-template-columns: 1fr; gap: 0; }
   .sch-flow__line::before,
   .sch-flow__line::after { display: none; }
@@ -1403,6 +1669,16 @@
     border-left: 1px solid var(--rule);
   }
   .sch-stage__dot { top: 18px; left: -7px; }
+}
+
+@media (max-width: 640px) {
+  /* paged fallback (phones, or reduced motion): copy stacks over the
+     note, so the flanking arrows sit near the top by the heading rather
+     than at the vertical center of the whole tall pair */
+  .sch-story__leaves[data-mode="paged"] { grid-template-columns: 1fr; }
+  .sch-story__nav { align-items: flex-start; }
+  .sch-story__arrow { margin-top: 6px; }
+  .sch-note { max-width: none; }
 }
 
 @media (max-width: 720px) {

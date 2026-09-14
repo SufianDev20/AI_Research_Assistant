@@ -7,7 +7,6 @@
 
   var mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   var mqFine = window.matchMedia("(pointer: fine)");
-  var mqDesktop = window.matchMedia("(min-width: 861px)");
   var reduce = mqReduce.matches;
 
   var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
@@ -22,6 +21,18 @@
   (function nav() {
     var el = document.querySelector("[data-nav]");
     if (!el) return;
+
+    // Publish the real navbar height so sticky sections can offset from it
+    // (CSS var --sch-nav-h; the stylesheet carries a 74px fallback).
+    var root = document.querySelector(".scholara") || document.documentElement;
+    var syncNavH = function () {
+      var h = Math.round(el.getBoundingClientRect().height);
+      if (h) root.style.setProperty("--sch-nav-h", h + "px");
+    };
+    syncNavH();
+    window.addEventListener("resize", syncNavH, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(syncNavH).observe(el);
+
     var stick = function () {
       el.classList.toggle("is-stuck", window.scrollY > 10);
     };
@@ -122,33 +133,53 @@
     });
   })();
 
-  /* ---- workflow strip: scroll-driven stage activation --------------- */
+  /* ---- "A living system" workflow strip ---------------------------------
+     Question -> Discover -> Read -> Compare -> Synthesize -> Cite, as one
+     plain six-column row in normal document flow (original presentation).
+     The fill is a passive, ambient reveal driven by scroll position — the
+     same read-only technique as [data-reveal] elsewhere: it never calls
+     preventDefault and never touches scrollTop/scrollLeft, so it cannot
+     trap or redirect vertical wheel/touch scrolling. Clicking a stage, or
+     using Left/Right once the row has focus, additionally lets a visitor
+     jump the highlight to any stage on demand. */
   (function workflow() {
     var strip = document.querySelector("[data-flow]");
     if (!strip) return;
+    var line = strip.querySelector("[data-flow-line]");
     var stages = Array.prototype.slice.call(strip.querySelectorAll(".sch-stage"));
-    var line = strip.querySelector(".sch-flow__line");
-    if (!stages.length) return;
+    if (!line || !stages.length) return;
+    var n = stages.length;
+
+    var render = function (active) {
+      stages.forEach(function (s, i) {
+        s.classList.toggle("is-on", i < active);
+        // aria-current marks a single "you are here", not every lit dot
+        if (i === active - 1) s.setAttribute("aria-current", "step");
+        else s.removeAttribute("aria-current");
+      });
+      line.style.setProperty("--flow-progress", (active / n) * 100 + "%");
+    };
 
     if (reduce) {
-      stages.forEach(function (s) { s.classList.add("is-on"); });
-      if (line) line.style.setProperty("--flow-progress", "100%");
+      render(n);
+      stages.forEach(function (s, i) {
+        s.addEventListener("click", function () { render(i + 1); });
+      });
       return;
     }
 
+    var manual = -1; // last stage a visitor explicitly chose, if any
     var ticking = false;
     var update = function () {
       ticking = false;
+      if (manual >= 0) return; // a deliberate choice takes priority over the ambient reveal
       var r = strip.getBoundingClientRect();
       var vh = window.innerHeight;
-      // progress as the strip travels through the middle of the viewport
+      // progress as the strip travels through the middle of the viewport —
+      // read-only bookkeeping, identical in spirit to the page's other
+      // scroll-triggered reveals; it never intercepts the scroll itself
       var p = clamp((vh * 0.85 - r.top) / (r.height + vh * 0.5), 0, 1);
-      var active = Math.round(p * stages.length);
-      stages.forEach(function (s, i) { s.classList.toggle("is-on", i < active); });
-      if (line) {
-        var pct = stages.length ? (active / stages.length) * 100 : 0;
-        line.style.setProperty("--flow-progress", pct + "%");
-      }
+      render(Math.round(p * n));
     };
     var onScroll = function () {
       if (!ticking) { ticking = true; requestAnimationFrame(update); }
@@ -156,6 +187,22 @@
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
     update();
+
+    stages.forEach(function (s, i) {
+      s.addEventListener("click", function () {
+        manual = i;
+        render(i + 1);
+      });
+    });
+    line.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      var base = manual >= 0 ? manual : Math.max(0, stages.filter(function (s) {
+        return s.classList.contains("is-on");
+      }).length - 1);
+      manual = clamp(base + (e.key === "ArrowRight" ? 1 : -1), 0, n - 1);
+      render(manual + 1);
+    });
   })();
 
   /* ---- struggle: trigger the pull-in once ------------------------------- */
@@ -178,70 +225,195 @@
     io.observe(el);
   })();
 
-  /* ---- pinned scroll story ----------------------------------------- */
-  (function story() {
-    var track = document.querySelector("[data-story-track]");
-    if (!track) return;
-    var stages = Array.prototype.slice.call(
-      track.querySelectorAll(".sch-story__stage")
-    );
-    var countEl = track.querySelector("[data-story-count]");
-    var bars = Array.prototype.slice.call(track.querySelectorAll(".sch-story__rail b"));
-    if (!stages.length) return;
+  /* ---- "How Scholara works": an open research book (StPageFlip) ---------
+     8 leaves (4 stage-copy / 4 sticky-note, interleaved) live in
+     [data-story-leaves] at all times — that is also the complete no-JS
+     fallback (a plain stacked reading list). With JS and enough width,
+     they're moved into a vendored StPageFlip instance for a genuine
+     diagonal page curl; under prefers-reduced-motion or a narrow
+     viewport, they're moved into the same holder in "paged" mode instead
+     (an instant copy+note pair swap, no library, no animation).
+     StPageFlip is vendored locally (static/js/landing/vendor/page-flip/)
+     — no CDN, no jQuery, no build step. It owns its own drag/corner
+     interaction and is built to coexist with page scroll
+     (mobileScrollSupport), but Next/Previous/the rail/arrow keys never
+     touch scroll either way — normal vertical wheel/touch scrolling is
+     never read, touched, or pre-empted by this code. */
+  (function book() {
+    var stage = document.querySelector("[data-flip-stage]");
+    var leavesHolder = document.querySelector("[data-story-leaves]");
+    if (!stage || !leavesHolder) return;
+    var leaves = Array.prototype.slice.call(leavesHolder.querySelectorAll("[data-leaf]"));
+    if (!leaves.length || leaves.length % 2 !== 0) return;
+    var n = leaves.length / 2; // number of stages (copy+note pairs)
 
-    var n = stages.length;
-    var current = -1;
+    var wrap = stage.closest(".sch-wrap");
+    var prevBtn = wrap && wrap.querySelector("[data-story-prev]");
+    var nextBtn = wrap && wrap.querySelector("[data-story-next]");
+    var segs = wrap ? Array.prototype.slice.call(wrap.querySelectorAll("[data-story-seg]")) : [];
+    var countEl = wrap && wrap.querySelector("[data-story-count]");
+    var live = wrap && wrap.querySelector("[data-story-live]");
+    var titles = [
+      "Search trusted academic literature",
+      "Understand papers through clear AI explanations",
+      "Compare findings, methods, and limitations",
+      "Turn evidence into structured notes and citations"
+    ];
 
-    var setStage = function (idx, frac) {
-      if (idx !== current) {
-        current = idx;
-        stages.forEach(function (s, i) { s.classList.toggle("is-active", i === idx); });
-        if (countEl) countEl.innerHTML = "<b>" + String(idx + 1).padStart(2, "0") +
-          "</b> / " + String(n).padStart(2, "0");
-      }
-      bars.forEach(function (b, i) {
-        var v = i < idx ? 1 : i > idx ? 0 : frac;
-        b.style.width = (v * 100).toFixed(1) + "%";
+    var hasPageFlip = typeof window.St !== "undefined" && typeof window.St.PageFlip === "function";
+    var mqStoryDesktop = window.matchMedia("(min-width: 641px)");
+    var useBookMode = function () { return hasPageFlip && !mqReduce.matches && mqStoryDesktop.matches; };
+
+    var current = 0; // stage index, 0..n-1
+    var mode = null; // "book" | "paged"
+    var pageFlip = null;
+    var flipbookEl = null;
+    var animating = false;
+
+    var updateChrome = function (idx) {
+      segs.forEach(function (s, i) {
+        s.classList.toggle("is-filled", i <= idx);
+        if (i === idx) s.setAttribute("aria-current", "step");
+        else s.removeAttribute("aria-current");
       });
+      if (countEl) {
+        countEl.innerHTML =
+          "<b>" + String(idx + 1).padStart(2, "0") + "</b>&nbsp;/&nbsp;" + String(n).padStart(2, "0");
+      }
+      var isAnimating = mode === "book" && animating;
+      if (prevBtn) prevBtn.disabled = isAnimating || idx <= 0;
+      if (nextBtn) nextBtn.disabled = isAnimating || idx >= n - 1;
+      if (live) live.textContent = "Stage " + (idx + 1) + " of " + n + ": " + titles[idx];
     };
 
-    var enabled = false;
-    var ticking = false;
-    var update = function () {
-      ticking = false;
-      var r = track.getBoundingClientRect();
-      var span = track.offsetHeight - window.innerHeight;
-      var p = clamp(-r.top / (span || 1), 0, 1);
-      var raw = p * n;
-      var idx = clamp(Math.floor(raw), 0, n - 1);
-      setStage(idx, clamp(raw - idx, 0, 1));
-    };
-    var onScroll = function () {
-      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    var renderPaged = function (idx) {
+      leaves.forEach(function (l, i) { l.hidden = Math.floor(i / 2) !== idx; });
     };
 
-    var enable = function () {
-      if (enabled) return;
-      enabled = true;
-      track.style.height = 100 * n + "vh";
-      window.addEventListener("scroll", onScroll, { passive: true });
-      update();
-    };
-    var disable = function () {
-      enabled = false;
-      track.style.height = "";
-      window.removeEventListener("scroll", onScroll);
-      stages.forEach(function (s) { s.classList.add("is-active"); });
+    /* ---- tear down whichever mode is currently mounted, always
+       returning the 8 leaves to the plain holder in original order ---- */
+    var teardown = function () {
+      if (pageFlip) {
+        try { pageFlip.destroy(); } catch (err) { /* noop */ }
+        pageFlip = null;
+      }
+      leaves.forEach(function (l) {
+        l.classList.remove("stf__item", "--soft", "--hard");
+        l.removeAttribute("style");
+        leavesHolder.appendChild(l);
+      });
+      if (flipbookEl && flipbookEl.parentNode) flipbookEl.parentNode.removeChild(flipbookEl);
+      flipbookEl = null;
+      animating = false;
     };
 
-    var apply = function () {
-      if (reduce || !mqDesktop.matches) disable();
-      else enable();
+    var mountBook = function () {
+      teardown();
+      mode = "book";
+      leavesHolder.hidden = true;
+      leavesHolder.removeAttribute("data-mode");
+
+      flipbookEl = document.createElement("div");
+      flipbookEl.className = "sch-flipbook";
+      stage.appendChild(flipbookEl);
+
+      pageFlip = new window.St.PageFlip(flipbookEl, {
+        width: 480,
+        height: 620,
+        size: "stretch",
+        minWidth: 300,
+        maxWidth: 620,
+        minHeight: 420,
+        maxHeight: 760,
+        showCover: false,
+        usePortrait: false, // this section's own breakpoint handles narrow widths instead
+        mobileScrollSupport: true,
+        useMouseEvents: true,
+        disableFlipByClick: true,
+        drawShadow: true,
+        maxShadowOpacity: 0.55,
+        flippingTime: 900,
+        startPage: current * 2
+      });
+      pageFlip.loadFromHTML(leaves);
+
+      pageFlip.on("flip", function (e) {
+        current = clamp(Math.round(e.data / 2), 0, n - 1);
+        updateChrome(current);
+      });
+      pageFlip.on("changeState", function (e) {
+        animating = e.data === "flipping";
+        flipbookEl.classList.toggle("is-flipping", animating);
+        updateChrome(current);
+      });
+
+      updateChrome(current);
     };
-    apply();
-    (mqDesktop.addEventListener
-      ? mqDesktop.addEventListener("change", apply)
-      : mqDesktop.addListener(apply));
+
+    var mountPaged = function () {
+      teardown();
+      mode = "paged";
+      leavesHolder.hidden = false;
+      leavesHolder.setAttribute("data-mode", "paged");
+      renderPaged(current);
+      updateChrome(current);
+    };
+
+    var applyMode = function () {
+      var wantBook = useBookMode();
+      if (wantBook && mode !== "book") mountBook();
+      else if (!wantBook && mode !== "paged") mountPaged();
+    };
+
+    var next = function () {
+      if (mode === "book") {
+        if (!animating && current < n - 1) pageFlip.flipNext();
+      } else {
+        goTo(current + 1);
+      }
+    };
+    var prev = function () {
+      if (mode === "book") {
+        if (!animating && current > 0) pageFlip.flipPrev();
+      } else {
+        goTo(current - 1);
+      }
+    };
+    var goTo = function (target) {
+      target = clamp(target, 0, n - 1);
+      if (target === current) return;
+      if (mode === "book") {
+        if (animating) return;
+        pageFlip.flip(target * 2);
+      } else {
+        current = target;
+        renderPaged(current);
+        updateChrome(current);
+      }
+    };
+
+    if (prevBtn) prevBtn.addEventListener("click", prev);
+    if (nextBtn) nextBtn.addEventListener("click", next);
+    segs.forEach(function (s, i) { s.addEventListener("click", function () { goTo(i); }); });
+
+    stage.setAttribute("tabindex", "0");
+    stage.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+    });
+
+    applyMode();
+
+    // Re-evaluate on resize/orientation change and on a reduced-motion
+    // preference toggle, but only actually tear down and remount when
+    // the desired mode has actually changed — not on every pixel.
+    var debounced = null;
+    window.addEventListener("resize", function () {
+      window.clearTimeout(debounced);
+      debounced = window.setTimeout(applyMode, 200);
+    }, { passive: true });
+    if (mqStoryDesktop.addEventListener) mqStoryDesktop.addEventListener("change", applyMode);
+    if (mqReduce.addEventListener) mqReduce.addEventListener("change", applyMode);
   })();
 
   /* ---- research universe: cursor-reactive knowledge field --------- */

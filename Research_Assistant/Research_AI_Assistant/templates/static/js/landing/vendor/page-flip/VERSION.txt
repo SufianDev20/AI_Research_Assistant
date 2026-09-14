@@ -1,0 +1,8 @@
+page-flip (StPageFlip) v2.0.7
+Source: https://www.npmjs.com/package/page-flip
+Fetched: npm pack page-flip@2.0.7
+Files vendored:
+  dist/js/page-flip.browser.js  sha256:bbaca0bbef57a22bb66a3fc69d67baf9a17fb9a9c89ec9ed35e2b91abe4bd1e7
+  src/Style/stPageFlip.css      sha256:ebca2fc2e54480fe0a3faf34dc2361760e92d2309f132763338b0cfd0767739a
+License: MIT (Nodlik, 2020) — see LICENSE in this folder.
+No CDN, no npm dependency added to the project; fetched once and vendored as static files.

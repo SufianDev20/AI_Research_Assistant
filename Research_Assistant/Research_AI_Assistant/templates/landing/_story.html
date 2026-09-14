@@ -1,21 +1,35 @@
 {% load static %}
-<section class="sch-story sch-invert" id="story" aria-labelledby="sch-story-h">
+<section class="sch-block sch-story sch-invert" id="story" aria-labelledby="sch-story-h">
   <span class="sch-grain" aria-hidden="true"></span>
-  <div class="sch-story__track" data-story-track>
-    <div class="sch-story__pin sch-wrap">
-      <div class="sch-story__top">
-        <p class="sch-kicker" id="sch-story-h">How Scholara works</p>
-        <p class="sch-story__count" data-story-count><b>01</b>&nbsp;/&nbsp;04</p>
-      </div>
+  <div class="sch-wrap">
+    <div class="sch-story__top">
+      <p class="sch-kicker" id="sch-story-h">How Scholara works</p>
+      <p class="sch-story__count" data-story-count><b>01</b>&nbsp;/&nbsp;04</p>
+    </div>
 
-      <div class="sch-story__rail" aria-hidden="true">
-        <i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i>
-      </div>
+    <div class="sch-story__rail" role="group" aria-label="Go to a stage">
+      <button type="button" class="sch-story__seg is-filled" data-story-seg aria-current="step" aria-label="Stage 1: Search trusted academic literature"><b></b></button>
+      <button type="button" class="sch-story__seg" data-story-seg aria-label="Stage 2: Understand papers through clear AI explanations"><b></b></button>
+      <button type="button" class="sch-story__seg" data-story-seg aria-label="Stage 3: Compare findings, methods, and limitations"><b></b></button>
+      <button type="button" class="sch-story__seg" data-story-seg aria-label="Stage 4: Turn evidence into structured notes and citations"><b></b></button>
+    </div>
 
-      <div class="sch-story__stages">
-        <!-- Stage 1 -->
-        <article class="sch-story__stage sch-spanel is-active">
-          <div class="sch-story__copy">
+    <div class="sch-story__nav">
+      <button type="button" class="sch-hcar__arrow sch-hcar__arrow--prev sch-story__arrow" data-story-prev aria-label="Previous stage">
+        {% include "landing/_icon.html" with name="arrow-right" %}
+      </button>
+
+      <div class="sch-flip-stage" data-flip-stage>
+        <!-- JS mounts one of two things here, in order of preference:
+             1) a StPageFlip book (desktop/tablet, motion allowed)
+             2) a plain instant-swap pair (narrow phones, or
+                prefers-reduced-motion) — see book() in landing.js.
+             The 8 leaves below are the single source of truth for both;
+             this progressive-enhancement default (visible, stacked, no
+             JS required) is also the exact fallback shown if JS never
+             runs at all. -->
+        <div class="sch-story__leaves" data-story-leaves>
+          <div class="sch-leaf sch-leaf--copy" data-leaf data-leaf-stage="0">
             <p class="sch-kicker">Stage 01</p>
             <h3>Search trusted academic literature</h3>
             <p>
@@ -24,25 +38,24 @@
               status attached to every hit.
             </p>
           </div>
-          <div class="sch-story__viz">
-            <div class="sch-slab">
-              <div class="sch-slab__bar">
+          <div class="sch-leaf sch-leaf--note" data-leaf data-leaf-stage="0">
+            <div class="sch-note">
+              <span class="sch-note__tape sch-note__tape--l" aria-hidden="true"></span>
+              <span class="sch-note__tape sch-note__tape--r" aria-hidden="true"></span>
+              <div class="sch-note__head">
                 {% include "landing/_icon.html" with name="search" %}
-                query &middot; retrieval practice AND exam performance
+                <span>query &middot; retrieval practice AND exam performance</span>
               </div>
-              <div class="sch-slab__body">
-                <div class="sch-row"><span class="sch-row__k">0.93</span><span>Test-enhanced learning in a middle-school science class</span><span class="sch-row__m">2011 · OA</span></div>
-                <div class="sch-row"><span class="sch-row__k">0.89</span><span>Retrieval practice and the maintenance of knowledge</span><span class="sch-row__m">1992</span></div>
-                <div class="sch-row"><span class="sch-row__k">0.86</span><span>The power of testing memory: basic research &amp; implications</span><span class="sch-row__m">2006 · OA</span></div>
-                <p class="sch-note-meta" style="margin-top:4px">filters &nbsp;·&nbsp; 2005&ndash;2025 &nbsp;·&nbsp; open access &nbsp;·&nbsp; peer-reviewed</p>
-              </div>
+              <ul class="sch-note__list">
+                <li><b class="sch-note__k">0.93</b><span class="sch-note__t">Test-enhanced learning in a middle-school science class</span><span class="sch-note__m">2011 · OA</span></li>
+                <li><b class="sch-note__k">0.89</b><span class="sch-note__t">Retrieval practice and the maintenance of knowledge</span><span class="sch-note__m">1992</span></li>
+                <li><b class="sch-note__k">0.86</b><span class="sch-note__t">The power of testing memory: basic research &amp; implications</span><span class="sch-note__m">2006 · OA</span></li>
+              </ul>
+              <p class="sch-note__foot">filters &nbsp;·&nbsp; 2005&ndash;2025 &nbsp;·&nbsp; open access &nbsp;·&nbsp; peer-reviewed</p>
             </div>
           </div>
-        </article>
 
-        <!-- Stage 2 -->
-        <article class="sch-story__stage sch-spanel">
-          <div class="sch-story__copy">
+          <div class="sch-leaf sch-leaf--copy" data-leaf data-leaf-stage="1">
             <p class="sch-kicker">Stage 02</p>
             <h3>Understand papers through clear AI explanations</h3>
             <p>
@@ -51,26 +64,25 @@
               from the paper&rsquo;s own text.
             </p>
           </div>
-          <div class="sch-story__viz">
-            <div class="sch-slab">
-              <div class="sch-slab__bar">
+          <div class="sch-leaf sch-leaf--note" data-leaf data-leaf-stage="1">
+            <div class="sch-note">
+              <span class="sch-note__tape sch-note__tape--l" aria-hidden="true"></span>
+              <span class="sch-note__tape sch-note__tape--r" aria-hidden="true"></span>
+              <div class="sch-note__head">
                 {% include "landing/_icon.html" with name="book" %}
-                summary &middot; Roediger &amp; Karpicke, 2006
+                <span>summary &middot; Roediger &amp; Karpicke, 2006</span>
               </div>
-              <div class="sch-slab__body">
-                <div class="sch-seg"><h5>Method</h5><p>Two experiments; students studied prose then either re-read it or took free-recall tests. Final test at 5&nbsp;minutes and 1&nbsp;week.</p></div>
-                <div class="sch-seg"><h5>Findings</h5><p>Repeated testing produced much better week-later recall than repeated studying, despite lower confidence at the time.</p></div>
-                <div class="sch-seg"><h5>Limitations</h5><p>Prose passages in a lab; transfer to open-ended exam formats is left to later work.</p></div>
-                <div class="sch-row"><span class="sch-row__k">Q</span><span>What was the retention interval?</span><span class="sch-row__m">&mdash;</span></div>
-                <div class="sch-row"><span class="sch-row__k">A</span><span>Five minutes and one week after study &mdash; see Experiment&nbsp;1.</span><span class="sch-row__m">&sect;2.1</span></div>
-              </div>
+              <div class="sch-note__seg"><h5>Method</h5><p>Two experiments; students studied prose then either re-read it or took free-recall tests. Final test at 5&nbsp;minutes and 1&nbsp;week.</p></div>
+              <div class="sch-note__seg"><h5>Findings</h5><p>Repeated testing produced much better week-later recall than repeated studying, despite lower confidence at the time.</p></div>
+              <div class="sch-note__seg"><h5>Limitations</h5><p>Prose passages in a lab; transfer to open-ended exam formats is left to later work.</p></div>
+              <ul class="sch-note__list sch-note__list--qa">
+                <li><b class="sch-note__k">Q</b><span class="sch-note__t">What was the retention interval?</span></li>
+                <li><b class="sch-note__k">A</b><span class="sch-note__t">Five minutes and one week after study &mdash; see Experiment&nbsp;1.</span><span class="sch-note__m">&sect;2.1</span></li>
+              </ul>
             </div>
           </div>
-        </article>
 
-        <!-- Stage 3 -->
-        <article class="sch-story__stage sch-spanel">
-          <div class="sch-story__copy">
+          <div class="sch-leaf sch-leaf--copy" data-leaf data-leaf-stage="2">
             <p class="sch-kicker">Stage 03</p>
             <h3>Compare findings, methods, and limitations</h3>
             <p>
@@ -79,30 +91,27 @@
               sources appear to diverge.
             </p>
           </div>
-          <div class="sch-story__viz">
-            <div class="sch-slab">
-              <div class="sch-slab__bar">
+          <div class="sch-leaf sch-leaf--note" data-leaf data-leaf-stage="2">
+            <div class="sch-note">
+              <span class="sch-note__tape sch-note__tape--l" aria-hidden="true"></span>
+              <span class="sch-note__tape sch-note__tape--r" aria-hidden="true"></span>
+              <div class="sch-note__head">
                 {% include "landing/_icon.html" with name="compare" %}
-                compare &middot; 3 papers &middot; spacing interval
+                <span>compare &middot; 3 papers &middot; spacing interval</span>
               </div>
-              <div class="sch-slab__body">
-                <table class="sch-cmp">
-                  <thead><tr><th>Paper</th><th>Design</th><th>On long gaps</th></tr></thead>
-                  <tbody>
-                    <tr><td>Cepeda 2006</td><td>Meta-analysis, 254 studies</td><td>Help as test delay grows</td></tr>
-                    <tr><td>Tabibian 2019</td><td>Field study, SR app</td><td>Adaptive beats any fixed gap</td></tr>
-                    <tr><td>Kang 2016</td><td>Narrative review</td><td>Depends on material &amp; goal</td></tr>
-                  </tbody>
-                </table>
-                <p class="sch-note-meta" style="margin-top:6px">&#9873; flagged &middot; fixed vs. adaptive intervals &mdash; read side by side</p>
-              </div>
+              <table class="sch-note__cmp">
+                <thead><tr><th>Paper</th><th>Design</th><th>On long gaps</th></tr></thead>
+                <tbody>
+                  <tr><td>Cepeda 2006</td><td>Meta-analysis, 254 studies</td><td>Help as test delay grows</td></tr>
+                  <tr><td>Tabibian 2019</td><td>Field study, SR app</td><td>Adaptive beats any fixed gap</td></tr>
+                  <tr><td>Kang 2016</td><td>Narrative review</td><td>Depends on material &amp; goal</td></tr>
+                </tbody>
+              </table>
+              <p class="sch-note__foot">&#9873; flagged &middot; fixed vs. adaptive intervals &mdash; read side by side</p>
             </div>
           </div>
-        </article>
 
-        <!-- Stage 4 -->
-        <article class="sch-story__stage sch-spanel">
-          <div class="sch-story__copy">
+          <div class="sch-leaf sch-leaf--copy" data-leaf data-leaf-stage="3">
             <p class="sch-kicker">Stage 04</p>
             <h3>Turn evidence into structured notes and citations</h3>
             <p>
@@ -110,21 +119,29 @@
               and references stay grouped in a research binder you can return to.
             </p>
           </div>
-          <div class="sch-story__viz">
-            <div class="sch-slab">
-              <div class="sch-slab__bar">
+          <div class="sch-leaf sch-leaf--note" data-leaf data-leaf-stage="3">
+            <div class="sch-note">
+              <span class="sch-note__tape sch-note__tape--l" aria-hidden="true"></span>
+              <span class="sch-note__tape sch-note__tape--r" aria-hidden="true"></span>
+              <div class="sch-note__head">
                 {% include "landing/_icon.html" with name="folder" %}
-                binder &middot; "Spaced practice in higher ed"
+                <span>binder &middot; &ldquo;Spaced practice in higher ed&rdquo;</span>
               </div>
-              <div class="sch-slab__body">
-                <div class="sch-row"><span class="sch-row__k">note</span><span>Spacing gains scale with retention interval</span><span class="sch-row__m">3 sources</span></div>
-                <div class="sch-row"><span class="sch-row__k">quote</span><span>&ldquo;&hellip;the advantage of spaced over massed practice increased&rdquo;</span><span class="sch-row__m">p.363</span></div>
-                <div class="sch-seg"><h5>Citation attached</h5><p>Cepeda, N.&nbsp;J., et&nbsp;al. (2006). Distributed practice in verbal recall tasks. <em>Psychological Bulletin, 132</em>(3), 354&ndash;380.</p></div>
-              </div>
+              <ul class="sch-note__list">
+                <li><b class="sch-note__k">note</b><span class="sch-note__t">Spacing gains scale with retention interval</span><span class="sch-note__m">3 sources</span></li>
+                <li><b class="sch-note__k">quote</b><span class="sch-note__t">&ldquo;&hellip;the advantage of spaced over massed practice increased&rdquo;</span><span class="sch-note__m">p.363</span></li>
+              </ul>
+              <div class="sch-note__seg"><h5>Citation attached</h5><p>Cepeda, N.&nbsp;J., et&nbsp;al. (2006). Distributed practice in verbal recall tasks. <em>Psychological Bulletin, 132</em>(3), 354&ndash;380.</p></div>
             </div>
           </div>
-        </article>
+        </div>
       </div>
+
+      <button type="button" class="sch-hcar__arrow sch-story__arrow sch-story__arrow--next" data-story-next aria-label="Next stage">
+        {% include "landing/_icon.html" with name="arrow-right" %}
+      </button>
     </div>
+
+    <span class="sch-sr-only" role="status" aria-live="polite" data-story-live></span>
   </div>
 </section>
