@@ -959,7 +959,15 @@
 .sch-leaf--copy {
   display: flex;
   flex-direction: column;
+  /* "safe center" (CSS Box Alignment) keeps the block centered when it
+     fits, but falls back to start-alignment instead of overflowing off
+     both edges when it doesn't — e.g. stage 2's note at tablet widths,
+     where content is taller than the fixed page. Plain "center" first
+     as the fallback for browsers that don't parse "safe center" (an
+     unsupported value invalidates the whole declaration, leaving the
+     prior one in effect, not the initial value). */
   justify-content: center;
+  justify-content: safe center;
   padding: clamp(20px, 3vw, 40px);
 }
 .sch-leaf--copy h3 {
@@ -974,9 +982,29 @@
 .sch-leaf--note {
   display: flex;
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: clamp(16px, 2.6vw, 32px);
 }
+
+/* Inside the book only: StPageFlip sets `display: block` inline on each
+   *positioned* (currently on-screen) leaf as part of its own
+   absolute-positioning, which silently overrides the flex rules above
+   and left content pinned to the top of the tall page. This restores
+   just the `display` so the already-correct flex centering above
+   actually runs — the whole stage-copy block, and the whole note+tape
+   unit, as one piece, at their natural size (align-items defaults to
+   stretch, so width/wrapping/typography are unaffected).
+   Scoped to [style*="z-index"] rather than every .sch-leaf: the library
+   only ever writes a z-index onto a leaf it has actually positioned for
+   the current spread/turn; leaves it has hidden get only
+   `display: none` with no z-index. Overriding display unconditionally
+   would have also forced those hidden leaves to `flex`, defeating the
+   library's own show/hide and leaving every stage's content sitting in
+   the DOM simultaneously (masked only by luck of z-index/paint order).
+   The no-JS and mobile/paged fallback never gets an inline style here,
+   so it is untouched either way. */
+.sch-flipbook .sch-leaf[style*="z-index"] { display: flex !important; }
 
 /* ---------------------------------------------------------------------
    The book itself: StPageFlip's own container. It moves the 8 leaves
