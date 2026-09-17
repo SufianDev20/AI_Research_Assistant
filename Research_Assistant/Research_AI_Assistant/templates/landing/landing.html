@@ -17,7 +17,8 @@
       href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{% static 'landing.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/landing/vendor/page-flip/stPageFlip.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/landing/landing.css' %}" />
   </head>
   <body class="scholara" id="top">
     {% include "landing/_sprite.html" %}
@@ -37,6 +38,7 @@
 
     {% include "landing/_footer.html" %}
 
-    <script src="{% static 'js/landing.js' %}" defer></script>
+    <script src="{% static 'js/landing/vendor/page-flip/page-flip.browser.js' %}" defer></script>
+    <script src="{% static 'js/landing/landing.js' %}" defer></script>
   </body>
 </html>

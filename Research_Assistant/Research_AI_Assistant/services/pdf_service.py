@@ -25,6 +25,38 @@ class PDFExtractionError(Exception):
     pass
 
 
+def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
+    """Download PDF bytes with a response-size guard."""
+    try:
+        response = requests.get(
+            pdf_url,
+            timeout=FETCH_TIMEOUT,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                "Accept": "application/pdf,*/*",
+            },
+            stream=True,
+        )
+        response.raise_for_status()
+
+        content_length = int(response.headers.get("Content-Length", 0))
+        if content_length > MAX_PDF_BYTES:
+            raise PDFExtractionError(
+                f"PDF too large for {context_id}: {content_length} bytes "
+                f"(limit {MAX_PDF_BYTES})"
+            )
+
+        pdf_bytes = response.content
+        if len(pdf_bytes) > MAX_PDF_BYTES:
+            raise PDFExtractionError(
+                f"PDF for {context_id} exceeds 50MB limit after download."
+            )
+
+        return pdf_bytes
+    except requests.RequestException as exc:
+        raise PDFExtractionError(f"Failed to fetch PDF for {context_id}: {exc}") from exc
+
+
 class PDFService:
     """Fetch a PDF and extract LLM-ready markdown."""
 
@@ -37,30 +69,7 @@ class PDFService:
         """
 
         # 1) Fetch
-        try:
-            response = requests.get(
-                pdf_url,
-                timeout=FETCH_TIMEOUT,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                    "Accept": "application/pdf,*/*",
-                },
-                stream=True,
-            )
-            response.raise_for_status()
-
-            content_length = int(response.headers.get("Content-Length", 0))
-            if content_length > MAX_PDF_BYTES:
-                raise PDFExtractionError(
-                    f"PDF too large: {content_length} bytes (limit {MAX_PDF_BYTES})"
-                )
-
-            pdf_bytes = response.content
-            if len(pdf_bytes) > MAX_PDF_BYTES:
-                raise PDFExtractionError("PDF exceeds 50MB limit after download.")
-
-        except requests.RequestException as exc:
-            raise PDFExtractionError(f"Failed to fetch PDF: {exc}") from exc
+        pdf_bytes = fetch_pdf_bytes(pdf_url, openalex_id)
 
         # 2) Prepare output dirs + temp file
         safe_id = re.sub(

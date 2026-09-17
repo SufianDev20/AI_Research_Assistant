@@ -6,15 +6,13 @@ Handles all interactions with OpenAlex API using pyalex library.
 from pyalex import Works, Authors
 from django.conf import settings
 from typing import List, Optional, Dict
-import logging
+import logging, pyalex
 
 # Configure PyAlex API key if available
 try:
     if (hasattr(settings, "OPENALEX_API_KEY") and settings.OPENALEX_API_KEY) or (
         hasattr(settings, "OPENALEX_EMAIL") and settings.OPENALEX_EMAIL
     ):
-        import pyalex
-
         pyalex.config.email = settings.OPENALEX_EMAIL
         pyalex.config.api_key = settings.OPENALEX_API_KEY
         logger = logging.getLogger(__name__)

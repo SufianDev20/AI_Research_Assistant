@@ -13,3 +13,7 @@ requests==2.34.0
 sqlparse==0.5.5
 tabulate==0.10.0
 urllib3==2.7.0
+clerk-backend-api==7.0.0
+pyjwt>=2.11.0
+cryptography>=44.0.1
+httpx>=0.28.1
