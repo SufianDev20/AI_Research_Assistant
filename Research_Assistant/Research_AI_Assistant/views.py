@@ -350,6 +350,22 @@ def frontend(request):
     return render(request, "index.html")
 
 
+def analysis(request):
+    """
+    Render the paper analysis page.
+
+    This page carries no server-side state of its own: the research
+    session (question, papers, session id) is handed off from the
+    workspace view via sessionStorage on the client and hydrated by
+    static/js/analysis/analysis.js on load. There is currently no
+    database-backed research session to look up by id, so nothing is
+    fetched here — see that module's handling of a missing/invalid
+    handoff (it shows a recovery path back to /workspace/, never
+    fabricated sample papers).
+    """
+    return render(request, "analysis.html")
+
+
 @require_POST
 @throttle_classes([GenerateTitle])
 def summarise(request):

@@ -1,6 +1,53 @@
 import { DOMManager } from './core.js';
 
 // Extend DOMManager prototype with research-related methods
+
+// ---------------------------------------------------------------------
+// Follow-up question -> paper analysis page handoff.
+//
+// The bottom textbox in the research view (#research-input /
+// #research-send-btn) used to re-search and append another turn to the
+// in-page chat via handleResearchMessage(). It now opens
+// /analysis/ instead, carrying the question, the current research
+// session id (if any), and the already-loaded papers with it — so the
+// user lands on a page with those papers ready, never having to search
+// again. See static/js/analysis/analysis.js for the receiving side;
+// the sessionStorage key/shape must match what it reads.
+// ---------------------------------------------------------------------
+const ANALYSIS_SESSION_KEY = "scholara:analysisSession";
+
+DOMManager.prototype.handleFollowUpQuestion = function() {
+  const input = this.elements.researchInput;
+  const question = input ? input.value.trim() : "";
+
+  // No navigation for an empty submission, and nothing to carry over
+  // without an active research session (matches handleResearchMessage's
+  // own guard above).
+  if (!question || !window.appState.currentResearchBinder) return;
+
+  const binder = window.appState.currentResearchBinder;
+  const payload = {
+    researchId: binder.id || null,
+    sourceQuery: binder.name || question,
+    question: question,
+    // Paper objects only (title/authors/abstract/pdf_url/etc.) — no
+    // full paper text, and never placed in the URL.
+    papers: Array.isArray(binder.papers) ? binder.papers : [],
+    createdAt: Date.now(),
+  };
+
+  try {
+    sessionStorage.setItem(ANALYSIS_SESSION_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error("Could not hand off research session to the analysis page:", err);
+    alert("Couldn't open the analysis page (storage unavailable). Please try again.");
+    return;
+  }
+
+  if (input) input.value = "";
+  window.location.href = "/analysis/";
+};
+
 DOMManager.prototype.renderReferences = function(papers) {
   if (!this.elements.referencesPanel || !this.elements.referencesList)
     return;

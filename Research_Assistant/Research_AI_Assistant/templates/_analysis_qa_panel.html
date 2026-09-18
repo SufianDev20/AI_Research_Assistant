@@ -1,0 +1,40 @@
+{% load static %}
+<!-- RIGHT: Question & Analysis — the submitted question, an area for
+     paper-grounded answers organized by paper, and a composer for
+     another question. See analysis.js: renderAnalysisPending(),
+     renderAnalysisResult(), renderAnalysisError(), and
+     static/js/analysis/analysis_api.js (requestPaperAnalysis) — the one
+     function that calls the backend. -->
+<section class="an-panel an-panel--qa" aria-labelledby="anQaHeading">
+  <div class="an-panel__head">
+    <p class="an-kicker" id="anQaHeading">Question &amp; Analysis</p>
+  </div>
+
+  <div class="an-qa__question">
+    <p class="an-qa__question-label">Your question</p>
+    <p class="an-qa__question-text" id="anQuestionText"></p>
+  </div>
+
+  <div
+    class="an-qa__body"
+    id="anAnalysisBody"
+    role="status"
+    aria-live="polite"
+    aria-atomic="false"
+  ></div>
+
+  <form class="an-qa__composer" id="anComposer">
+    <label for="anQuestionInput" class="an-sr-only">Ask another question about these papers</label>
+    <input
+      id="anQuestionInput"
+      type="text"
+      class="an-qa__input"
+      placeholder="Ask another question about these papers…"
+      autocomplete="off"
+      maxlength="2000"
+    />
+    <button type="submit" class="an-qa__send" id="anQuestionSend" aria-label="Send question">
+      {% include "landing/_icon.html" with name="arrow-right" cls="an-ico" %}
+    </button>
+  </form>
+</section>

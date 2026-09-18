@@ -1,0 +1,580 @@
+/* ============================================================================
+   Scholara — paper analysis page
+   Frontend foundation for the multi-paper follow-up flow: a research
+   desk with three panels (refined paper / paper list / question &
+   analysis). Palette matches the established Scholara landing language
+   (academic green + warm paper) — copied as literal values here rather
+   than importing landing.css, so this page has no dependency on that
+   file's unrelated hero/feature/footer rules and cannot be affected by
+   changes to them, or vice versa.
+   ========================================================================== */
+
+.an-body {
+  --paper: #f4f2e9;
+  --paper-raised: #faf8f1;
+  --paper-sunk: #ece9dc;
+
+  --ink: #16261d;
+  --ink-body: #3d4b43;
+  --ink-meta: #6d7970;
+
+  --forest: #1c4633;
+  --forest-deep: #123024;
+  --emerald: #2f7d5d;
+  --emerald-bright: #3f9b73;
+  --mint: #a9d4be;
+  --mint-wash: #e2eee4;
+
+  --gold: #b0894e;
+  --gold-soft: #c9a86f;
+
+  --rule: rgba(22, 38, 29, 0.14);
+  --rule-soft: rgba(22, 38, 29, 0.08);
+  --panel: rgba(28, 70, 51, 0.05);
+
+  --deep-1: #0f2a1e;
+  --deep-2: #0a1c14;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  margin: 0;
+  height: 100%;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.58;
+  color: var(--ink-body);
+  background: var(--paper-sunk);
+}
+html:has(.an-body) { height: 100%; }
+
+.an-body *,
+.an-body *::before,
+.an-body *::after { box-sizing: border-box; }
+
+.an-body :focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* .an-recover and .an-shell both set their own `display` below, which
+   otherwise beats the UA stylesheet's [hidden]{display:none} at equal
+   specificity (author rules win ties). Toggle visibility with
+   el.hidden, never style.display, and this keeps it authoritative. */
+.an-body [hidden] { display: none !important; }
+
+.an-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.an-body h1, .an-body h2, .an-body h3, .an-body h4, .an-body h5 {
+  font-family: "Newsreader", serif;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* Defensive fallback: every icon include here should pass cls="an-ico"
+   (which the rules below size per context) — this just keeps a
+   forgotten one from rendering at the SVG's raw intrinsic size instead
+   of silently failing closed. */
+.an-body .sch-ico { width: 1em; height: 1em; }
+
+.an-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--emerald);
+}
+
+/* ---------------------------------------------------------------------
+   Shell: fixed-height "research desk" on desktop/tablet, matching the
+   rest of the workspace's app-shell pattern (research-view / paper-view
+   both do the same). Each panel scrolls its own overflow natively —
+   plain CSS overflow-y, never a wheel/touch listener — so document
+   scroll is never intercepted; see the narrow breakpoint below, which
+   drops the fixed height entirely and lets the whole page scroll.
+   ------------------------------------------------------------------- */
+.an-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.an-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px clamp(16px, 3vw, 32px);
+  background: linear-gradient(180deg, var(--deep-1), var(--deep-2));
+  color: #eef3ec;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.an-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef3ec;
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.an-back:hover { border-color: var(--mint); background: rgba(255, 255, 255, 0.08); }
+.an-back__ico { width: 15px; height: 15px; transform: rotate(180deg); }
+.an-topbar__meta { min-width: 0; }
+.an-topbar__kicker {
+  margin: 0 0 2px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mint);
+}
+.an-topbar__source {
+  margin: 0;
+  font-family: "Newsreader", serif;
+  font-size: 1.05rem;
+  color: #f1f5ee;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.an-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(280px, 1fr) minmax(320px, 1.15fr);
+  gap: 1px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.an-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+.an-panel--list { background: var(--paper-raised); }
+
+.an-panel__head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px clamp(14px, 2vw, 22px) 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.an-panel__count {
+  margin: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--ink-meta);
+}
+
+/* =========================== LEFT: Refined Paper ========================= */
+.an-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px clamp(14px, 2vw, 22px) 28px;
+}
+.an-detail__idle,
+.an-detail__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 40px;
+  color: var(--ink-meta);
+}
+.an-detail__idle .an-ico, .an-detail__empty .an-ico { width: 26px; height: 26px; color: var(--rule); }
+
+.an-detail__title {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  line-height: 1.28;
+  margin-bottom: 8px;
+}
+.an-detail__authors {
+  font-size: 0.86rem;
+  color: var(--ink-body);
+  margin-bottom: 4px;
+}
+.an-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--ink-meta);
+  margin-bottom: 16px;
+}
+.an-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--rule);
+  color: var(--emerald);
+  background: var(--mint-wash);
+}
+.an-badge--muted { color: var(--ink-meta); background: var(--panel); }
+
+.an-detail__section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule-soft); }
+.an-detail__section:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+.an-detail__section h4 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--forest);
+  margin-bottom: 8px;
+}
+.an-detail__section p { margin: 0; color: var(--ink-body); font-size: 0.9rem; line-height: 1.65; }
+.an-detail__citation {
+  font-size: 0.84rem;
+  font-style: italic;
+  color: var(--ink-body);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.an-detail__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--emerald);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.an-detail__link:hover { text-decoration: underline; }
+
+/* =========================== MIDDLE: Research Papers ====================== */
+.an-paper-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px clamp(10px, 1.6vw, 16px) 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.an-paper-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.an-paper-card:hover { border-color: var(--emerald); }
+.an-paper-card:active { transform: scale(0.995); }
+.an-paper-card[aria-current="true"] {
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 1px var(--emerald), 0 10px 24px -16px rgba(18, 48, 36, 0.4);
+  background: #fff;
+}
+.an-paper-card__title {
+  font-family: "Newsreader", serif;
+  font-size: 0.98rem;
+  line-height: 1.32;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.an-paper-card__meta {
+  font-size: 0.78rem;
+  color: var(--ink-meta);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.an-paper-card__foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.an-paper-card__cited {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--ink-meta);
+}
+.an-paper-list__empty {
+  padding: 32px 12px;
+  text-align: center;
+  color: var(--ink-meta);
+  font-size: 0.88rem;
+}
+
+/* =========================== RIGHT: Question & Analysis =================== */
+.an-panel--qa { background: var(--paper); }
+.an-qa__question {
+  flex: none;
+  padding: 14px clamp(14px, 2vw, 22px);
+  border-bottom: 1px solid var(--rule);
+  background: var(--mint-wash);
+}
+.an-qa__question-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--forest);
+  margin-bottom: 4px;
+}
+.an-qa__question-text {
+  font-family: "Newsreader", serif;
+  font-size: 1.08rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.an-qa__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px clamp(14px, 2vw, 22px) 24px;
+}
+
+.an-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ink-meta);
+  padding-top: 30px;
+}
+.an-pending .an-ico { width: 24px; height: 24px; color: var(--rule); }
+.an-pending--active .an-ico {
+  color: var(--emerald);
+  animation: an-pulse 1.6s ease-in-out infinite;
+}
+@keyframes an-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.an-answer {
+  font-size: 0.94rem;
+  line-height: 1.7;
+  color: var(--ink-body);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.an-answer p { margin: 0 0 0.75em; }
+.an-answer p:last-child { margin-bottom: 0; }
+
+.an-evidence__head {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--forest);
+  margin-bottom: 10px;
+}
+.an-evidence-group {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.an-evidence-group__paper {
+  font-family: "Newsreader", serif;
+  font-size: 0.92rem;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.an-citation {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 0.85rem;
+}
+.an-citation:first-of-type { border-top: 0; padding-top: 0; }
+.an-citation__page {
+  flex: none;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--ink-meta);
+  padding-top: 2px;
+  white-space: nowrap;
+}
+.an-citation__snippet {
+  color: var(--ink-body);
+  font-style: italic;
+  line-height: 1.55;
+}
+.an-citation__verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-style: normal;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.62rem;
+  color: var(--emerald);
+}
+.an-citation__verified .an-ico { width: 10px; height: 10px; }
+
+.an-note {
+  font-size: 0.82rem;
+  color: var(--ink-meta);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.an-note--error { color: #7a2e1f; background: rgba(178, 68, 40, 0.06); border-color: rgba(178, 68, 40, 0.25); }
+.an-note strong { color: inherit; }
+
+.an-retry {
+  appearance: none;
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+  color: var(--forest);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.an-retry:hover { border-color: var(--emerald); }
+
+.an-qa__composer {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 12px clamp(14px, 2vw, 22px);
+  border-top: 1px solid var(--rule);
+  background: var(--paper-raised);
+}
+.an-qa__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--ink);
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+}
+.an-qa__input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 1px; }
+.an-qa__send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--forest);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.an-qa__send .an-ico { width: 16px; height: 16px; }
+.an-qa__send:hover:not(:disabled) { background: var(--emerald); }
+.an-qa__send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------------
+   Empty / recovery state (no valid handoff found)
+   ------------------------------------------------------------------- */
+.an-recover {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: linear-gradient(180deg, var(--deep-1), var(--deep-2));
+}
+.an-recover__card {
+  max-width: 440px;
+  text-align: center;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: clamp(28px, 5vw, 44px);
+  box-shadow: 0 40px 90px -50px rgba(0, 0, 0, 0.6);
+}
+.an-recover__card .an-ico { width: 30px; height: 30px; color: var(--gold); margin-bottom: 14px; }
+.an-recover__card h2 { font-size: 1.3rem; margin-bottom: 8px; }
+.an-recover__card p { color: var(--ink-body); font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; }
+.an-recover__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--forest);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.an-recover__cta:hover { background: var(--emerald); }
+
+/* ---------------------------------------------------------------------
+   Responsive: stack, and hand scroll back to the document itself —
+   never a fixed viewport shell fighting a narrow screen.
+   ------------------------------------------------------------------- */
+@media (max-width: 980px) {
+  .an-shell { height: auto; min-height: 100vh; }
+  .an-layout {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .an-panel { overflow: visible; }
+  .an-detail, .an-paper-list, .an-qa__body {
+    overflow: visible;
+    max-height: none;
+  }
+  .an-panel--list { order: 1; }
+  .an-panel--detail { order: 2; }
+  .an-panel--qa { order: 3; }
+  .an-qa__composer { position: sticky; bottom: 0; }
+}
+
+@media (max-width: 560px) {
+  .an-topbar { gap: 12px; padding: 12px 16px; }
+  .an-back span { display: none; }
+  .an-back { padding: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .an-body *, .an-body *::before, .an-body *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

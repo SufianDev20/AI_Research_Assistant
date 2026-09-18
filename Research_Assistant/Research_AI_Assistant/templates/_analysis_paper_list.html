@@ -1,0 +1,17 @@
+{% load static %}
+<!-- MIDDLE: Research Papers — the paper collection carried over from the
+     research result the user came from. Always a plain vertical list
+     (never horizontal-scrolling), so no extra scroll controls are
+     needed at any width — see analysis.js renderPaperList(). -->
+<section class="an-panel an-panel--list" aria-labelledby="anListHeading">
+  <div class="an-panel__head">
+    <p class="an-kicker" id="anListHeading">Research Papers</p>
+    <p class="an-panel__count" id="anPaperCount"></p>
+  </div>
+  <div
+    class="an-paper-list"
+    id="anPaperList"
+    role="list"
+    aria-label="Papers from this research result"
+  ></div>
+</section>

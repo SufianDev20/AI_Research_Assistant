@@ -1,0 +1,19 @@
+{% load static %}
+<!-- LEFT: Refined Paper — details for whichever paper is selected in the
+     middle panel. Populated entirely by analysis.js from the paper
+     object already carried over from the research view; nothing here
+     is fetched or fabricated. Fields the base paper metadata doesn't
+     carry (a written summary, methodology, findings) are only rendered
+     if analysis.js finds them present on the object — see its
+     renderPaperDetail() for the exact field list and what each maps to. -->
+<section class="an-panel an-panel--detail" aria-labelledby="anDetailHeading">
+  <div class="an-panel__head">
+    <p class="an-kicker" id="anDetailHeading">Refined Paper</p>
+  </div>
+  <div class="an-detail" id="anPaperDetail">
+    <div class="an-detail__idle">
+      {% include "landing/_icon.html" with name="file" cls="an-ico" %}
+      <p>Select a paper from the list to see its details here.</p>
+    </div>
+  </div>
+</section>

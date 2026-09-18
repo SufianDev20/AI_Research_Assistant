@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Paper Analysis — Scholara</title>
+    <meta name="color-scheme" content="light" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/analysis/analysis.css' %}" />
+  </head>
+  <body class="an-body">
+    {% csrf_token %}
+    {% include "landing/_sprite.html" %}
+
+    <!-- Populated by analysis.js on load. Hidden by default so a flash of
+         an empty shell never appears before the handoff/recovery check
+         runs; also hidden entirely (rather than removed) if a valid
+         session is found, so no separate reflow is needed. -->
+    <div class="an-recover" id="anRecover" hidden>
+      <div class="an-recover__card">
+        {% include "landing/_icon.html" with name="alert" cls="an-ico" %}
+        <h2>No active research session</h2>
+        <p id="anRecoverMessage">
+          We couldn't find a research session to analyze. Start a search in
+          the workspace, then ask a follow-up question from there to open
+          this page with its papers already loaded.
+        </p>
+        <a class="an-recover__cta" href="{% url 'research_ai_assistant:frontend' %}">
+          {% include "landing/_icon.html" with name="arrow-right" cls="an-back__ico" %}
+          <span>Return to research</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="an-shell" id="anShell" hidden>
+      <header class="an-topbar">
+        <a class="an-back" href="{% url 'research_ai_assistant:frontend' %}">
+          {% include "landing/_icon.html" with name="arrow-right" cls="an-back__ico" %}
+          <span>Back to research</span>
+        </a>
+        <div class="an-topbar__meta">
+          <p class="an-topbar__kicker">Paper analysis</p>
+          <p class="an-topbar__source" id="anSourceQuery"></p>
+        </div>
+      </header>
+
+      <main class="an-layout">
+        {% include "_analysis_paper_detail.html" %}
+        {% include "_analysis_paper_list.html" %}
+        {% include "_analysis_qa_panel.html" %}
+      </main>
+    </div>
+
+    <script type="module" src="{% static 'js/analysis/analysis.js' %}"></script>
+  </body>
+</html>

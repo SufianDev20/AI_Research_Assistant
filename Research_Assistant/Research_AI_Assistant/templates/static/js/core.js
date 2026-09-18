@@ -228,11 +228,16 @@ export class DOMManager {
     }
 
     // Research view listeners
+    // Follow-up submissions now open the paper analysis page (see
+    // handleFollowUpQuestion in research.js) instead of continuing the
+    // in-page chat. handleResearchMessage() below is unused by this
+    // wiring but left in place, not deleted, in case anything else
+    // still calls it.
     if (elements.researchSendBtn) {
       elements.researchSendBtn.addEventListener(
         "click",
         function () {
-          this.handleResearchMessage();
+          this.handleFollowUpQuestion();
         }.bind(this),
       );
     }
@@ -243,7 +248,7 @@ export class DOMManager {
         function (e) {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            this.handleResearchMessage();
+            this.handleFollowUpQuestion();
           }
         }.bind(this),
       );
