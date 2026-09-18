@@ -347,12 +347,38 @@ function renderAnalysisResult(result, excluded) {
 
 function renderAnalysisError(err, onRetry, excluded) {
   if (!els.analysisBody) return;
+
+  // A 413 means this exact request (these papers, at their current size)
+  // cannot fit the model's context budget — the backend token-budget
+  // that decides this is fixed server-side (see the project notes: this
+  // needs a real redesign, tracked separately). Retrying with the same
+  // papers and question will hit the identical limit again, so offering
+  // "Try again" here would be a false promise. The only thing that can
+  // actually change the outcome today is picking a different, smaller
+  // set of papers, and the only way to do that from this page is to go
+  // back and start a new search.
+  const isTooLarge = err && err.status === 413;
+
   els.analysisBody.innerHTML = `
     ${excludedPapersNote(excluded || [])}
     <div class="an-note an-note--error">
-      <strong>Analysis failed.</strong> ${escapeHtml(err && err.message ? err.message : "Unknown error.")}
+      ${
+        isTooLarge
+          ? `<strong>These papers are too large to analyze together.</strong> The combined text of the selected papers is more than this analysis can process in one request. Go back and start a narrower search — fewer or shorter papers are more likely to fit.`
+          : `<strong>Analysis failed.</strong> ${escapeHtml(err && err.message ? err.message : "Unknown error.")}`
+      }
     </div>
   `;
+
+  if (isTooLarge) {
+    const backBtn = document.createElement("a");
+    backBtn.className = "an-retry";
+    backBtn.href = "/workspace/";
+    backBtn.textContent = "Back to research";
+    els.analysisBody.appendChild(backBtn);
+    return;
+  }
+
   const retryBtn = document.createElement("button");
   retryBtn.type = "button";
   retryBtn.className = "an-retry";

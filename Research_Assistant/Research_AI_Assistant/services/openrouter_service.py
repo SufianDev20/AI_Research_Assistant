@@ -149,6 +149,11 @@ class OpenRouterService:
                     ],
                     "temperature": model_temperature,
                     "max_tokens": max_tokens,
+                    # Ask OpenRouter to drop reasoning tokens from the
+                    # response entirely for models that support the
+                    # separate `reasoning` field, instead of leaving it to
+                    # each caller to notice and discard message.reasoning.
+                    "reasoning": {"exclude": True},
                 }
 
                 response = requests.post(

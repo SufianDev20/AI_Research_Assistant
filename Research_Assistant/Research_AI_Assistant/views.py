@@ -10,7 +10,13 @@ import re
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
-from rest_framework.decorators import api_view, throttle_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+    throttle_classes,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework import status
@@ -19,7 +25,12 @@ from .models import QueryLog, PaperPDF
 from .services.openalex_service import OpenAlexAPIError, OpenAlexService
 from .services.extract_service import ExtractionService
 from .services.openrouter_service import OpenRouterAPIError, OpenRouterService
-from .services.prompt_builder import system_prompt, build_user_message
+from .services.prompt_builder import (
+    system_prompt,
+    build_user_message,
+    extract_final_summary,
+    InvalidSummaryFormat,
+)
 from .services.pdf_service import PDFService, PDFExtractionError
 
 # Multi-Paper Q&A backend (separate feature from ask_paper above:
@@ -52,6 +63,8 @@ class GenerateTitle(AnonRateThrottle):
 
 
 @api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def api_root(request):
     """
     Root endpoint providing API information.
@@ -72,6 +85,8 @@ def api_root(request):
 
 
 @api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([SearchRateThrottle])
 def search(request):
     """
@@ -413,9 +428,16 @@ def summarise(request):
             user_message=user_message,
             request_type="summary",
         )
+        summary = extract_final_summary(summary)
 
         return JsonResponse({"summary": summary})
 
+    except InvalidSummaryFormat as exc:
+        logger.warning("OpenRouter returned a summary in an unexpected format: %s", exc)
+        return JsonResponse(
+            {"error": "Summary could not be generated in the required format. Please try again."},
+            status=502,
+        )
     except OpenRouterAPIError as exc:
         logger.error("OpenRouter summarise error: %s", exc)
         return JsonResponse(
@@ -524,6 +546,8 @@ class SummariseThrottle(AnonRateThrottle):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([PDFThrottle])
 def extract_pdf(request):
     """
@@ -537,6 +561,19 @@ def extract_pdf(request):
     if not openalex_id:
         return Response(
             {"error": "openalex_id is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Match the PaperPDF model's field limits so bad input fails as a
+    # clean 400 here instead of a DB error inside get_or_create() below.
+    if len(openalex_id) > 100:
+        return Response(
+            {"error": "openalex_id must be 100 characters or fewer."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if pdf_url and len(pdf_url) > 500:
+        return Response(
+            {"error": "pdf_url must be 500 characters or fewer."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -638,6 +675,8 @@ def extract_pdf(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([SummariseThrottle])
 def ask_paper(request):
     """
@@ -650,6 +689,20 @@ def ask_paper(request):
     if not openalex_id or not question:
         return Response(
             {"error": "Both 'openalex_id' and 'question' are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # question was previously unbounded, i.e. any length was forwarded
+    # straight into a paid OpenRouter call. Cap it to the same limit
+    # multi_paper_qa already enforces via QARequestSerializer.
+    if len(question) > 2000:
+        return Response(
+            {"error": "question must be 2000 characters or fewer."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if len(openalex_id) > 100:
+        return Response(
+            {"error": "openalex_id must be 100 characters or fewer."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -698,6 +751,8 @@ class MultiPaperQAThrottle(AnonRateThrottle):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([MultiPaperQAThrottle])
 def multi_paper_qa(request):
     """

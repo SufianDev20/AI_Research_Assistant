@@ -13,6 +13,7 @@ Harvard citation format reference:
   Author(s) (Year) Title. Source. DOI.
 """
 
+import re
 from typing import List, Dict
 
 system_prompt = """You are an academic research assistant. Summarise each paper individually using only the provided metadata. No fabrication.
@@ -92,6 +93,37 @@ def build_user_message(papers: List[Dict], query: str) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+# Matches the start of the first real paper block, per the structure
+# required above ("Paper [N]: Title"). Free OpenRouter models occasionally
+# narrate their own reasoning ("We need to output each paper block...")
+# ahead of the actual answer even with reasoning tokens excluded from the
+# API response (see OpenRouterService.complete()) -- some providers just
+# don't separate the two. Since every valid answer is required to begin
+# with this marker, anything before its first occurrence is not part of
+# the intended output.
+_PAPER_BLOCK_RE = re.compile(r"(?im)^\s*Paper\s*\[?\d+\]?\s*:")
+
+
+class InvalidSummaryFormat(ValueError):
+    """The model did not provide the requested paper summary format."""
+
+
+def extract_final_summary(raw_content: str) -> str:
+    """
+    Strip any reasoning/narration preamble a model prepended ahead of the
+    first "Paper N:" block, returning only the intended final summary.
+
+    A response without a paper block must not reach the UI: some models
+    place their reasoning in message.content instead of a separate field.
+    """
+    if not raw_content:
+        raise InvalidSummaryFormat("No paper summary was returned.")
+    match = _PAPER_BLOCK_RE.search(raw_content)
+    if not match:
+        raise InvalidSummaryFormat("No formatted paper summary was returned.")
+    return raw_content[match.start():].strip()
 
 
 def _format_author_list(authors: List[Dict]) -> str:

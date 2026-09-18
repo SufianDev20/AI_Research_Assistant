@@ -459,6 +459,7 @@ html:has(.an-body) { height: 100%; }
 
 .an-retry {
   appearance: none;
+  display: inline-block;
   border: 1px solid var(--rule);
   background: var(--paper-raised);
   color: var(--forest);
@@ -466,6 +467,7 @@ html:has(.an-body) { height: 100%; }
   padding: 6px 14px;
   font-size: 0.82rem;
   cursor: pointer;
+  text-decoration: none;
   margin-top: 8px;
 }
 .an-retry:hover { border-color: var(--emerald); }

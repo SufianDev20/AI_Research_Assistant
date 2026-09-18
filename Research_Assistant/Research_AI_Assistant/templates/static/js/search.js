@@ -144,8 +144,26 @@ DOMManager.prototype.retrieveFromBackend = async function(
     seedParam;
 
   var response = await fetch(url);
-  if (!response.ok)
-    throw new Error(`Backend search error ${response.status}`);
+  if (!response.ok) {
+    // Distinguish "the search service itself failed" (auth/config/upstream
+    // issue — nothing to do with the query) from a query that legitimately
+    // matched zero papers, which is a normal 200 response handled by the caller.
+    let detail = null;
+    try {
+      const errBody = await response.json();
+      detail = errBody.error || errBody.detail || null;
+    } catch (_parseErr) {
+      // Non-JSON error body; fall back to a status-based message below.
+    }
+    const err = new Error(
+      detail
+        ? `Search service unavailable: ${detail}`
+        : `Search service unavailable (HTTP ${response.status})`,
+    );
+    err.isServiceError = true;
+    err.status = response.status;
+    throw err;
+  }
 
   const data = await response.json();
   return data; // Return full data object including pagination info

@@ -17,6 +17,12 @@ import { DOMManager } from './core.js';
 const ANALYSIS_SESSION_KEY = "scholara:analysisSession";
 
 DOMManager.prototype.handleFollowUpQuestion = function() {
+  // Blocks both the Send button and the Enter key: the button's disabled
+  // attribute alone doesn't stop Enter (its keydown handler calls this
+  // directly, bypassing .disabled), so the active-request check has to
+  // live here too, not just on the button.
+  if (window.appState.isThinking) return;
+
   const input = this.elements.researchInput;
   const question = input ? input.value.trim() : "";
 
@@ -215,6 +221,23 @@ DOMManager.prototype.generateResearchResponse = async function() {
 
     this.renderReferences(papersToUse);
 
+    // A 200 response with zero papers is a valid, successful search that
+    // simply matched nothing — distinct from the search service being
+    // unavailable (handled in the catch block below). Report it as such
+    // and skip the summarise call: there is nothing to summarise.
+    if (!papersToUse || papersToUse.length === 0) {
+      const noResultsMessage =
+        "No papers matched this search. Try different keywords, a broader year range, or a different search mode.";
+      assistantDiv.innerHTML = noResultsMessage;
+      assistantDiv.style.opacity = "1";
+      window.appState.currentResearchBinder.messages.push({
+        role: "assistant",
+        content: noResultsMessage,
+      });
+      this.updatePaginationInfo();
+      return;
+    }
+
     // Apply rate limiting before LLM call
     await this.waitForRateLimit();
 
@@ -288,6 +311,11 @@ DOMManager.prototype.generateResearchResponse = async function() {
     );
     window.appState.isThinking = false;
     window.appState.isGeneratingResponse = false;
+    // Restore the follow-up Send button on both success and failure — it
+    // was only ever disabled to stop a follow-up being submitted while
+    // this request was in flight (see the isThinking guards above and in
+    // handleFollowUpQuestion), not meant to stay disabled afterwards.
+    if (sendBtn) sendBtn.disabled = false;
     // Show reference filters only after generation completes
     this.setReferencesFilterVisibility(true);
   }
