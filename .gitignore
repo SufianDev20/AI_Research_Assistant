@@ -31,7 +31,8 @@ Thumbs.db
 # Windsurf
 .windsurf/
 .vscode/
-
+.agents/
+.claude/
 # Python testing and profiling
 .pytest_cache/
 .mypy_cache/
