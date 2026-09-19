@@ -213,8 +213,8 @@ AIResearchAssistant/
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/your-username/AIResearchAssistant.git
-   cd AIResearchAssistant
+   git clone https://github.com/SufianDev20/AI_Research_Assistant.git
+   cd AI_Research_Assistant
    cd Research_Assistant
    ```
 

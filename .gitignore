@@ -65,7 +65,6 @@ __pycache__/
 .vscode/
 .idea/
 .windsurf/
-
 # OS files
 .DS_Store
 .DS_Store?
