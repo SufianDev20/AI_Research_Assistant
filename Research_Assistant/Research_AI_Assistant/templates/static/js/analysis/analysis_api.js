@@ -83,3 +83,36 @@ export async function requestPaperAnalysis({ paperIds, question, pdfUrls, csrfTo
     paper_errors: (data && data.paper_errors) || {},
   };
 }
+
+const SEARCH_ENDPOINT = "/api/search/";
+
+export async function fetchResearchPapers(searchParams) {
+  const query = searchParams && searchParams.query;
+  if (!query) throw new Error("No search query is available to reload the papers.");
+
+  const params = new URLSearchParams({
+    q: query,
+    mode: searchParams.mode || "best_match",
+    per_page: String(Math.min(Number(searchParams.perPage) || 25, 50)),
+  });
+  if (searchParams.minYear) params.set("min_year", searchParams.minYear);
+  if (searchParams.maxYear) params.set("max_year", searchParams.maxYear);
+
+  let response;
+  try {
+    response = await fetch(`${SEARCH_ENDPOINT}?${params.toString()}`);
+  } catch (networkErr) {
+    const err = new Error("Could not reach the search service to reload these papers.");
+    err.cause = networkErr;
+    throw err;
+  }
+
+  if (!response.ok) {
+    const err = new Error(`Could not reload the papers for this research result (HTTP ${response.status}).`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const data = await response.json().catch(() => null);
+  return (data && data.papers) || [];
+}

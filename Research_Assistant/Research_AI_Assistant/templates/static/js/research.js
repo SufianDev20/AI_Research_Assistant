@@ -3,18 +3,30 @@ import { DOMManager } from './core.js';
 // Extend DOMManager prototype with research-related methods
 
 // ---------------------------------------------------------------------
-// Follow-up question -> paper analysis page handoff.
 //
-// The bottom textbox in the research view (#research-input /
-// #research-send-btn) used to re-search and append another turn to the
-// in-page chat via handleResearchMessage(). It now opens
-// /analysis/ instead, carrying the question, the current research
-// session id (if any), and the already-loaded papers with it — so the
-// user lands on a page with those papers ready, never having to search
-// again. See static/js/analysis/analysis.js for the receiving side;
-// the sessionStorage key/shape must match what it reads.
 // ---------------------------------------------------------------------
 const ANALYSIS_SESSION_KEY = "scholara:analysisSession";
+
+function writeAnalysisSession({ binder, question, papers, selectedIds }) {
+  const payload = {
+    researchId: binder.id || null,
+    sourceQuery: binder.name || question || "",
+    question: question || "",
+    papers: Array.isArray(papers) ? papers : [],
+    selectedIds: Array.isArray(selectedIds) ? selectedIds.filter(Boolean) : [],
+    searchParams: window.appState.searchParams || null,
+    createdAt: Date.now(),
+  };
+
+  try {
+    sessionStorage.setItem(ANALYSIS_SESSION_KEY, JSON.stringify(payload));
+    return true;
+  } catch (err) {
+    console.error("Could not hand off research session to the analysis page:", err);
+    alert("Couldn't open the analysis page (storage unavailable). Please try again.");
+    return false;
+  }
+}
 
 DOMManager.prototype.handleFollowUpQuestion = function() {
   // Blocks both the Send button and the Enter key: the button's disabled
@@ -32,25 +44,29 @@ DOMManager.prototype.handleFollowUpQuestion = function() {
   if (!question || !window.appState.currentResearchBinder) return;
 
   const binder = window.appState.currentResearchBinder;
-  const payload = {
-    researchId: binder.id || null,
-    sourceQuery: binder.name || question,
-    question: question,
-    // Paper objects only (title/authors/abstract/pdf_url/etc.) — no
-    // full paper text, and never placed in the URL.
-    papers: Array.isArray(binder.papers) ? binder.papers : [],
-    createdAt: Date.now(),
-  };
+  const papers = Array.isArray(binder.papers) ? binder.papers : [];
 
-  try {
-    sessionStorage.setItem(ANALYSIS_SESSION_KEY, JSON.stringify(payload));
-  } catch (err) {
-    console.error("Could not hand off research session to the analysis page:", err);
-    alert("Couldn't open the analysis page (storage unavailable). Please try again.");
-    return;
-  }
+  const selectedIds = papers
+    .filter((p) => p && (p.pdf_url || p.oa_url))
+    .slice(0, 10)
+    .map((p) => p.openalex_id);
+
+  if (!writeAnalysisSession({ binder, question, papers, selectedIds })) return;
 
   if (input) input.value = "";
+  window.location.href = "/analysis/";
+};
+
+DOMManager.prototype.openAnalysisPage = function(papers, clickedIndex) {
+  const binder = window.appState.currentResearchBinder;
+  if (!binder) return;
+
+  const list = Array.isArray(papers) ? papers : [];
+  const clicked = list[clickedIndex];
+  const selectedIds = clicked && clicked.openalex_id ? [clicked.openalex_id] : [];
+
+  if (!writeAnalysisSession({ binder, question: "", papers: list, selectedIds })) return;
+
   window.location.href = "/analysis/";
 };
 
@@ -106,9 +122,10 @@ DOMManager.prototype.renderReferences = function(papers) {
         " citations</div>";
 
       card.addEventListener("click", (e) => {
-           e.preventDefault();
-           this.showPaperView(sortedPapers, i);
-    });
+        if (e.target.closest("a.source-link")) return;
+        e.preventDefault();
+        this.openAnalysisPage(sortedPapers, i);
+      });
 
       this.elements.referencesList.appendChild(card);
     }.bind(this),

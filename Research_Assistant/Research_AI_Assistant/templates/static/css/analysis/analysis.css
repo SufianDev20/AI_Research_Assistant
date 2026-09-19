@@ -194,7 +194,38 @@ html:has(.an-body) { height: 100%; }
   color: var(--ink-meta);
 }
 
-/* =========================== LEFT: Refined Paper ========================= */
+/* ========================== LEFT: Selected Papers ======================== */
+.an-detail__card {
+  position: relative;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.an-detail__card + .an-detail__card { margin-top: 14px; }
+
+.an-detail__remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink-meta);
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.an-detail__remove:hover { color: #7a2e1f; border-color: rgba(178, 68, 40, 0.45); }
+
+.an-detail__card .an-detail__title { padding-right: 30px; }
+
 .an-detail {
   flex: 1 1 auto;
   min-height: 0;
@@ -286,6 +317,7 @@ html:has(.an-body) { height: 100%; }
   gap: 8px;
 }
 .an-paper-card {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
@@ -294,15 +326,36 @@ html:has(.an-body) { height: 100%; }
   background: var(--paper-raised);
   border: 1px solid var(--rule);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 12px 40px 12px 14px;
   transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease), transform 0.1s var(--ease);
 }
-.an-paper-card:hover { border-color: var(--emerald); }
-.an-paper-card:active { transform: scale(0.995); }
-.an-paper-card[aria-current="true"] {
+.an-paper-card:hover:not(:disabled) { border-color: var(--emerald); }
+.an-paper-card:active:not(:disabled) { transform: scale(0.995); }
+.an-paper-card--selected {
   border-color: var(--emerald);
   box-shadow: 0 0 0 1px var(--emerald), 0 10px 24px -16px rgba(18, 48, 36, 0.4);
   background: #fff;
+}
+.an-paper-card:disabled { cursor: not-allowed; opacity: 0.45; }
+
+.an-paper-card__check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--paper);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.an-paper-card--selected .an-paper-card__check {
+  background: var(--emerald);
+  border-color: var(--emerald);
 }
 .an-paper-card__title {
   font-family: "Newsreader", serif;

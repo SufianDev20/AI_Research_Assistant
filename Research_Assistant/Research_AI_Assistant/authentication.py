@@ -1,3 +1,4 @@
+import logging
 import os
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
@@ -6,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class ClerkAuthentication(BaseAuthentication):
@@ -21,12 +23,19 @@ class ClerkAuthentication(BaseAuthentication):
         )
 
         if not request_state.is_signed_in:
+            logger.warning(
+                "Clerk auth rejected %s %s: %s",
+                django_request.method,
+                django_request.path,
+                request_state.reason,
+            )
             raise AuthenticationFailed(f"Clerk auth failed: {request_state.reason}")
 
         payload = request_state.payload
         clerk_user_id = payload.get("sub")
 
         if not clerk_user_id:
+            logger.error("Clerk token verified but has no 'sub' claim")
             raise AuthenticationFailed("No user ID in Clerk token")
 
         user, _ = User.objects.get_or_create(

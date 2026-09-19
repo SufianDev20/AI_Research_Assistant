@@ -20,6 +20,7 @@ env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 # settings.py
 CLERK_SECRET_KEY = env("CLERK_SECRET_KEY")
+CLERK_PUBLISHABLE_KEY = env("CLERK_PUBLISHABLE_KEY", default="")
 CLERK_AUTHORIZED_PARTIES = env.list(
     "CLERK_AUTHORIZED_PARTIES",
     default=["http://localhost:8080"],
@@ -163,3 +164,10 @@ import os
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"Research_AI_Assistant": {"handlers": ["console"], "level": "DEBUG" if DEBUG else "INFO"}},
+}

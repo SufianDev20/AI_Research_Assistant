@@ -13,6 +13,7 @@ app_name = "research_ai_assistant"
 
 urlpatterns = [
     path("", views.landing, name="landing"),
+    path("sign-in/", views.sign_in, name="sign_in"),
     path("workspace/", views.frontend, name="frontend"),
     path("analysis/", views.analysis, name="analysis"),
     path("api/", views.api_root, name="api_root"),

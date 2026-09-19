@@ -7,6 +7,7 @@ import logging
 import json
 import re
 
+from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
@@ -358,11 +359,19 @@ def landing(request):
     return render(request, "landing/landing.html")
 
 
+def sign_in(request):
+    """
+    Render the Clerk sign-in page (Google). The publishable key is public by
+    design; the secret key is never passed to templates.
+    """
+    return render(request, "sign_in.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
+
+
 def frontend(request):
     """
     Render the frontend HTML template for the Scholara research workspace.
     """
-    return render(request, "index.html")
+    return render(request, "index.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
 
 
 def analysis(request):
@@ -378,7 +387,7 @@ def analysis(request):
     handoff (it shows a recovery path back to /workspace/, never
     fabricated sample papers).
     """
-    return render(request, "analysis.html")
+    return render(request, "analysis.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
 
 
 @require_POST

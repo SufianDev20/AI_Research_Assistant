@@ -1,8 +1,12 @@
 {% load static %}
 <!-- MIDDLE: Research Papers — the paper collection carried over from the
-     research result the user came from. Always a plain vertical list
-     (never horizontal-scrolling), so no extra scroll controls are
-     needed at any width — see analysis.js renderPaperList(). -->
+     research result the user came from (the same papers the References
+     sidebar showed). Each card is a toggle: clicking it adds or removes
+     that paper from the selection shown on the left, which is what the
+     Q&A is scoped to. Up to 10 at once, matching QARequestSerializer.
+     Always a plain vertical list (never horizontal-scrolling), so no
+     extra scroll controls are needed at any width — see analysis.js
+     renderPaperList() and togglePaper(). -->
 <section class="an-panel an-panel--list" aria-labelledby="anListHeading">
   <div class="an-panel__head">
     <p class="an-kicker" id="anListHeading">Research Papers</p>

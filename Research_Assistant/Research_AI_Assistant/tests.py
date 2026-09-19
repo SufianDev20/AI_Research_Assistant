@@ -18,7 +18,14 @@ from django.urls import reverse
 
 from .services.openalex_service import OpenAlexService, OpenAlexAPIError
 from .services.extract_service import ExtractionService
-from .services.openrouter_service import OpenRouterService, OpenRouterAPIError
+from django.core.cache import cache
+
+from .services.openrouter_service import (
+    FREE_MODELS,
+    OpenRouterService,
+    OpenRouterAPIError,
+    fetch_free_models,
+)
 from .services.prompt_builder import system_prompt, build_user_message
 
 
@@ -908,3 +915,43 @@ class TestSummariseView(TestCase):
         """GET on /api/summarise/ must return 405 Method Not Allowed."""
         resp = self.client.get(reverse("research_ai_assistant:summarise"))
         self.assertEqual(resp.status_code, 405)
+
+
+@override_settings(OPENROUTER_API_KEY="test-key-123")
+class TestFetchFreeModels(TestCase):
+    """fetch_free_models(): filters ':free' ids, caches, falls back on error."""
+
+    def setUp(self):
+        cache.clear()
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.get")
+    def test_keeps_only_free_models(self, mock_get):
+        mock_get.return_value = MagicMock(
+            json=lambda: {
+                "data": [
+                    {"id": "a/model-one:free"},
+                    {"id": "b/paid-model"},
+                    {"id": "c/model-two:free"},
+                ]
+            }
+        )
+        models = fetch_free_models()
+        self.assertIn("a/model-one:free", models)
+        self.assertIn("c/model-two:free", models)
+        self.assertNotIn("b/paid-model", models)
+        headers = mock_get.call_args[1]["headers"]
+        self.assertEqual(headers["Authorization"], "Bearer test-key-123")
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.get")
+    def test_result_is_cached(self, mock_get):
+        mock_get.return_value = MagicMock(json=lambda: {"data": [{"id": "a/x:free"}]})
+        fetch_free_models()
+        fetch_free_models()
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.get")
+    def test_falls_back_to_builtin_list_on_error(self, mock_get):
+        import requests as req_lib
+
+        mock_get.side_effect = req_lib.exceptions.ConnectionError("down")
+        self.assertEqual(fetch_free_models(), FREE_MODELS)

@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in — Scholara</title>
+    <meta name="clerk-publishable-key" content="{{ clerk_publishable_key }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;450;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/sign_in.css' %}" />
+  </head>
+  <body class="si-body">
+    <main class="si-card">
+      <a class="si-brand" href="/">Scholara</a>
+      <h1>Sign in to start researching</h1>
+      <p class="si-sub">Continue with Google to open your research workspace.</p>
+      <div id="clerk-sign-in" aria-live="polite"></div>
+      <p class="si-error" id="siError" hidden></p>
+    </main>
+    <script type="module" src="{% static 'js/sign_in.js' %}"></script>
+  </body>
+</html>

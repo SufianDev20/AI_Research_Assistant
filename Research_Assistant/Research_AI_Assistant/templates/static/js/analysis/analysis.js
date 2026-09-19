@@ -15,7 +15,7 @@
 // oa_status, has_pdf_link, pdf_url, oa_url, concepts[], ...
 // ============================================================================
 
-import { requestPaperAnalysis } from "./analysis_api.js";
+import { fetchResearchPapers, requestPaperAnalysis } from "./analysis_api.js";
 
 const SESSION_KEY = "scholara:analysisSession";
 const MAX_ANALYZABLE_PAPERS = 10; // QARequestSerializer caps paper_ids at 10
@@ -71,9 +71,17 @@ function paperBadgeHtml(paper) {
 // ==================== state ====================
 const state = {
   session: null,
-  selectedIndex: -1,
+  selectedIds: new Set(),
   analysisAbort: null,
 };
+
+function isSelected(paper) {
+  return !!paper && state.selectedIds.has(paper.openalex_id);
+}
+
+function selectedPapers() {
+  return state.session.papers.filter(isSelected);
+}
 
 // ==================== elements ====================
 const els = {};
@@ -109,7 +117,8 @@ function loadSession() {
   }
   if (!parsed || typeof parsed !== "object") return null;
   if (!Array.isArray(parsed.papers)) return null;
-  if (typeof parsed.question !== "string" || !parsed.question.trim()) return null;
+  parsed.question = typeof parsed.question === "string" ? parsed.question : "";
+  if (!Array.isArray(parsed.selectedIds)) parsed.selectedIds = [];
   return parsed;
 }
 
@@ -137,11 +146,16 @@ function renderTopBar() {
 }
 
 // ==================== rendering: middle (paper list) ====================
+function renderPaperListMessage(html) {
+  if (els.paperCount) els.paperCount.textContent = "";
+  if (els.paperList) els.paperList.innerHTML = html;
+}
+
 function renderPaperList() {
   const papers = state.session.papers;
   if (els.paperCount) {
     els.paperCount.textContent = papers.length
-      ? `${papers.length} paper${papers.length === 1 ? "" : "s"}`
+      ? `${state.selectedIds.size} of ${papers.length} selected`
       : "";
   }
   if (!els.paperList) return;
@@ -152,13 +166,21 @@ function renderPaperList() {
     return;
   }
 
+  const atCap = state.selectedIds.size >= MAX_ANALYZABLE_PAPERS;
+
   els.paperList.innerHTML = "";
-  papers.forEach((paper, i) => {
+  papers.forEach((paper) => {
+    const selected = isSelected(paper);
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "an-paper-card";
+    card.className = `an-paper-card${selected ? " an-paper-card--selected" : ""}`;
     card.setAttribute("role", "listitem");
-    card.setAttribute("aria-current", i === state.selectedIndex ? "true" : "false");
+    card.setAttribute("aria-pressed", selected ? "true" : "false");
+
+    if (!selected && atCap) {
+      card.disabled = true;
+      card.title = `You can analyse up to ${MAX_ANALYZABLE_PAPERS} papers at once. Remove one to add another.`;
+    }
 
     const metaParts = [];
     if (paper.publication_year) metaParts.push(paper.publication_year);
@@ -171,40 +193,63 @@ function renderPaperList() {
       : "";
 
     card.innerHTML = `
+      <span class="an-paper-card__check" aria-hidden="true">${selected ? "✓" : ""}</span>
       <div class="an-paper-card__title">${escapeHtml(paper.title || "Untitled")}</div>
       <div class="an-paper-card__meta">${escapeHtml(metaParts.join(" · "))}</div>
       <div class="an-paper-card__foot">${paperBadgeHtml(paper)}${cited}</div>
     `;
-    card.addEventListener("click", () => selectPaper(i));
+    card.addEventListener("click", () => togglePaper(paper));
     els.paperList.appendChild(card);
   });
 }
 
-function updateActiveCard() {
-  if (!els.paperList) return;
-  const cards = els.paperList.querySelectorAll(".an-paper-card");
-  cards.forEach((card, i) => {
-    card.setAttribute("aria-current", i === state.selectedIndex ? "true" : "false");
-  });
+// ==================== selection ====================
+function togglePaper(paper) {
+  if (!paper || !paper.openalex_id) return;
+  if (state.selectedIds.has(paper.openalex_id)) {
+    state.selectedIds.delete(paper.openalex_id);
+  } else {
+    if (state.selectedIds.size >= MAX_ANALYZABLE_PAPERS) return;
+    state.selectedIds.add(paper.openalex_id);
+  }
+  persistSelection();
+  renderPaperList();
+  renderSelectedPapers();
+  if (!state.session.question) renderIdleAnalysis();
 }
 
-// ==================== rendering: left (refined paper) ====================
-function selectPaper(index) {
-  state.selectedIndex = index;
-  updateActiveCard();
-  renderPaperDetail(state.session.papers[index]);
+function persistSelection() {
+  state.session.selectedIds = Array.from(state.selectedIds);
+  saveSession(state.session);
 }
 
-function renderPaperDetail(paper) {
+// ==================== rendering: left (selected papers) ====================
+function renderSelectedPapers() {
   if (!els.paperDetail) return;
-  if (!paper) {
+  const chosen = selectedPapers();
+
+  if (!chosen.length) {
     els.paperDetail.innerHTML = `
       <div class="an-detail__idle">
-        <p>Select a paper from the list to see its details here.</p>
+        <p>Select papers from the list to analyse them together.</p>
       </div>`;
     return;
   }
 
+  els.paperDetail.innerHTML = "";
+  chosen.forEach((paper) => {
+    const card = document.createElement("article");
+    card.className = "an-detail__card";
+    card.innerHTML = renderSelectedCard(paper);
+
+    const remove = card.querySelector(".an-detail__remove");
+    if (remove) remove.addEventListener("click", () => togglePaper(paper));
+
+    els.paperDetail.appendChild(card);
+  });
+}
+
+function renderSelectedCard(paper) {
   const authors = formatAuthors(paper, 8);
   const metaParts = [];
   if (paper.publication_year) metaParts.push(String(paper.publication_year));
@@ -233,7 +278,10 @@ function renderPaperDetail(paper) {
     )
     .join("");
 
-  els.paperDetail.innerHTML = `
+  return `
+    <button type="button" class="an-detail__remove" aria-label="Remove ${escapeHtml(
+      paper.title || "this paper"
+    )} from the selection">&times;</button>
     <h3 class="an-detail__title">${escapeHtml(paper.title || "Untitled")}</h3>
     ${authors ? `<p class="an-detail__authors">${escapeHtml(authors)}</p>` : ""}
     <div class="an-detail__meta">
@@ -255,7 +303,20 @@ function renderPaperDetail(paper) {
 
 // ==================== rendering: right (question + analysis) ====================
 function renderQuestion() {
-  if (els.questionText) els.questionText.textContent = state.session.question;
+  const question = state.session.question || "";
+  const wrap = document.querySelector(".an-qa__question");
+  if (wrap) wrap.hidden = !question;
+  if (els.questionText) els.questionText.textContent = question;
+}
+
+function renderIdleAnalysis() {
+  if (!els.analysisBody) return;
+  const count = state.selectedIds.size;
+  els.analysisBody.innerHTML = count
+    ? `<div class="an-note">Ask a question below to analyse the ${count} selected paper${
+        count === 1 ? "" : "s"
+      } together.</div>`
+    : '<div class="an-note">Select one or more papers, then ask a question about them.</div>';
 }
 
 function renderAnalysisPending(active, excluded) {
@@ -402,16 +463,27 @@ async function runAnalysis(question) {
     return;
   }
 
-  const eligible = papers.filter((p) => p.pdf_url || p.oa_url).slice(0, MAX_ANALYZABLE_PAPERS);
-  const excluded = papers.filter((p) => !(p.pdf_url || p.oa_url));
+  const chosen = selectedPapers();
+
+  if (!chosen.length) {
+    if (els.analysisBody) {
+      els.analysisBody.innerHTML =
+        '<div class="an-note">Select at least one paper from the list before asking a question.</div>';
+    }
+    return;
+  }
+
+  const eligible = chosen.filter((p) => p.pdf_url || p.oa_url);
+  const excluded = chosen.filter((p) => !(p.pdf_url || p.oa_url));
 
   if (!eligible.length) {
     if (els.analysisBody) {
       els.analysisBody.innerHTML = `
         <div class="an-note">
-          None of the ${papers.length} paper${papers.length === 1 ? "" : "s"} in this research
-          result have a fetchable full-text link, so paper-grounded analysis isn't possible
-          for ${papers.length === 1 ? "it" : "them"} yet.
+          None of the ${chosen.length} selected paper${chosen.length === 1 ? "" : "s"} have a
+          fetchable full-text link, so paper-grounded analysis isn't possible
+          for ${chosen.length === 1 ? "it" : "them"}. Select a paper marked
+          <strong>Open access · PDF</strong> and try again.
         </div>`;
     }
     return;
@@ -461,8 +533,37 @@ function handleComposerSubmit(e) {
   runAnalysis(question);
 }
 
+function seedSelection() {
+  const available = new Set(state.session.papers.map((p) => p.openalex_id));
+  state.selectedIds = new Set(
+    (state.session.selectedIds || [])
+      .filter((id) => available.has(id))
+      .slice(0, MAX_ANALYZABLE_PAPERS)
+  );
+}
+
+async function ensurePapers() {
+  if (state.session.papers.length) return;
+
+  const params = state.session.searchParams ||
+    (state.session.sourceQuery ? { query: state.session.sourceQuery } : null);
+  if (!params || !params.query) return;
+
+  renderPaperListMessage(
+    '<div class="an-paper-list__empty">Loading the papers for this research result…</div>'
+  );
+
+  try {
+    const papers = await fetchResearchPapers(params);
+    state.session.papers = Array.isArray(papers) ? papers : [];
+    saveSession(state.session);
+  } catch (err) {
+    console.error("Could not reload papers for the analysis page:", err);
+  }
+}
+
 // ==================== init ====================
-function init() {
+async function init() {
   cacheElements();
 
   const session = loadSession();
@@ -476,20 +577,22 @@ function init() {
   if (els.shell) els.shell.hidden = false;
 
   renderTopBar();
-  renderPaperList();
   renderQuestion();
-
-  if (session.papers.length) {
-    selectPaper(0);
-  } else {
-    renderPaperDetail(null);
-  }
 
   if (els.composer) {
     els.composer.addEventListener("submit", handleComposerSubmit);
   }
 
-  runAnalysis(session.question);
+  await ensurePapers();
+  seedSelection();
+  renderPaperList();
+  renderSelectedPapers();
+
+  if (session.question) {
+    runAnalysis(session.question);
+  } else {
+    renderIdleAnalysis();
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);
