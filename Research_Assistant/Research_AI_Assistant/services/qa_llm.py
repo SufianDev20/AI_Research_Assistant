@@ -31,7 +31,7 @@ Rules:
 2. If the answer is not supported by the provided excerpts, respond exactly with: "not found in provided papers" as the "answer" field, and return an empty citations list. Only refuse this way when the excerpts truly do not address the question — for broad or overview questions (e.g. "what does this paper cover", "summarize this paper"), synthesize an answer from whatever excerpts are relevant, even if no single excerpt states the summary outright.
 3. Keep "answer" to 3-5 sentences maximum. Do not pad or restate the question.
 4. Every claim in "answer" must be traceable to at least one citation in "citations". For a broad/overview question, cite the excerpts that best support the overall summary (e.g. the abstract or introduction) rather than refusing because no excerpt is itself a full summary.
-5. Each citation must reference a paper_id and page number that actually appear in the provided excerpts. Do not invent page numbers.
+5. Each citation must reference a paper_id and page number that actually appear in the provided excerpts. Do not invent page numbers, and do not cite a page from your general knowledge of how the paper is likely structured (e.g. "the abstract is usually page 1") — only a page you can see printed as "[paper_id, Page N]" in the excerpts below is valid. Not every page of a paper is shown to you; a page missing from the excerpts is being enforced as absent, not omitted by accident, and citing it will cause the citation to be rejected and shown to the user as unverified.
 6. "quoted_snippet" must be a short excerpt (under 15 words) copied verbatim from the cited page's text, so it can be verified against the source.
 7. Output ONLY valid JSON matching this exact schema, no markdown code fences, no extra commentary:
 

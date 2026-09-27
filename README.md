@@ -15,7 +15,9 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **Author Search Service**: Search for academic authors via OpenAlex API
 - **Metadata Extraction**: Comprehensive extraction of paper metadata including title, authors, abstract, publication year, DOI, research concepts, and open access information
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
-- **PDF extraction for answering**: Extracts text from PDFs to answer questions using LLMs for the research paper.
+- **PDF-to-Markdown Extraction**: Converts open-access PDFs to page-tagged Markdown (PyMuPDF4LLM), cached per paper so repeat questions skip re-downloading and re-OCRing
+- **Multi-Paper Q&A with Verified Citations**: Ask questions across up to 10 selected papers at once; every citation is checked deterministically against the source page text (page existence + fuzzy snippet match) before being shown as verified
+- **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side on protected endpoints
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
 - **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
 - **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
@@ -75,8 +77,10 @@ Based on actual format compliance testing:
 
 ### Frontend Features
 
+- **Landing Page**: Dedicated marketing/entry page at `/`, separate from the workspace
 - **Modern UI**: Clean, responsive web interface with dark theme
 - **Interactive Research View**: Dynamic chat-like interface for research conversations
+- **Paper Analysis Page**: Select papers from a search, view them side-by-side, and run multi-paper Q&A with page-level, verified citations shown per answer
 - **Binder System**: Save and organize research conversations with custom colors and titles
 - **Paper Cards**: Visual display of research papers with metadata and links
 - **Load More Functionality**: Seamless pagination for browsing large result sets
@@ -167,35 +171,33 @@ AIResearchAssistant/
     │   ├── settings.py                 # Django settings
     │   └── urls.py                     # Root URL configuration
     └── Research_AI_Assistant/          # Main Django app
-        ├── models.py                    # Database Model
+        ├── models.py                    # Database models (incl. PaperPDF cache, custom User)
         ├── serializers.py               # Django Serializer
-        ├── views.py                     # API views and endpoints
+        ├── authentication.py            # Clerk JWT authentication backend
+        ├── views.py                     # API views and endpoints (search, summarise, PDF, Q&A)
         ├── views_performance.py         # Monitoring Performance of OpenRouter
         ├── urls.py                      # App URL configuration
         ├── tests.py                     # Unit tests
         ├── templates/                   # HTML templates
-        │   ├── index.html               # Main frontend template
+        │   ├── landing/                 # Landing page (`/`)
+        │   ├── index.html               # Workspace template (`/workspace/`)
+        │   ├── analysis.html            # Paper analysis + multi-paper Q&A page (`/analysis/`)
+        │   ├── sign_in.html             # Clerk sign-in page
         │   ├── images/                  # Interface screenshots
-        │   │   ├── Interface.png
-        │   │   ├── Filter3.png
-        │   │   ├── FilterByRelevance.png
-        │   │   ├── FilterMostCited.png
-        │   │   ├── BinderSaved.png
-        │   │   ├── BinderDelete.png
-        │   │   ├── Filter1.png
-        │   │   ├── Filter2.png
-        │   │   ├── ResponsePage.png
-        │   │   └── Performance_Dashboard.png
-        │   └── admin/                   # Admin templates
-        │       └── performance_dashboard.html  # Performance monitoring dashboard
-        │   └── static/                  # Static assets
-        │       └── styles.css          # Main stylesheet
+        │   ├── admin/                   # Admin templates
+        │   │   └── performance_dashboard.html  # Performance monitoring dashboard
+        │   └── static/                  # Static assets (JS/CSS, no build step)
+        │       ├── styles.css           # Workspace stylesheet
+        │       └── js/                  # ES-module JS (globals.js entry point, analysis/*)
         └── services/                    # Business logic services
             ├── openalex_service.py      # OpenAlex API client
             ├── openrouter_service.py    # OpenRouter LLM client with performance tracking
             ├── extract_service.py       # Metadata extraction from OpenAlex
-            ├── prompt_builder.py        # LLM prompt construction
-            ├── pdf_service.py            # PDF generation for summaries
+            ├── prompt_builder.py        # Summary LLM prompt construction
+            ├── pdf_service.py           # PDF fetching + PyMuPDF4LLM extraction (SSRF-guarded)
+            ├── qa_pipeline.py           # Q&A chunking, context assembly, citation validation
+            ├── qa_llm.py                # Q&A LLM prompt + JSON response parsing
+            ├── qa_chunk_cache.py        # Caches Q&A chunks per paper to avoid re-OCR
             └── performance_tracker.py   # Model performance monitoring and intelligent fallback
 ```
 
@@ -243,7 +245,11 @@ AIResearchAssistant/
    OPENROUTER_SITE_NAME=Research AI Assistant
    DEBUG=True
    ALLOWED_HOSTS=localhost,127.0.0.1
+   CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxx
+   CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxx
    ```
+
+   `CLERK_SECRET_KEY` has no default and is required for Django to start. Get both keys from your [Clerk dashboard](https://dashboard.clerk.com/).
 
 5. **Run database migrations**:
 
