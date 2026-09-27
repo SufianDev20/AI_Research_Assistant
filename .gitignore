@@ -19,7 +19,7 @@ __pycache__/
 # Django
 db.sqlite3
 *.log
-
+skills-lock.json
 # Editor folders
 .vscode/
 .idea/
@@ -47,14 +47,13 @@ db.sqlite3
 media/
 staticfiles/
 **/migrations/__pycache__/
-
+references/
 
 # Package distribution
 *.egg-info/
 dist/
 build/
 *.egg
-
 # Development environments
 venv/
 .venv/

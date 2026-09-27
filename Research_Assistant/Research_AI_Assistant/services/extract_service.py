@@ -7,6 +7,44 @@ OpenAlex Work object reference: https://developers.openalex.org
 
 from typing import Dict, List, Optional, Tuple
 
+RELIABLE_DOMAINS = {
+    "arxiv.org",
+    "www.ncbi.nlm.nih.gov",
+    "pmc.ncbi.nlm.nih.gov",
+    "europepmc.org",
+    "www.biorxiv.org",
+    "www.medrxiv.org",
+    "doaj.org",
+    "core.ac.uk",
+    "zenodo.org",
+    "osf.io",
+}
+
+BLOCKED_DOMAINS = {
+    "dl.acm.org",
+    "ieeexplore.ieee.org",
+    "www.sciencedirect.com",
+    "link.springer.com",
+    "onlinelibrary.wiley.com",
+    "www.tandfonline.com",
+    "www.jstor.org",
+}
+
+
+MAX_PDF_CANDIDATES = 3
+
+
+def fetch_reliability(pdf_url: str) -> str:
+    """Return 'reliable', 'blocked', or 'unknown' based on the URL's domain."""
+    from urllib.parse import urlparse
+
+    host = urlparse(pdf_url).hostname or ""
+    if host in RELIABLE_DOMAINS:
+        return "reliable"
+    if host in BLOCKED_DOMAINS:
+        return "blocked"
+    return "unknown"
+
 
 class ExtractionService:
     """Parse OpenAlex work objects into structured metadata."""
@@ -25,6 +63,7 @@ class ExtractionService:
         Reference:
             https://developers.openalex.org
         """
+        pdf_candidates = ExtractionService._collect_pdf_candidates(work)
         pdf_url, oa_url = ExtractionService._extract_pdf_and_oa_urls(work)
 
         return {
@@ -53,6 +92,7 @@ class ExtractionService:
             "has_pdf_link": bool(pdf_url),
             "full_text_url": pdf_url or oa_url,
             "pdf_url": pdf_url,
+            "pdf_candidates": pdf_candidates,
             "oa_url": oa_url,
             "referenced_works": ExtractionService._extract_referenced_works(work),
             "referenced_works_count": len(work.get("referenced_works", [])),
@@ -125,45 +165,57 @@ class ExtractionService:
         return None
 
     @staticmethod
+    def _collect_pdf_candidates(work: Dict) -> List[str]:
+        """
+        Direct PDF URLs OpenAlex lists for this work, best first (max 3).
+
+        Sources, in the order they were always consulted: best_oa_location,
+        primary_location, every locations[] entry, content_urls["pdf"]. The
+        first of these is the URL the app has always used; it is kept in the
+        result even when the cap applies. The rest are ordered so hosts that
+        don't block server downloads come before known-blocked publishers.
+        """
+        best_oa = work.get("best_oa_location") or {}
+        primary = work.get("primary_location") or {}
+        locations = work.get("locations")
+        content_urls = work.get("content_urls")
+
+        raw = [best_oa.get("pdf_url"), primary.get("pdf_url")]
+        if isinstance(locations, list):
+            raw += [loc.get("pdf_url") for loc in locations if isinstance(loc, dict)]
+        if isinstance(content_urls, dict):
+            raw.append(content_urls.get("pdf"))
+
+        unique = list(dict.fromkeys(u for u in raw if isinstance(u, str) and u))
+        if not unique:
+            return []
+
+        original = unique[0]
+        rank = {"reliable": 0, "unknown": 1, "blocked": 2}
+        candidates = sorted(unique, key=lambda u: rank[fetch_reliability(u)])[
+            :MAX_PDF_CANDIDATES
+        ]
+        if original not in candidates:
+            candidates[-1] = original
+        return candidates
+
+    @staticmethod
     def _extract_pdf_and_oa_urls(work: Dict) -> Tuple[Optional[str], Optional[str]]:
         """
-        Iterates across best_oa_location, primary_location, content_urls, and all locations
-        to find direct PDF links and fallback landing pages.
+        Return (best direct pdf_url, landing page). The pdf_url is the first of
+        _collect_pdf_candidates; the landing page falls back from best_oa_location
+        to primary_location to open_access.oa_url.
         """
-        pdf_url = None
-        landing_page = None
+        candidates = ExtractionService._collect_pdf_candidates(work)
+        pdf_url = candidates[0] if candidates else None
 
-        # 1. Best OA Location
         best_oa = work.get("best_oa_location") or {}
-        if best_oa.get("pdf_url"):
-            pdf_url = best_oa.get("pdf_url")
-        landing_page = best_oa.get("landing_page_url")
-
-        # 2. Primary Location Fallback
         primary = work.get("primary_location") or {}
-        if not pdf_url and primary.get("pdf_url"):
-            pdf_url = primary.get("pdf_url")
-        if not landing_page:
-            landing_page = primary.get("landing_page_url")
-
-        # 3. Deep search: Check all locations array for a direct pdf_url
-        if not pdf_url:
-            locations = work.get("locations", [])
-            if isinstance(locations, list):
-                for loc in locations:
-                    if isinstance(loc, dict) and loc.get("pdf_url"):
-                        pdf_url = loc.get("pdf_url")
-                        break
-
-        # 4. Fallback content_urls
-        if not pdf_url:
-            content_urls = work.get("content_urls") or {}
-            if isinstance(content_urls, dict):
-                pdf_url = content_urls.get("pdf")
-
-        # 5. Open Access Landing Page Fallback
-        if not landing_page:
-            landing_page = (work.get("open_access") or {}).get("oa_url")
+        landing_page = (
+            best_oa.get("landing_page_url")
+            or primary.get("landing_page_url")
+            or (work.get("open_access") or {}).get("oa_url")
+        )
 
         return pdf_url, landing_page
 

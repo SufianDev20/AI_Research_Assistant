@@ -13,6 +13,8 @@ from django.test import override_settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Research_Assistant.settings")
 django.setup()
 
+from Research_AI_Assistant.serializers import QARequestSerializer
+from Research_AI_Assistant.services.extract_service import ExtractionService
 from Research_AI_Assistant.services.pdf_service import (
     MAX_PDF_BYTES,
     PDFExtractionError,
@@ -143,7 +145,10 @@ class TestQAPipeline(unittest.TestCase):
         with patch(
             "Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes",
             return_value=b"pdf bytes",
-        ), patch.dict(sys.modules, {"pymupdf4llm": pdf_backend}):
+        ), patch.dict(
+            sys.modules,
+            {"pymupdf4llm": pdf_backend, "pymupdf": SimpleNamespace(open=lambda **kw: MagicMock())},
+        ):
             result = QAChunkService.fetch_and_chunk("https://example.test/a.pdf", "W1")
 
         self.assertEqual(result["page_count"], 2)
@@ -176,12 +181,15 @@ class TestQAPipeline(unittest.TestCase):
         with patch(
             "Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes",
             return_value=b"pdf bytes",
-        ), patch.dict(sys.modules, {"pymupdf4llm": pdf_backend}):
+        ), patch.dict(
+            sys.modules,
+            {"pymupdf4llm": pdf_backend, "pymupdf": SimpleNamespace(open=lambda **kw: MagicMock())},
+        ):
             with self.assertRaisesRegex(QAChunkError, "no usable text chunks"):
                 QAChunkService.fetch_and_chunk("https://example.test/a.pdf", "W1")
 
     def test_build_context_orders_chunks_and_uses_fallback_token_estimate(self):
-        chunks = QAContextService.build_context(
+        chunks, _ = QAContextService.build_context(
             {
                 "W2": [{"paper_id": "W2", "page": 3, "text": "third"}],
                 "W1": [
@@ -217,6 +225,33 @@ class TestQAPipeline(unittest.TestCase):
                 {"W1": [{"text": "evidence", "token_estimate": 1}]},
                 max_context_tokens=1999,
             )
+
+    def test_build_context_trims_to_relevant_chunks_when_question_given(self):
+        def chunk(paper, page, text):
+            return {"paper_id": paper, "page": page, "text": text, "token_estimate": 1500}
+
+        papers = {
+            "W1": [
+                chunk("W1", 1, "unrelated methods section"),
+                chunk("W1", 2, "amyloid plaque symptoms of alzheimer disease"),
+            ],
+            "W2": [
+                chunk("W2", 1, "budget tables"),
+                chunk("W2", 2, "memory loss symptoms in alzheimer patients"),
+            ],
+        }
+        chunks, stats = QAContextService.build_context(
+            papers,
+            max_context_tokens=5100,  # budget 3100 -> two 1500-token chunks
+            question="What are the symptoms of alzheimer disease?",
+        )
+
+        self.assertTrue(stats["trimmed"])
+        self.assertEqual([(c["paper_id"], c["page"]) for c in chunks], [("W1", 2), ("W2", 2)])
+        self.assertEqual(stats["papers"]["W1"], {"total": 2, "used": 1})
+
+        with self.assertRaises(QAContextError):
+            QAContextService.build_context(papers, max_context_tokens=5100)
 
     def test_validate_citations_flags_page_and_snippet_independently(self):
         citations = QACitationValidator.validate_citations(
@@ -311,6 +346,110 @@ class TestPDFService(unittest.TestCase):
         self.assertEqual(result["page_count"], 3)
         self.assertEqual(result["image_paths"], [])
         self.assertIsNone(result["error"])
+
+
+SPRINGER = "https://link.springer.com/content/pdf/x.pdf"
+REPO = "https://repo.example.edu/files/x.pdf"
+
+
+def _loc(pdf_url=None, is_oa=True):
+    return {"pdf_url": pdf_url, "landing_page_url": "https://l.example/x", "is_oa": is_oa}
+
+
+class TestPDFCandidates(unittest.TestCase):
+    def test_single_pdf_url_is_unchanged(self):
+        work = {"best_oa_location": _loc(SPRINGER), "locations": [_loc(SPRINGER)]}
+        self.assertEqual(ExtractionService._collect_pdf_candidates(work), [SPRINGER])
+        meta = ExtractionService.extract_metadata(work)
+        self.assertEqual(meta["pdf_url"], SPRINGER)
+        self.assertEqual(meta["pdf_candidates"], [SPRINGER])
+        self.assertTrue(meta["has_pdf_link"])
+
+    def test_non_blocked_copy_is_ordered_before_blocked_publisher(self):
+        work = {
+            "best_oa_location": _loc(SPRINGER),
+            "locations": [_loc(SPRINGER), _loc(REPO)],
+        }
+        self.assertEqual(
+            ExtractionService._collect_pdf_candidates(work), [REPO, SPRINGER]
+        )
+        self.assertEqual(ExtractionService.extract_metadata(work)["pdf_url"], REPO)
+
+    def test_original_pick_is_kept_when_cap_applies(self):
+        others = [f"https://r{i}.example.edu/x.pdf" for i in range(5)]
+        work = {
+            "best_oa_location": _loc(SPRINGER),
+            "locations": [_loc(SPRINGER)] + [_loc(u) for u in others],
+        }
+        candidates = ExtractionService._collect_pdf_candidates(work)
+        self.assertLessEqual(len(candidates), 3)
+        self.assertIn(SPRINGER, candidates)
+
+    def test_no_pdf_url_gives_empty_list(self):
+        work = {"best_oa_location": _loc(None), "locations": [_loc(None)]}
+        self.assertEqual(ExtractionService._collect_pdf_candidates(work), [])
+        meta = ExtractionService.extract_metadata(work)
+        self.assertIsNone(meta["pdf_url"])
+        self.assertFalse(meta["has_pdf_link"])
+
+
+class TestChunkCandidateFallback(unittest.TestCase):
+    def _backend(self):
+        return SimpleNamespace(
+            to_markdown=MagicMock(
+                return_value=[{"metadata": {"page_number": 1}, "text": "Page text."}]
+            )
+        )
+
+    def test_blocked_first_candidate_falls_through_to_second(self):
+        fetch = MagicMock(
+            side_effect=[PDFExtractionError("403 Forbidden: blocked"), b"%PDF ok"]
+        )
+        with patch(
+            "Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes", fetch
+        ), patch.dict(
+            sys.modules,
+            {"pymupdf4llm": self._backend(), "pymupdf": SimpleNamespace(open=lambda **kw: MagicMock())},
+        ):
+            result = QAChunkService.fetch_and_chunk([SPRINGER, REPO], "W1")
+        self.assertEqual(result["chunks"][0]["page"], 1)
+        self.assertEqual([c.args[0] for c in fetch.call_args_list], [SPRINGER, REPO])
+
+    def test_all_candidates_failing_reports_reasons(self):
+        fetch = MagicMock(side_effect=PDFExtractionError("403 Forbidden: blocked"))
+        with patch("Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes", fetch):
+            with self.assertRaisesRegex(QAChunkError, "403 Forbidden"):
+                QAChunkService.fetch_and_chunk([SPRINGER, REPO], "W1")
+
+    def test_empty_candidate_list_is_rejected(self):
+        with self.assertRaises(QAChunkError):
+            QAChunkService.fetch_and_chunk([], "W1")
+
+
+class TestQARequestSerializerCandidates(unittest.TestCase):
+    def _validate(self, pdf_urls):
+        s = QARequestSerializer(
+            data={"paper_ids": ["W1"], "question": "q?", "pdf_urls": pdf_urls}
+        )
+        return s, s.is_valid()
+
+    def test_string_value_is_normalised_to_list(self):
+        s, ok = self._validate({"W1": SPRINGER})
+        self.assertTrue(ok, s.errors)
+        self.assertEqual(s.validated_data["pdf_urls"]["W1"], [SPRINGER])
+
+    def test_list_value_is_accepted(self):
+        s, ok = self._validate({"W1": [SPRINGER, REPO]})
+        self.assertTrue(ok, s.errors)
+        self.assertEqual(s.validated_data["pdf_urls"]["W1"], [SPRINGER, REPO])
+
+    def test_more_than_three_candidates_rejected(self):
+        _, ok = self._validate({"W1": [REPO] * 4})
+        self.assertFalse(ok)
+
+    def test_overlong_url_rejected(self):
+        _, ok = self._validate({"W1": ["https://e.example/" + "a" * 500]})
+        self.assertFalse(ok)
 
 
 if __name__ == "__main__":

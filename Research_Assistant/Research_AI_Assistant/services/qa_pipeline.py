@@ -11,9 +11,10 @@ the LLM call:
 The LLM-specific code remains in qa_llm.py.
 """
 
-import logging, re, os, tempfile
+import logging, math, re
+from collections import Counter
 from difflib import SequenceMatcher
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Union
 
 from .pdf_service import PDFExtractionError, fetch_pdf_bytes
 
@@ -43,9 +44,41 @@ class QAChunkService:
     """
 
     @staticmethod
-    def fetch_and_chunk(pdf_url: str, openalex_id: str) -> Dict:
+    def fetch_and_chunk(pdf_url: Union[str, List[str]], openalex_id: str) -> Dict:
         """
-          Fetch a PDF and split it into page tagged
+        Fetch a PDF and split it into page-tagged chunks, trying each
+        candidate URL in order until one yields usable text.
+
+        Args:
+            pdf_url: A direct PDF URL, or an ordered list of them (best first).
+            openalex_id (str): OpenAlex Work ID used only for logging and error messages.
+
+        Raises:
+            QAChunkError: If no candidate works. With one candidate the error
+            is that candidate's own; with several, all reasons are joined.
+        """
+        candidates = [pdf_url] if isinstance(pdf_url, str) else list(pdf_url or [])
+        if not candidates:
+            candidates = [""]
+
+        reasons: List[str] = []
+        for candidate in candidates:
+            try:
+                return QAChunkService._fetch_and_chunk_one(candidate, openalex_id)
+            except Exception as exc:
+                logger.warning(
+                    "PDF candidate failed for %s (%s): %s", openalex_id, candidate, exc
+                )
+                reasons.append(str(exc))
+
+        if len(reasons) == 1:
+            raise QAChunkError(reasons[0])
+        raise QAChunkError("; ".join(reasons))
+
+    @staticmethod
+    def _fetch_and_chunk_one(pdf_url: str, openalex_id: str) -> Dict:
+        """
+        Fetch a single PDF and split it into page tagged
 
         Args:
             pdf_url (str): Direct PDF URL
@@ -73,18 +106,16 @@ class QAChunkService:
         except PDFExtractionError as exc:
             raise QAChunkError(str(exc)) from exc
         try:
+            import pymupdf
             import pymupdf4llm as pm4
         except ModuleNotFoundError as exc:
             raise QAChunkError(
                 f"No PDF Backend available. Install `pymupdf4llm`"
             ) from exc
-        tmp_path = None
+        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         try:
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                tmp.write(pdf_bytes)
-                tmp_path = tmp.name
             page_dicts = pm4.to_markdown(
-                tmp_path, page_chunks=True, force_text=True, write_images=False
+                doc, page_chunks=True, force_text=True, write_images=False
             )
             if not isinstance(page_dicts, list) or not page_dicts:
                 raise QAChunkError(f"No pages extracted from PDF for {openalex_id}.")
@@ -127,11 +158,7 @@ class QAChunkService:
             }
 
         finally:
-            if tmp_path:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
+            doc.close()
 
     @staticmethod
     def _estimate_tokens(text: str) -> int:
@@ -199,42 +226,44 @@ class QAContextService:
     def build_context(
         papers_chunks: Dict[str, List[Dict]],
         max_context_tokens: int = DEFAULT_CONTEXT_WINDOW_TOKENS,
-    ) -> List[Dict]:
+        question: Optional[str] = None,
+    ) -> Tuple[List[Dict], Dict]:
         """
-        Concatenate chunks from multiple papers in a stable order and verify
-        the total fits inside the model's context window.
+        Assemble chunks from all papers ordered by (paper_id, page) and fit
+        them inside the context window.
 
-        Args:
-            papers_chunks: Mapping of paper_id -> list of chunk dicts, where
-                each chunk dict has keys "paper_id", "page", "text",
-                "token_estimate" (the shape produced by
-                QAChunkService.fetch_and_chunk()["chunks"]).
-            max_context_tokens: The selected model's context window in
-                tokens. Defaults to DEFAULT_CONTEXT_WINDOW_TOKENS when the
-                caller does not know the model's real limit.
+        If everything fits, all chunks are returned. If not and a ``question``
+        is given, only the chunks most relevant to it are kept, with a fair
+        per-paper share of the budget. Without a question an overflow raises.
 
         Returns:
-            A flat list of chunk dicts, ordered by paper_id then page number,
-            ready to pass to qa_prompt_builder.build_qa_user_message().
+            (chunks, stats) where stats is {"trimmed": bool, "papers":
+            {paper_id: {"total": n, "used": n}}} (chunk counts).
 
         Raises:
-            QAContextError: If no chunks are provided, or if the total
-                estimated tokens exceed the available budget
-                (max_context_tokens - RESERVED_TOKENS). The caller should
-                surface this as a 413-style error to the client rather than
-                silently truncating, since silent truncation could drop the
-                page containing the answer.
+            QAContextError: no chunks, no usable budget, or (no question)
+                an overflow.
         """
         if not papers_chunks:
             raise QAContextError("No paper chunks were provided to build context from.")
 
+        budget = max_context_tokens - RESERVED_TOKENS
+        if budget <= 0:
+            raise QAContextError(
+                f"max_context_tokens ({max_context_tokens}) is too small to "
+                f"leave room for the system prompt and output "
+                f"(reserve {RESERVED_TOKENS})."
+            )
+
+        def tokens(chunk: Dict) -> int:
+            return chunk.get("token_estimate") or QAContextService._estimate_tokens(
+                chunk.get("text", "")
+            )
+
         ordered_chunks: List[Dict] = []
-
         for paper_id in sorted(papers_chunks.keys()):
-            paper_chunk_list = papers_chunks[paper_id] or []
-
             ordered_chunks.extend(
-                sorted(paper_chunk_list, key=lambda c: c.get("page", 0))
+                sorted(papers_chunks[paper_id] or [], key=lambda c: c.get("page", 0))
             )
 
         if not ordered_chunks:
@@ -243,38 +272,93 @@ class QAContextService:
                 "answer from."
             )
 
-        total_tokens = sum(
-            chunk.get("token_estimate")
-            or QAContextService._estimate_tokens(chunk.get("text", ""))
-            for chunk in ordered_chunks
-        )
+        total_tokens = sum(tokens(c) for c in ordered_chunks)
+        trimmed = total_tokens > budget
+        chosen = ordered_chunks
 
-        budget = max_context_tokens - RESERVED_TOKENS
-
-        if budget <= 0:
-            raise QAContextError(
-                f"max_context_tokens ({max_context_tokens}) is too small to "
-                f"leave room for the system prompt and output "
-                f"(reserve {RESERVED_TOKENS})."
+        if trimmed:
+            if not (question or "").strip():
+                raise QAContextError(
+                    f"Selected papers require ~{total_tokens} tokens of context, "
+                    f"which exceeds the available budget of {budget} tokens "
+                    f"(model window {max_context_tokens}, reserved "
+                    f"{RESERVED_TOKENS}). Select fewer papers or a model with "
+                    f"a larger context window."
+                )
+            chosen = QAContextService._select_relevant(
+                ordered_chunks, question, budget, tokens
             )
 
-        if total_tokens > budget:
-            raise QAContextError(
-                f"Selected papers require ~{total_tokens} tokens of context, "
-                f"which exceeds the available budget of {budget} tokens "
-                f"(model window {max_context_tokens}, reserved "
-                f"{RESERVED_TOKENS}). Select fewer papers or a model with "
-                f"a larger context window."
-            )
+        papers: Dict[str, Dict] = {}
+        for c in ordered_chunks:
+            papers.setdefault(c.get("paper_id"), {"total": 0, "used": 0})["total"] += 1
+        for c in chosen:
+            papers[c.get("paper_id")]["used"] += 1
 
         logger.info(
-            "Q&A context assembled: %d chunks, ~%d tokens (budget %d)",
+            "Q&A context assembled: %d/%d chunks (budget %d tokens, trimmed=%s)",
+            len(chosen),
             len(ordered_chunks),
-            total_tokens,
             budget,
+            trimmed,
         )
 
-        return ordered_chunks
+        return chosen, {"trimmed": trimmed, "papers": papers}
+
+    @staticmethod
+    def _select_relevant(
+        ordered_chunks: List[Dict], question: str, budget: int, tokens
+    ) -> List[Dict]:
+        """
+        Keep the chunks most relevant to the question within the budget.
+
+        Relevance is a small TF-IDF keyword score. Each paper first gets an
+        equal share of the budget so one long paper cannot crowd out the
+        others; any unused budget is then filled with the best remaining
+        chunks overall. The result keeps the (paper_id, page) ordering.
+        """
+        terms = {w for w in re.findall(r"[a-z0-9]+", question.lower()) if len(w) > 2}
+        counts = [
+            Counter(re.findall(r"[a-z0-9]+", c.get("text", "").lower()))
+            for c in ordered_chunks
+        ]
+        n = len(ordered_chunks)
+        idf = {
+            t: math.log(1 + n / (1 + sum(1 for cnt in counts if t in cnt)))
+            for t in terms
+        }
+        scores = [
+            sum(idf[t] * (1 + math.log(cnt[t])) for t in terms if cnt.get(t))
+            for cnt in counts
+        ]
+
+        by_paper: Dict[str, List[int]] = {}
+        for i, c in enumerate(ordered_chunks):
+            by_paper.setdefault(c.get("paper_id"), []).append(i)
+
+        share = budget // len(by_paper)
+        picked = set()
+        used = 0
+
+        # Pass 1: best chunks per paper within that paper's share.
+        for indices in by_paper.values():
+            spent = 0
+            for i in sorted(indices, key=lambda i: (-scores[i], i)):
+                cost = tokens(ordered_chunks[i])
+                if spent + cost <= share and used + cost <= budget:
+                    picked.add(i)
+                    spent += cost
+                    used += cost
+
+        # Pass 2: spend whatever is left on the best remaining chunks.
+        rest = sorted((i for i in range(n) if i not in picked), key=lambda i: (-scores[i], i))
+        for i in rest:
+            cost = tokens(ordered_chunks[i])
+            if used + cost <= budget:
+                picked.add(i)
+                used += cost
+
+        return [ordered_chunks[i] for i in sorted(picked)]
 
     @staticmethod
     def _estimate_tokens(text: str) -> int:

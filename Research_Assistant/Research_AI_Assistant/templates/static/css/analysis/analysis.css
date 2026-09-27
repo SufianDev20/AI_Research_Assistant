@@ -226,6 +226,10 @@ html:has(.an-body) { height: 100%; }
 
 .an-detail__card .an-detail__title { padding-right: 30px; }
 
+.an-detail__coverage { margin-top: 12px; font-size: 0.78rem; color: var(--ink-meta); }
+.an-detail__bar { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.an-detail__bar i { display: block; height: 100%; background: var(--emerald); }
+
 .an-detail {
   flex: 1 1 auto;
   min-height: 0;
@@ -387,13 +391,28 @@ html:has(.an-body) { height: 100%; }
 
 /* =========================== RIGHT: Question & Analysis =================== */
 .an-panel--qa { background: var(--paper); }
-.an-qa__question {
-  flex: none;
-  padding: 14px clamp(14px, 2vw, 22px);
+/* One turn = one asked question plus its answer. Turns stack oldest-first in
+   .an-transcript; each is repainted independently by analysis.js. */
+.an-turn {
+  display: block;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--rule);
+}
+.an-transcript > .an-turn:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.an-turn__question {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-left: 2px solid var(--emerald);
+  border-radius: 0 4px 4px 0;
   background: var(--mint-wash);
 }
-.an-qa__question-label {
+.an-turn--error .an-turn__question { border-left-color: var(--rule); }
+.an-turn__question-label {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.62rem;
   letter-spacing: 0.09em;
@@ -401,12 +420,15 @@ html:has(.an-body) { height: 100%; }
   color: var(--forest);
   margin-bottom: 4px;
 }
-.an-qa__question-text {
+.an-turn__question-text {
   font-family: "Newsreader", serif;
   font-size: 1.08rem;
   color: var(--ink);
   line-height: 1.4;
 }
+/* Inside a turn the spinner sits right under the question, not half a panel
+   down as it did when it was the panel's only content. */
+.an-turn .an-pending { padding-top: 6px; }
 
 .an-qa__body {
   flex: 1 1 auto;
@@ -524,6 +546,11 @@ html:has(.an-body) { height: 100%; }
   margin-top: 8px;
 }
 .an-retry:hover { border-color: var(--emerald); }
+
+/* A question is in flight: one turn at a time, so the composer is locked
+   rather than cancelling the running turn. */
+.an-qa__composer--busy { opacity: 0.6; }
+.an-qa__composer--busy .an-qa__send { cursor: progress; }
 
 .an-qa__composer {
   flex: none;

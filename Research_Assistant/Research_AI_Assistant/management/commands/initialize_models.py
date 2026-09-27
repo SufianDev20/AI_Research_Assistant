@@ -6,7 +6,7 @@ Run: python manage.py initialize_models
 from django.core.management.base import BaseCommand
 from django.db.models import Avg, Count, Q
 from Research_AI_Assistant.models import ModelReliability, ModelPerformance
-from Research_AI_Assistant.services.openrouter_service import FREE_MODELS
+from Research_AI_Assistant.services.openrouter_service import fetch_free_models
 
 
 class Command(BaseCommand):
@@ -17,6 +17,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Initializing OpenRouter model reliability configuration...")
+
+        # Discovered live so withdrawn models drop out and new ones appear
+        # without editing a hard-coded list; falls back to the built-in list
+        # when the API is unreachable.
+        self.free_models = fetch_free_models()
+        self.stdout.write(f"Discovered {len(self.free_models)} free models.")
 
         # Get actual performance data to inform tier decisions
         performance_data = self.get_performance_metrics()
@@ -56,7 +62,7 @@ class Command(BaseCommand):
         """Get actual performance metrics for all models."""
         metrics = {}
 
-        for model_name in FREE_MODELS:
+        for model_name in self.free_models:
             try:
                 perf = ModelPerformance.objects.filter(model_name=model_name).first()
                 if perf:

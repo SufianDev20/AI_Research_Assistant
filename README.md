@@ -189,8 +189,7 @@ AIResearchAssistant/
         │   └── admin/                   # Admin templates
         │       └── performance_dashboard.html  # Performance monitoring dashboard
         │   └── static/                  # Static assets
-        │       ├── styles.css          # Main stylesheet
-        │       └── scripts.js           # Frontend JavaScript
+        │       └── styles.css          # Main stylesheet
         └── services/                    # Business logic services
             ├── openalex_service.py      # OpenAlex API client
             ├── openrouter_service.py    # OpenRouter LLM client with performance tracking

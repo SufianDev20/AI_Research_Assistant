@@ -38,11 +38,11 @@ from .services.pdf_service import PDFService, PDFExtractionError
 # multi-paper, page-level citations, deterministic citation validation).
 from .services.qa_pipeline import (
     QAChunkError,
-    QAChunkService,
     QAContextError,
     QAContextService,
     QACitationValidator,
 )
+from .services.qa_chunk_cache import QAChunkCache
 from .services.qa_llm import QACompletionError, QACompletionService
 from .serializers import QARequestSerializer
 
@@ -232,7 +232,6 @@ def search(request):
             cursor=cursor,
             open_access_only=open_access_only,
             oa_status=oa_status,
-            min_year=min_year,
             max_year=max_year,
             random_seed=random_seed,
         )
@@ -364,14 +363,20 @@ def sign_in(request):
     Render the Clerk sign-in page (Google). The publishable key is public by
     design; the secret key is never passed to templates.
     """
-    return render(request, "sign_in.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
+    return render(
+        request,
+        "sign_in.html",
+        {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY},
+    )
 
 
 def frontend(request):
     """
     Render the frontend HTML template for the Scholara research workspace.
     """
-    return render(request, "index.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
+    return render(
+        request, "index.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY}
+    )
 
 
 def analysis(request):
@@ -387,7 +392,11 @@ def analysis(request):
     handoff (it shows a recovery path back to /workspace/, never
     fabricated sample papers).
     """
-    return render(request, "analysis.html", {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY})
+    return render(
+        request,
+        "analysis.html",
+        {"clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY},
+    )
 
 
 @require_POST
@@ -437,14 +446,37 @@ def summarise(request):
             user_message=user_message,
             request_type="summary",
         )
-        summary = extract_final_summary(summary)
+        try:
+            summary = extract_final_summary(summary)
+        except InvalidSummaryFormat:
+            # A provider can return a successful HTTP response while ignoring
+            # the requested format. Give the same service one bounded repair
+            # attempt before exposing a format error to the client.
+            logger.warning(
+                "OpenRouter returned an invalid summary format; retrying with "
+                "a stricter format instruction."
+            )
+            summary = openrouter_service.complete(
+                system_prompt=(
+                    f"{system_prompt}\n\n"
+                    "This is a format repair attempt. Start your response "
+                    "immediately with `Paper 1:` and return only the required "
+                    "paper blocks followed by `References:`. Do not explain "
+                    "your reasoning, use JSON, or add markdown fences."
+                ),
+                user_message=user_message,
+                request_type="summary",
+            )
+            summary = extract_final_summary(summary)
 
         return JsonResponse({"summary": summary})
 
     except InvalidSummaryFormat as exc:
         logger.warning("OpenRouter returned a summary in an unexpected format: %s", exc)
         return JsonResponse(
-            {"error": "Summary could not be generated in the required format. Please try again."},
+            {
+                "error": "Summary could not be generated in the required format. Please try again."
+            },
             status=502,
         )
     except OpenRouterAPIError as exc:
@@ -786,6 +818,11 @@ def multi_paper_qa(request):
     per-paper in "paper_errors" and the request still answers from
     whatever papers succeeded.
 
+    Chunks come from QAChunkCache, so a follow-up question about the same
+    papers reuses the stored chunks instead of re-downloading and re-OCRing
+    every PDF. A recent failure is remembered too, so a publisher-blocked
+    paper fails fast rather than burning a fetch timeout per question.
+
     Returns JSON (200):
     {
         "answer": "...",
@@ -822,7 +859,7 @@ def multi_paper_qa(request):
     # Chunk each paper independently so one bad PDF does not stop the rest.
     for paper_id in paper_ids:
         try:
-            result = QAChunkService.fetch_and_chunk(pdf_urls[paper_id], paper_id)
+            result = QAChunkCache.get_or_chunk(pdf_urls[paper_id], paper_id)
             papers_chunks[paper_id] = result["chunks"]
         except QAChunkError as exc:
             logger.warning("Chunking failed for %s: %s", paper_id, exc)
@@ -841,7 +878,9 @@ def multi_paper_qa(request):
         )
 
     try:
-        context_chunks = QAContextService.build_context(papers_chunks)
+        context_chunks, context_stats = QAContextService.build_context(
+            papers_chunks, question=question
+        )
     except QAContextError as exc:
         return Response(
             {"error": str(exc), "paper_errors": paper_errors},
@@ -875,6 +914,8 @@ def multi_paper_qa(request):
             "answer": llm_result["answer"],
             "citations": validated_citations,
             "paper_errors": paper_errors,
+            "context_trimmed": context_stats["trimmed"],
+            "context_papers": context_stats["papers"],
         },
         status=status.HTTP_200_OK,
     )
