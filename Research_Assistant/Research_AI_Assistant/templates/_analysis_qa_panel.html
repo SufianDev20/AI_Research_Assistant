@@ -1,23 +1,19 @@
 {% load static %}
-<!-- RIGHT: Question & Analysis — the submitted question, an area for
-     paper-grounded answers organized by paper, and a composer for
-     another question. See analysis.js: renderAnalysisPending(),
-     renderAnalysisResult(), renderAnalysisError(), and
-     static/js/analysis/analysis_api.js (requestPaperAnalysis) — the one
-     function that calls the backend. -->
+<!-- RIGHT: Question & Analysis - a transcript of question/answer turns,
+     each grounded in the selected papers, plus a composer for the next
+     question. See analysis.js: renderTranscript(), appendTurn(),
+     turnBodyHtml(), and static/js/analysis/analysis_api.js
+     (requestPaperAnalysis) - the one function that calls the backend. -->
 <section class="an-panel an-panel--qa" aria-labelledby="anQaHeading">
   <div class="an-panel__head">
     <p class="an-kicker" id="anQaHeading">Question &amp; Analysis</p>
   </div>
 
-  <div class="an-qa__question">
-    <p class="an-qa__question-label">Your question</p>
-    <p class="an-qa__question-text" id="anQuestionText"></p>
-  </div>
-
+  <!-- One <article class="an-turn"> per question; analysis.js repaints only
+       the turn that changed, never this whole container. -->
   <div
-    class="an-qa__body"
-    id="anAnalysisBody"
+    class="an-qa__body an-transcript"
+    id="anTranscript"
     role="status"
     aria-live="polite"
     aria-atomic="false"

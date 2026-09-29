@@ -83,23 +83,6 @@ export class DOMManager {
       // Section elements
       heroSection: document.querySelector(".hero-section"),
       bindersSection: document.querySelector(".binders-section"),
-
-      paperView: document.getElementById("paperView"),
-      paperBackBtn: document.getElementById("paperBackBtn"),
-      paperViewTitle: document.getElementById("paperViewTitle"),
-      paperViewMeta: document.getElementById("paperViewMeta"),
-      paperOABadge: document.getElementById("paperOABadge"),
-      paperDOILink: document.getElementById("paperDOILink"),
-      paperSidebarList: document.getElementById("paperSidebarList"),
-      paperIdleState: document.getElementById("paperIdleState"),
-      paperLoadingState: document.getElementById("paperLoadingState"),
-      paperExtractedState: document.getElementById("paperExtractedState"),
-      paperMarkdown: document.getElementById("paperMarkdown"),
-      paperUnavailableState: document.getElementById("paperUnavailableState"),
-      paperQAChat: document.getElementById("paperQAChat"),
-      paperQAInput: document.getElementById("paperQAInput"),
-      paperQASendBtn: document.getElementById("paperQASendBtn"),
-      paperQAStatus: document.getElementById("paperQAStatus"),
     };
   }
 
@@ -326,22 +309,6 @@ export class DOMManager {
         elements.profileDropdown.classList.remove("show");
       }
     });
-    if (elements.paperBackBtn) {
-       elements.paperBackBtn.addEventListener("click", () => this.hidePaperView());
-    }
-
-    if (elements.paperQASendBtn) {      
-      elements.paperQASendBtn.addEventListener("click", () => this.handlePaperQA());
-    }
-
-    if (elements.paperQAInput) {      
-      elements.paperQAInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          this.handlePaperQA();
-        }
-      });
-    }
   }
 
   // ==================== EVENT HANDLERS ====================

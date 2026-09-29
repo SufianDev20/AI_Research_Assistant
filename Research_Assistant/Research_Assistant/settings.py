@@ -20,6 +20,7 @@ env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 # settings.py
 CLERK_SECRET_KEY = env("CLERK_SECRET_KEY")
+CLERK_PUBLISHABLE_KEY = env("CLERK_PUBLISHABLE_KEY", default="")
 CLERK_AUTHORIZED_PARTIES = env.list(
     "CLERK_AUTHORIZED_PARTIES",
     default=["http://localhost:8080"],
@@ -28,9 +29,19 @@ CLERK_AUTHORIZED_PARTIES = env.list(
 OPENALEX_EMAIL = env("OPENALEX_EMAIL")
 OPENALEX_API_KEY = env("OPENALEX_API_KEY", default=None)
 OPENROUTER_API_KEY = env("OPENROUTER_API_KEY")
-OPENROUTER_TIMEOUT_SECONDS = 30
+OPENROUTER_TIMEOUT_SECONDS = env.int("OPENROUTER_TIMEOUT_SECONDS", default=60)
 OPENROUTER_SITE_URL = env("OPENROUTER_SITE_URL", default="https://127.0.0.1:8080")
 OPENROUTER_SITE_NAME = "Research_AI_Assistant"
+# Preferred model. Only attempted first if OPENROUTER_PIN_DEFAULT_MODEL is on;
+# otherwise the reliability ranking and circuit breaker decide the order, which
+# is what keeps a repeatedly failing model from being retried first every time.
+OPENROUTER_MODEL = env("OPENROUTER_MODEL", default="google/gemma-4-31b-it:free")
+OPENROUTER_PIN_DEFAULT_MODEL = env.bool("OPENROUTER_PIN_DEFAULT_MODEL", default=False)
+# How long the free-model list discovered from the OpenRouter models API is
+# cached before being refreshed.
+OPENROUTER_MODELS_CACHE_SECONDS = env.int(
+    "OPENROUTER_MODELS_CACHE_SECONDS", default=6 * 60 * 60
+)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -163,3 +174,10 @@ import os
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"Research_AI_Assistant": {"handlers": ["console"], "level": "DEBUG" if DEBUG else "INFO"}},
+}

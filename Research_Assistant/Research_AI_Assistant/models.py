@@ -232,6 +232,16 @@ class PaperPDF(models.Model):
     )
     error_message = models.TextField(null=True, blank=True)
 
+    # Multi-paper Q&A cache. The Q&A path needs page-tagged chunks, not the
+    # single markdown blob above, and re-chunking means re-downloading and
+    # re-OCRing the PDF for every follow-up question. Written and read only by
+    # services/qa_chunk_cache.py.
+    qa_chunks = models.JSONField(default=list, blank=True)
+    qa_chunk_version = models.PositiveSmallIntegerField(default=0)
+    qa_source_pdf_url = models.URLField(max_length=500, blank=True, default="")
+    qa_last_attempt_at = models.DateTimeField(null=True, blank=True)
+    qa_error = models.TextField(blank=True, default="")
+
     def __str__(self):
         return f"PaperPdf {self.openalex_id} - {self.extraction_success}"
 

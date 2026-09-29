@@ -114,6 +114,13 @@ def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
                 f"PDF for {context_id} exceeds 50MB limit after download."
             )
 
+        # Some publishers (e.g. Springer) answer 200 with an HTML bot-check page
+        # instead of a PDF. Worded to match the frontend's publisher-block pattern.
+        if b"%PDF" not in pdf_bytes[:1024]:
+            raise PDFExtractionError(
+                f"403 Forbidden: publisher returned a web page instead of a PDF for {context_id}"
+            )
+
         return pdf_bytes
     except requests.RequestException as exc:
         raise PDFExtractionError(f"Failed to fetch PDF for {context_id}: {exc}") from exc

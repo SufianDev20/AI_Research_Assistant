@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Paper Analysis — Scholara</title>
     <meta name="color-scheme" content="light" />
+    <meta name="clerk-publishable-key" content="{{ clerk_publishable_key }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -57,6 +58,7 @@
       </main>
     </div>
 
+    <script type="module" src="{% static 'js/gate.js' %}"></script>
     <script type="module" src="{% static 'js/analysis/analysis.js' %}"></script>
   </body>
 </html>

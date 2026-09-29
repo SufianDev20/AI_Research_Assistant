@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scholara - AI Research Assistant</title>
     {% csrf_token %}
+    <meta name="clerk-publishable-key" content="{{ clerk_publishable_key }}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
     <link rel="stylesheet" href="{% static 'styles.css' %}" />
   </head>
@@ -48,6 +49,7 @@
     </nav>
 
     <div class="nav-spacer"></div>
+    <script type="module" src="{% static 'js/gate.js' %}"></script>
     <script type="module" src="{% static 'js/globals.js' %}"></script>
   </body>
 </html>

@@ -5,6 +5,7 @@ Handles model performance metrics, reliability scoring, and intelligent fallback
 
 import logging
 import hashlib
+import json
 import time
 from datetime import timedelta
 from typing import List, Dict, Optional, Tuple
@@ -17,6 +18,19 @@ from ..models import ModelPerformance, ResponseLog, ModelReliability
 logger = logging.getLogger(__name__)
 # How long does a circuit breaker model stays disable before being retried
 CIRCUIT_BREAKER_RESET_MIN = 30
+
+
+def _passed_format_check(request_type: str, response_content: str) -> bool:
+    """Check whether a model's response matches the expected shape for its request type."""
+    if request_type == "qa":
+        try:
+            parsed = json.loads(response_content.strip().strip("`"))
+        except (ValueError, TypeError):
+            return False
+        return isinstance(parsed, dict) and "answer" in parsed
+
+    required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
+    return all(field in response_content for field in required_fields)
 
 
 class PerformanceTracker:
@@ -85,16 +99,8 @@ class PerformanceTracker:
                 )
 
                 # Validate format compliance
-                required_fields = [
-                    "Authors:",
-                    "Year:",
-                    "Source:",
-                    "DOI:",
-                    "Summary:",
-                    "References:",
-                ]
-                passed_format_check = all(
-                    field in response_content for field in required_fields
+                passed_format_check = _passed_format_check(
+                    request_type, response_content
                 )
 
                 # Update stats for existing records
@@ -233,6 +239,27 @@ class PerformanceTracker:
             logger.info(
                 f"Circuit breaker auto-reset: {recovered} model(s) re-enabled after {CIRCUIT_BREAKER_RESET_MIN}-minute timeout"
             )
+
+    @staticmethod
+    def ensure_model_rows(model_names: List[str]) -> None:
+        """
+        Make sure every model has tracking rows so it can be ranked.
+
+        get_intelligent_model_order() only scores models that have a
+        ModelReliability or ModelPerformance row; anything else falls to the
+        unscored tail of the list. Models now arrive from live discovery
+        (openrouter_service.fetch_free_models) rather than a list seeded by
+        `initialize_models`, so rows are created on first sight.
+        """
+        for model_name in model_names:
+            try:
+                ModelReliability.objects.get_or_create(
+                    model_name=model_name,
+                    defaults={"tier": "secondary", "priority": 50},
+                )
+                ModelPerformance.objects.get_or_create(model_name=model_name)
+            except Exception as e:
+                logger.error(f"Failed to create tracking rows for {model_name}: {e}")
 
     @staticmethod
     def get_intelligent_model_order(free_models: List[str]) -> List[str]:
