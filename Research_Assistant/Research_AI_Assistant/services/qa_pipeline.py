@@ -367,6 +367,37 @@ class QAContextService:
 
 
 # Citation Validation
+def resolve_paper_id(raw, alias_map: Dict[str, str], known_ids) -> Optional[str]:
+    """
+    Map whatever paper reference the LLM returned back to a real paper id.
+
+    Tries, in order: a prompt alias ("P1", "p1", "Paper 1"), an exact known id,
+    then a trailing OpenAlex token ("W123" matches "https://openalex.org/W123").
+    Returns the original value unchanged when nothing matches, so the caller's
+    exact lookup still fails visibly rather than guessing.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+
+    text = raw.strip()
+    known = list(known_ids)
+
+    alias = re.fullmatch(r"(?:paper\s*)?p?\s*(\d+)", text, flags=re.IGNORECASE)
+    if alias and f"P{int(alias.group(1))}" in alias_map:
+        return alias_map[f"P{int(alias.group(1))}"]
+
+    if text in known:
+        return text
+
+    token = text.rstrip("/").rsplit("/", 1)[-1].lower()
+    if token:
+        matches = [k for k in known if k.rstrip("/").rsplit("/", 1)[-1].lower() == token]
+        if len(matches) == 1:
+            return matches[0]
+
+    return raw
+
+
 class QACitationValidator:
     """Validate LLM-returned citations against the actual source chunks."""
 
@@ -414,11 +445,18 @@ class QACitationValidator:
 
             page_text_lookup[key] = (f"{existing} {chunk.get('text', '')}").strip()
 
+        known_ids = {paper_id for paper_id, _ in page_text_lookup}
+
         validated: List[Dict] = []
 
         for citation in citations:
-            paper_id = citation.get("paper_id")
+            paper_id = resolve_paper_id(citation.get("paper_id"), {}, known_ids)
             page = citation.get("page")
+            # Models sometimes return the page as a string ("4").
+            try:
+                page = int(page)
+            except (TypeError, ValueError):
+                pass
             snippet = (citation.get("quoted_snippet") or "").strip()
 
             key = (paper_id, page)
@@ -449,6 +487,8 @@ class QACitationValidator:
             validated.append(
                 {
                     **citation,
+                    "paper_id": paper_id,
+                    "page": page,
                     "page_exists": page_exists,
                     "text_verified": text_verified,
                 }

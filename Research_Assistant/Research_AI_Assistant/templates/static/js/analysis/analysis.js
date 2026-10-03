@@ -273,6 +273,7 @@ function makeTurn(question, selectedIds) {
     selectedIds: [...selectedIds],
     answer: "",
     citations: [],
+    papers: {},
     paperErrors: {},
     contextTrimmed: false,
     coverage: null,
@@ -285,8 +286,13 @@ function makeTurn(question, selectedIds) {
 
 const turnNode = (id) => els.transcript?.querySelector(`[data-turn-id="${id}"]`);
 
-function findPaperTitle(paperId) {
-  return state.session.papers.find((p) => p.openalex_id === paperId)?.title || paperId;
+// Never falls back to the raw id: an OpenAlex URL means nothing to the reader.
+function findPaperTitle(paperId, turnPapers) {
+  return (
+    state.session.papers.find((p) => p.openalex_id === paperId)?.title ||
+    turnPapers?.[paperId]?.title ||
+    "Unknown paper"
+  );
 }
 
 function excludedPapersNote(titles) {
@@ -306,7 +312,7 @@ function paperErrorNote(reason, title) {
   return `<div class="an-note an-note--error"><strong>${escapeHtml(title)}: ${label}.</strong> ${escapeHtml(reason)}</div>`;
 }
 
-function evidenceHtml(citations) {
+function evidenceHtml(citations, turnPapers) {
   const byPaper = new Map();
   (citations ?? []).forEach((c) => {
     const key = c.paper_id || "unknown";
@@ -328,7 +334,7 @@ function evidenceHtml(citations) {
       })
       .join("");
     html += `<div class="an-evidence-group">
-      <div class="an-evidence-group__paper">${escapeHtml(findPaperTitle(paperId))}</div>
+      <div class="an-evidence-group__paper">${escapeHtml(findPaperTitle(paperId, turnPapers))}</div>
       ${rows}
     </div>`;
   });
@@ -367,9 +373,9 @@ function turnBodyHtml(turn) {
   const answerHtml = turn.answer
     ? turn.answer.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p.trim())}</p>`).join("")
     : "";
-  const evidence = evidenceHtml(turn.citations);
+  const evidence = evidenceHtml(turn.citations, turn.papers);
   const errorEntries = Object.entries(turn.paperErrors ?? {});
-  const errorsHtml = errorEntries.map(([paperId, reason]) => paperErrorNote(reason, findPaperTitle(paperId))).join("");
+  const errorsHtml = errorEntries.map(([paperId, reason]) => paperErrorNote(reason, findPaperTitle(paperId, turn.papers))).join("");
   const nothingReturned = !turn.answer && !evidence && !errorEntries.length;
 
   return `
@@ -523,17 +529,30 @@ async function runAnalysis(turn) {
     eligible.map((p) => [p.openalex_id, p.pdf_candidates?.length ? p.pdf_candidates : p.pdf_url || p.oa_url]),
   );
 
+  const paperMeta = Object.fromEntries(
+    eligible.map((p) => [
+      p.openalex_id,
+      {
+        title: p.title || "",
+        authors: (p.authors ?? []).map((a) => a?.name).filter(Boolean).slice(0, 10),
+        year: Number.isInteger(p.publication_year) ? p.publication_year : null,
+      },
+    ]),
+  );
+
   try {
     const result = await requestPaperAnalysis({
       paperIds,
       question: turn.question,
       pdfUrls,
+      paperMeta,
       csrfToken: getCsrfToken(),
       signal: controller.signal,
     });
     turn.status = "done";
     turn.answer = result.answer;
     turn.citations = result.citations;
+    turn.papers = result.papers;
     turn.paperErrors = result.paper_errors;
     turn.contextTrimmed = result.context_trimmed;
     turn.coverage = result.context_papers;

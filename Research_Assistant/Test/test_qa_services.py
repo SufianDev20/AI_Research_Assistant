@@ -24,7 +24,9 @@ from Research_AI_Assistant.services.pdf_service import (
 from Research_AI_Assistant.services.qa_llm import (
     QACompletionError,
     QACompletionService,
+    build_paper_legend,
     build_qa_user_message,
+    paper_label,
 )
 from Research_AI_Assistant.services.qa_pipeline import (
     QAChunkError,
@@ -75,6 +77,61 @@ class TestQALlm(unittest.TestCase):
         self.assertEqual(call["request_type"], "qa")
         self.assertEqual(call["temperature"], 0.1)
         self.assertEqual(call["max_tokens"], 800)
+
+    def test_paper_label_formats_one_two_and_many_authors(self):
+        self.assertEqual(paper_label({"authors": ["Ann Smith"]}, "Paper 1"), "Smith")
+        self.assertEqual(
+            paper_label({"authors": ["Ann Smith", "Bo Jones"]}, "Paper 1"),
+            "Smith and Jones",
+        )
+        self.assertEqual(
+            paper_label({"authors": ["Ann Smith", "Bo Jones", "Cy Lee"]}, "Paper 1"),
+            "Smith, Jones et al.",
+        )
+        self.assertEqual(paper_label({"title": "A Title"}, "Paper 1"), "A Title")
+        self.assertEqual(paper_label({}, "Paper 1"), "Paper 1")
+
+    def test_ask_with_legend_uses_aliases_and_maps_back_to_real_ids(self):
+        url_a, url_b = "https://openalex.org/W1", "https://openalex.org/W2"
+        _, legend = build_paper_legend(
+            {
+                url_a: {"title": "Alpha", "authors": ["Ann Smith"], "year": 2020},
+                url_b: {"title": "Beta", "authors": ["Bo Jones", "Cy Lee", "Di Wu"]},
+            },
+            [url_b, url_a],
+        )
+        chunks = [
+            {"paper_id": url_a, "page": 3, "text": "Alpha text."},
+            {"paper_id": url_b, "page": 1, "text": "Beta text."},
+        ]
+
+        message = build_qa_user_message(chunks, "Q?", legend)
+        self.assertIn("[P1, Page 3]: Alpha text.", message)
+        self.assertIn("[P2, Page 1]: Beta text.", message)
+        self.assertIn("label: Smith", message)
+        self.assertIn("label: Jones, Lee et al.", message)
+        self.assertNotIn("openalex.org", message)
+
+        openrouter = MagicMock()
+        openrouter.complete.return_value = (
+            '{"answer":"The paper Smith says x.",'
+            '"citations":[{"paper_id":"P1","page":"3","quoted_snippet":"Alpha"}]}'
+        )
+        result = QACompletionService.ask(openrouter, chunks, "Q?", legend)
+        self.assertEqual(result["citations"][0]["paper_id"], url_a)
+
+        validated = QACitationValidator.validate_citations(result["citations"], chunks)
+        self.assertTrue(validated[0]["page_exists"])
+        self.assertTrue(validated[0]["text_verified"])
+        self.assertEqual(validated[0]["page"], 3)
+
+    def test_validate_citations_resolves_bare_openalex_token(self):
+        chunks = [{"paper_id": "https://openalex.org/W9", "page": 2, "text": "Some text here."}]
+        validated = QACitationValidator.validate_citations(
+            [{"paper_id": "W9", "page": 2, "quoted_snippet": "Some text"}], chunks
+        )
+        self.assertTrue(validated[0]["page_exists"])
+        self.assertEqual(validated[0]["paper_id"], "https://openalex.org/W9")
 
     def test_ask_wraps_completion_failures(self):
         openrouter = MagicMock()

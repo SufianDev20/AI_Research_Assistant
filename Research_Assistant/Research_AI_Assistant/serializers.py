@@ -74,6 +74,29 @@ class PDFUrlsValueField(serializers.Field):
         return value
 
 
+class PaperMetaField(serializers.Field):
+    """Display metadata for one paper. Lenient: bad parts are dropped, not rejected."""
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("Expected an object.")
+        title = data.get("title")
+        authors = data.get("authors")
+        year = data.get("year")
+        return {
+            "title": title.strip()[:300] if isinstance(title, str) else "",
+            "authors": [
+                a.strip()[:100] for a in authors[:10] if isinstance(a, str) and a.strip()
+            ]
+            if isinstance(authors, list)
+            else [],
+            "year": year if isinstance(year, int) else None,
+        }
+
+    def to_representation(self, value):
+        return value
+
+
 class QARequestSerializer(serializers.Serializer):
     """
     Validate an incoming Multi-Paper Q&A request.
@@ -94,6 +117,12 @@ class QARequestSerializer(serializers.Serializer):
     pdf_urls = serializers.DictField(
         child=PDFUrlsValueField(),
         help_text="Mapping of paper_id -> direct PDF URL (or ordered list of up to 3 candidate URLs) for each selected paper.",
+    )
+
+    paper_meta = serializers.DictField(
+        child=PaperMetaField(),
+        required=False,
+        help_text="Optional mapping of paper_id -> {title, authors, year}, used to name papers in the answer.",
     )
 
     def validate(self, attrs):

@@ -43,7 +43,11 @@ from .services.qa_pipeline import (
     QACitationValidator,
 )
 from .services.qa_chunk_cache import QAChunkCache
-from .services.qa_llm import QACompletionError, QACompletionService
+from .services.qa_llm import (
+    QACompletionError,
+    QACompletionService,
+    build_paper_legend,
+)
 from .serializers import QARequestSerializer
 
 logger = logging.getLogger(__name__)
@@ -804,6 +808,9 @@ def multi_paper_qa(request):
         "pdf_urls": {
             "https://openalex.org/W123": "https://.../paper1.pdf",
             "https://openalex.org/W456": "https://.../paper2.pdf"
+        },
+        "paper_meta": {   // optional; names papers in the answer
+            "https://openalex.org/W123": {"title": "...", "authors": ["A. Smith"], "year": 2021}
         }
     }
 
@@ -887,10 +894,15 @@ def multi_paper_qa(request):
             status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
         )
 
+    # The LLM sees short aliases + author labels, never OpenAlex URLs.
+    _, legend = build_paper_legend(
+        validated.get("paper_meta"), papers_chunks.keys()
+    )
+
     try:
         openrouter_service = OpenRouterService()
         llm_result = QACompletionService.ask(
-            openrouter_service, context_chunks, question
+            openrouter_service, context_chunks, question, legend
         )
     except QACompletionError as exc:
         logger.error("Multi-paper Q&A completion failed: %s", exc)
@@ -913,6 +925,10 @@ def multi_paper_qa(request):
         {
             "answer": llm_result["answer"],
             "citations": validated_citations,
+            "papers": {
+                pid: {"title": info["title"], "label": info["label"]}
+                for pid, info in legend.items()
+            },
             "paper_errors": paper_errors,
             "context_trimmed": context_stats["trimmed"],
             "context_papers": context_stats["papers"],

@@ -9,13 +9,13 @@ export function isPublisherBlock(reason) {
   return typeof reason === "string" && PUBLISHER_BLOCK_PATTERN.test(reason);
 }
 
-export async function requestPaperAnalysis({ paperIds, question, pdfUrls, csrfToken, signal }) {
+export async function requestPaperAnalysis({ paperIds, question, pdfUrls, paperMeta, csrfToken, signal }) {
   let response;
   try {
     response = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-      body: JSON.stringify({ paper_ids: paperIds, question, pdf_urls: pdfUrls }),
+      body: JSON.stringify({ paper_ids: paperIds, question, pdf_urls: pdfUrls, paper_meta: paperMeta }),
       signal,
     });
   } catch (networkErr) {
@@ -37,6 +37,7 @@ export async function requestPaperAnalysis({ paperIds, question, pdfUrls, csrfTo
   return {
     answer: data?.answer ?? "",
     citations: data?.citations ?? [],
+    papers: data?.papers ?? {},
     paper_errors: data?.paper_errors ?? {},
     context_trimmed: !!data?.context_trimmed,
     context_papers: data?.context_papers ?? {},
