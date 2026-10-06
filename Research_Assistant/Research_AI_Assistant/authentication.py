@@ -1,5 +1,4 @@
 import logging
-import os
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from clerk_backend_api import authenticate_request, AuthenticateRequestOptions
@@ -44,3 +43,8 @@ class ClerkAuthentication(BaseAuthentication):
         )
 
         return (user, None)
+
+    def authenticate_header(self, request):
+        # A WWW-Authenticate value makes DRF answer auth failures with 401
+        # instead of 403, so the frontend can tell them apart.
+        return "Bearer"

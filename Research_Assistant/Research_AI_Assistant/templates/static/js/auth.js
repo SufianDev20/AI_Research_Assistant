@@ -61,7 +61,7 @@ export async function requireSignIn() {
   // No publishable key: fail open; the API still enforces auth server-side.
   if (!readPublishableKey()) {
     log.error(
-      "CLERK_PUBLISHABLE_KEY is not set — sign-in gate disabled. " +
+      "CLERK_PUBLISHABLE_KEY is not set - sign-in gate disabled. " +
         "Add it to Research_Assistant/.env to turn sign-in on."
     );
     return null;
@@ -99,19 +99,42 @@ export async function signOut() {
   window.location.replace("/sign-in/");
 }
 
-// Wraps fetch: attaches the Clerk token to /api/ calls and logs them.
+// Resolves a fetch input to a URL; returns it only for same-origin /api/ paths.
+function sameOriginApiUrl(input) {
+  let raw = "";
+  if (typeof input === "string") raw = input;
+  else if (input instanceof URL) raw = input.href;
+  else if (input instanceof Request) raw = input.url;
+  if (!raw) return null;
+  let url;
+  try {
+    url = new URL(raw, window.location.href);
+  } catch (err) {
+    return null;
+  }
+  if (url.origin !== window.location.origin) return null;
+  return url.pathname.startsWith("/api/") ? url : null;
+}
+
+// Wraps fetch: attaches the Clerk token to same-origin /api/ calls and logs them.
 export function installFetchInterceptor() {
   if (window.__scholaraFetchPatched) return;
   window.__scholaraFetchPatched = true;
   const httpLog = createLogger("http");
   const originalFetch = window.fetch.bind(window);
 
-  window.fetch = async (input, init = {}) => {
-    const rawUrl = typeof input === "string" ? input : input.url;
-    if (!rawUrl || !rawUrl.startsWith("/api/")) return originalFetch(input, init);
+  window.fetch = async (input, init) => {
+    const apiUrl = sameOriginApiUrl(input);
+    // Never attach the token to another origin or a non-API path.
+    if (!apiUrl) return originalFetch(input, init);
 
-    const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
-    const headers = new Headers(init.headers || {});
+    const opts = init || {};
+    const isRequest = input instanceof Request;
+    const rawUrl = apiUrl.pathname + apiUrl.search;
+    const method = (opts.method || (isRequest && input.method) || "GET").toUpperCase();
+    // fetch(request, { headers }) replaces the Request's headers, so merge them first.
+    const headers = new Headers(isRequest ? input.headers : undefined);
+    new Headers(opts.headers || {}).forEach((v, k) => headers.set(k, v));
     if (!headers.has("Authorization")) {
       const authHeaders = await getAuthHeaders();
       Object.entries(authHeaders).forEach(([k, v]) => headers.set(k, v));
@@ -119,12 +142,13 @@ export function installFetchInterceptor() {
     const started = performance.now();
     httpLog.info(`${method} ${rawUrl} started`);
     try {
-      const response = await originalFetch(input, { ...init, headers });
+      const response = await originalFetch(input, { ...opts, headers });
       const ms = Math.round(performance.now() - started);
       if (response.ok) {
         httpLog.info(`${method} ${rawUrl} -> ${response.status} (${ms} ms)`);
       } else {
         httpLog.warn(`${method} ${rawUrl} -> ${response.status} ${response.statusText} (${ms} ms)`);
+        // Only 401 means "not signed in"; a 403 is an authorization error and stays on the page.
         if (response.status === 401) {
           httpLog.warn("session expired or missing; redirecting to sign-in");
           window.location.replace("/sign-in/");
