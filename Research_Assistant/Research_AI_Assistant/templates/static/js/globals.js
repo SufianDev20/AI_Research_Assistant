@@ -29,57 +29,37 @@ window.appState = appState;
 let domManager;
 
 // ==================== GLOBAL FUNCTIONS (for backwards compatibility) ====================
-function toggleProfileDropdown() {
-  const dropdown = document.getElementById("profileDropdown");
-  if (dropdown) {
-    dropdown.classList.toggle("show");
-  }
-}
-
-function logout() {
-  if (confirm("Log out of BRAIN?")) {
-    alert("👋 Logged out (demo)");
-  }
-}
+// Account menu (open/close, real Clerk sign-out) now lives entirely in
+// profile.js — no global toggle/logout functions needed here anymore.
 
 function resetFilters() {
-  console.log("Reset button clicked");
-  if (domManager) {
-    console.log("DOM Manager exists");
-    // Reset year range filter to default (1900-2026)
-    if (domManager.elements.yearMin && domManager.elements.yearMax) {
-      console.log("Resetting sliders to 1900 and 2026");
-      // Reset slider values to defaults
-      domManager.elements.yearMin.value = "1900";
-      domManager.elements.yearMax.value = "2026";
-
-      // Reset slider fills
-      domManager.updateSingleSlider("min");
-      domManager.updateSingleSlider("max");
-      console.log("Sliders reset complete");
-    } else {
-      console.log("Sliders not found:", {
-        yearMin: !!domManager.elements.yearMin,
-        yearMax: !!domManager.elements.yearMax,
-      });
-    }
-
-    // Reset search by to default (best_match)
-    if (domManager.elements.searchBy) {
-      domManager.elements.searchBy.value = "best_match";
-      console.log("Search by reset to best_match");
-    }
-
-    // Reset quota to default (5 papers)
-    if (domManager.elements.quota) {
-      domManager.elements.quota.value = "5";
-      console.log("Quota reset to 5");
-    }
-
-    console.log("Filters reset to defaults");
-  } else {
-    console.log("DOM Manager not found");
+  if (!domManager) {
+    console.log("Reset requested before DOM Manager was ready");
+    return;
   }
+
+  // Values reset synchronously first -- the transition below is purely
+  // decorative on top of this, so reset still fully works even if the
+  // animation is skipped (reduced motion) or CSS/JS animation support
+  // is unavailable for any reason.
+  if (domManager.elements.yearMin && domManager.elements.yearMax) {
+    domManager.elements.yearMin.value = "1900";
+    domManager.elements.yearMax.value = "2026";
+    if (domManager.elements.yearError) domManager.elements.yearError.hidden = true;
+  }
+  if (domManager.elements.searchBy) {
+    domManager.elements.searchBy.value = "best_match";
+  }
+  if (domManager.elements.quota) {
+    domManager.elements.quota.value = "5";
+    // Setting .value directly does not fire "change" -- the ambient
+    // background (js/workspace-bg.js) listens for it to resize its node
+    // count to match, so Reset needs to dispatch one explicitly or the
+    // background would silently keep showing the pre-reset count.
+    domManager.elements.quota.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  domManager.playResetTransition();
 }
 
 function performSearch() {
@@ -131,12 +111,6 @@ function init() {
   // Initial render
   domManager.renderBinders();
   domManager.setupFilterListeners();
-  if (domManager.elements.yearMin && domManager.elements.yearMax) {
-    domManager.updateSingleSlider("min");
-    domManager.updateSingleSlider("max");
-  } else {
-    domManager.updateYearLabel();
-  }
 
   // Expose domManager to global scope AFTER initialization
   window.domManager = domManager;
@@ -165,8 +139,6 @@ function migrateExistingBinders() {
 }
 
 // Attach functions to window for HTML onclick attributes
-window.toggleProfileDropdown = toggleProfileDropdown;
-window.logout = logout;
 window.resetFilters = resetFilters;
 window.performSearch = performSearch;
 

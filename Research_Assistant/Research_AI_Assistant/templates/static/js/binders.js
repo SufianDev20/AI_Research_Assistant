@@ -11,6 +11,15 @@ DOMManager.prototype.renderBinders = function() {
       window.appState.binders.length + " active";
   }
 
+  if (window.appState.binders.length === 0) {
+    var empty = document.createElement("div");
+    empty.className = "binders-empty";
+    empty.textContent =
+      "No research binders yet. Run a search and save it to a binder to see it here.";
+    this.elements.bindersContainer.appendChild(empty);
+    return;
+  }
+
   window.appState.binders.forEach(
     function (binder) {
       var binderElement = this.createBinderElement(binder);

@@ -1,62 +1,333 @@
+    {% load static %}
     <div class="main-container">
-      <!-- HERO INPUT WITH INTEGRATED FILTERS -->
+      <!-- RESEARCH INPUT WITH ATTACHED ADVANCED OPTIONS -->
       <div class="hero-section">
         <div class="hero-container">
           <div class="hero-label">
-            <i class="fa-solid fa-brain"></i>
-            <span>ASK BRAIN ANYTHING</span>
+            <i class="fa-solid fa-feather-pointed"></i>
+            <span>Ask Scholara</span>
           </div>
 
           <!-- Main Search Container -->
-          <div class="search-card">
+          <div class="search-card" id="wsSearchCard">
             <div class="search-input-section">
-              <input id="queryInput" type="text" placeholder="What breakthrough in quantum computing happened in the last 5 years?" class="search-input" />
-
-              <button onclick="performSearch()" class="search-button">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <span>RESEARCH</span>
+              <label for="queryInput" class="sr-only">Research topic</label>
+              <input
+                id="queryInput"
+                type="text"
+                placeholder="Enter a topic to research"
+                autocomplete="off"
+                class="search-input"
+              />
+              <button onclick="performSearch()" class="search-button" aria-label="Research this topic">
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
               </button>
             </div>
 
-            <div class="filters-section">
-              <div class="filters-container">
-                <div class="year-range">
-                  <label class="filter-label">YEARS</label>
-                  <div class="dual-slider-wrapper">
-                    <div class="slider-display-labels">
-                      <span id="minYearDisplay">1900</span>
-                      <span id="maxYearDisplay">2026</span>
-                    </div>
-                    <div class="dual-slider-track">
-                      <div class="slider-track-base"></div>
-                      <div class="slider-fill" id="sliderFill"></div>
-                      <input type="range" id="yearMin" min="1900" max="2026" value="1900" class="year-slider thumb-min" />
-                      <input type="range" id="yearMax" min="1900" max="2026" value="2026" class="year-slider thumb-max" />
+            <div class="ws-toggle-row">
+              <button
+                type="button"
+                id="wsAdvancedToggle"
+                class="ws-advanced-toggle"
+                aria-expanded="false"
+                aria-controls="wsAdvancedPanel"
+              >
+                <span>Advanced options</span>
+                <i class="fa-solid fa-chevron-down ws-advanced-toggle__chev" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          <!-- Deliberately a sibling of .search-card, not a child: the
+               card's own rounded/shadowed background must never extend
+               behind the open panel, or the sheets read as sitting
+               inside one big enclosing box instead of hanging free
+               against the page. -->
+          <div class="ws-advanced-panel" id="wsAdvancedPanel" hidden>
+              <!-- Shared paint servers for every sheet's paper shadow and every
+                   ring's metal gradient below -- defined once, referenced by
+                   url(#id) from each sheet/ring's own inline svg. -->
+              <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+                <defs>
+                  <!-- Two layers merged under the paper: a tight dark contact
+                       shadow right at the edge, plus a wider, lower-opacity
+                       diffuse fade -- per reference/picture 1.png, which shows
+                       visible separation from the page background rather than
+                       a single flat strip. Warm neutral flood color (not
+                       near-black) so it reads as a soft shadow, not an outline.
+                       Region is sized generously (-40%/180% x, -40%/260% y) so
+                       the wide layer's blur has room; the real clip was the
+                       svg element's own default overflow:hidden, fixed via
+                       .ws-tab__paper{overflow:visible} in styles.css. -->
+                  <filter id="wsPaperShadow" x="-50%" y="-50%" width="200%" height="320%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="2.5" result="tightBlur" />
+                    <feOffset in="tightBlur" dx="0" dy="2" result="tightOffset" />
+                    <feColorMatrix in="tightOffset" type="matrix"
+                      values="0 0 0 0 0.33  0 0 0 0 0.30  0 0 0 0 0.26  0 0 0 0.5 0"
+                      result="tightShadow" />
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="wideBlur" />
+                    <feOffset in="wideBlur" dx="0" dy="7" result="wideOffset" />
+                    <feColorMatrix in="wideOffset" type="matrix"
+                      values="0 0 0 0 0.33  0 0 0 0 0.30  0 0 0 0 0.26  0 0 0 0.26 0"
+                      result="wideShadow" />
+                    <feMerge>
+                      <feMergeNode in="wideShadow" />
+                      <feMergeNode in="tightShadow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                  <!-- Very restrained surface shading for the paper fill itself,
+                       per reference/picture 1.png's gentle tonal variation:
+                       barely darker at the very top, back to the base color by
+                       18% down. Kept subtle: this is not meant to read as its
+                       own visible gradient, just to stop the fill from looking
+                       perfectly flat next to the now-visible cast shadow above it. -->
+                  <linearGradient id="wsPaperFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#f1efe2" />
+                    <stop offset="18%" stop-color="#f8f6ed" />
+                    <stop offset="100%" stop-color="#f8f6ed" />
+                  </linearGradient>
+                  <!-- Traced directly from ring-target.png (user-supplied close-up of
+                       reference/picture 1.png), with proportions cross-checked by pixel
+                       sampling that image rather than estimated by eye. -->
+                  <linearGradient id="wsRingMetal" gradientUnits="userSpaceOnUse" x1="5.5" y1="0" x2="10.5" y2="0">
+                    <stop offset="0%" stop-color="#b9bdc0" />
+                    <stop offset="22%" stop-color="#eef0f0" />
+                    <stop offset="38%" stop-color="#c7cbce" />
+                    <stop offset="65%" stop-color="#959b9f" />
+                    <stop offset="100%" stop-color="#6d7377" />
+                  </linearGradient>
+                  <radialGradient id="wsRingHole" cx="0.38" cy="0.32" r="0.8">
+                    <stop offset="0%" stop-color="#6e7479" />
+                    <stop offset="45%" stop-color="#3f4448" />
+                    <stop offset="100%" stop-color="#25282b" />
+                  </radialGradient>
+                  <filter id="wsRingEmboss" x="-60%" y="-30%" width="220%" height="160%">
+                    <feDropShadow dx="0.2" dy="0.8" stdDeviation="0.6" flood-color="#2a2d1f" flood-opacity="0.3" />
+                  </filter>
+                </defs>
+              </svg>
+              <div class="ws-tabs" id="wsFiltersContainer">
+                <div class="ws-tab-wrap ws-tab-wrap--years">
+                  <div class="ws-tab__fold">
+                    <svg class="ws-tab__paper" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                      <path d="M0,0 L100,0 L100,85 C100,89 58,94 36,96 C30,96.1 23,96.1 17,96 C10,95 0,91 0,90 Z" />
+                    </svg>
+                    <div class="ws-tab__topshade" aria-hidden="true"></div>
+                    <div class="ws-tab">
+                      <div class="ws-tab__inner">
+                        <label class="filter-label" id="wsYearsLabel">Years</label>
+                        <div class="ws-year-fields" role="group" aria-labelledby="wsYearsLabel">
+                          <label class="ws-year-field">
+                            <span class="ws-year-field__hint">From</span>
+                            <input
+                              type="number"
+                              id="yearMin"
+                              min="1900"
+                              max="2026"
+                              value="1900"
+                              inputmode="numeric"
+                              aria-describedby="wsYearError"
+                            />
+                          </label>
+                          <span class="ws-year-sep" aria-hidden="true">&ndash;</span>
+                          <label class="ws-year-field">
+                            <span class="ws-year-field__hint">To</span>
+                            <input
+                              type="number"
+                              id="yearMax"
+                              min="1900"
+                              max="2026"
+                              value="2026"
+                              inputmode="numeric"
+                              aria-describedby="wsYearError"
+                            />
+                          </label>
+                        </div>
+                        <p class="ws-year-error" id="wsYearError" role="alert" hidden></p>
+                      </div>
                     </div>
                   </div>
+                  <span class="ws-tab__rings" aria-hidden="true">
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                  </span>
                 </div>
 
-                <div class="filter-dropdown">
-                  <label class="filter-label">SEARCH BY</label>
-                  <select id="searchBy" class="filter-select">
-                    <option value="relevance">Relevance</option>
-                    <option value="open_access">Open Access</option>
-                    <option value="best_match" selected>Best Match</option>
-                  </select>
+                <div class="ws-tab-wrap ws-tab-wrap--searchby">
+                  <div class="ws-tab__fold">
+                    <svg class="ws-tab__paper" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                      <path d="M0,0 L100,0 L100,86 C100,90 58,94.5 32,96 C28,96.1 24,96.1 20,96 C12,95.2 0,89.5 0,88 Z" />
+                    </svg>
+                    <div class="ws-tab__topshade" aria-hidden="true"></div>
+                    <div class="ws-tab">
+                      <div class="ws-tab__inner">
+                        <label class="filter-label" for="searchBy">Search by</label>
+                        <select id="searchBy" class="filter-select">
+                          <option value="relevance">Relevance</option>
+                          <option value="open_access">Open Access</option>
+                          <option value="best_match" selected>Best Match</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="ws-tab__rings" aria-hidden="true">
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                  </span>
                 </div>
 
-                <div class="filter-dropdown">
-                  <label class="filter-label">Number of Papers (Default:5)</label>
-                  <select id="quota" class="filter-select">
-                    <option value="5" selected>5 papers</option>
-                    <option value="10">10 papers</option>
-                    <option value="15">15 papers</option>
-                    <option value="20">20 papers</option>
-                  </select>
+                <div class="ws-tab-wrap ws-tab-wrap--papers">
+                  <div class="ws-tab__fold">
+                    <svg class="ws-tab__paper" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                      <path d="M0,0 L100,0 L100,87 C100,91 52,93.5 27,95 C21,95.1 16,95.1 11,95 C6,94.3 0,90.5 0,89 Z" />
+                    </svg>
+                    <div class="ws-tab__topshade" aria-hidden="true"></div>
+                    <div class="ws-tab">
+                      <div class="ws-tab__inner">
+                        <label class="filter-label" for="quota">Number of papers</label>
+                        <select id="quota" class="filter-select">
+                          <option value="5" selected>5 papers</option>
+                          <option value="10">10 papers</option>
+                          <option value="15">15 papers</option>
+                          <option value="20">20 papers</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="ws-tab__rings" aria-hidden="true">
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                  </span>
                 </div>
 
-                <div>
-                  <button onclick="resetFilters()" class="reset-button">RESET</button>
+                <div class="ws-tab-wrap ws-tab-wrap--reset">
+                  <div class="ws-tab__fold">
+                    <svg class="ws-tab__paper" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                      <path d="M0,0 L100,0 L100,84 C100,88 46,93 24,95 C19,95.1 16,95.1 12,95 C7,94.2 0,90.5 0,89 Z" />
+                    </svg>
+                    <div class="ws-tab__topshade" aria-hidden="true"></div>
+                    <div class="ws-tab">
+                      <div class="ws-tab__inner">
+                        <button type="button" onclick="resetFilters()" class="reset-button">Reset</button>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="ws-tab__rings" aria-hidden="true">
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                    <!-- SVG implementation kept for rollback -- preview below uses the
+                         photo-extracted PNG asset instead (ws-ring-attachment.png).
+                    <svg class="ws-tab__ring" viewBox="0 0 16 34" focusable="false">
+                      <circle class="ring-hole" cx="8" cy="8" r="3.0" />
+                      <circle class="ring-hole" cx="8" cy="26" r="3.0" />
+                      <path class="ring-loop" d="M 8 11.8 Q 9.1 17 8 22.2" />
+                      <g class="ring-metal-group">
+                        <circle class="ring-rim" cx="8" cy="8" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="8" r="3.35" />
+                        <circle class="ring-rim" cx="8" cy="26" r="4.3" />
+                        <circle class="ring-rim-detail" cx="8" cy="26" r="3.35" />
+                      </g>
+                    </svg>
+                    -->
+                    <img class="ws-tab__ring ws-tab__ring--photo" src="{% static 'img/ws-ring-attachment.png' %}" alt="" aria-hidden="true" />
+                  </span>
                 </div>
               </div>
             </div>

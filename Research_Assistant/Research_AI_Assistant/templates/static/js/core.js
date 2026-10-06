@@ -34,17 +34,16 @@ export class DOMManager {
       yearFilter: document.getElementById("yearFilter"),
       yearValue: document.getElementById("yearValue"),
       sliderTooltip: document.getElementById("sliderTooltip"),
-      sliderTooltipMin: document.getElementById("sliderTooltipMin"),
-      sliderTooltipMax: document.getElementById("sliderTooltipMax"),
       yearMin: document.getElementById("yearMin"),
       yearMax: document.getElementById("yearMax"),
-      sliderFill: document.getElementById("sliderFill"),
-      sliderFillMin: document.getElementById("sliderFillMin"),
-      sliderFillMax: document.getElementById("sliderFillMax"),
-      minYearDisplay: document.getElementById("minYearDisplay"),
-      maxYearDisplay: document.getElementById("maxYearDisplay"),
+      yearError: document.getElementById("wsYearError"),
       searchBy: document.getElementById("searchBy"),
       quota: document.getElementById("quota"),
+
+      // Advanced options panel (attached below the search input)
+      advancedToggle: document.getElementById("wsAdvancedToggle"),
+      advancedPanel: document.getElementById("wsAdvancedPanel"),
+      filtersContainer: document.getElementById("wsFiltersContainer"),
 
       // Binder elements
       bindersContainer: document.getElementById("bindersContainer"),
@@ -77,8 +76,9 @@ export class DOMManager {
       modalInput: document.getElementById("modal-input"),
       modalSendBtn: document.getElementById("modal-send-btn"),
 
-      // Profile elements
-      profileDropdown: document.getElementById("profileDropdown"),
+      // Profile elements: the account menu (#profileMenu) is entirely
+      // owned by profile.js, including its own outside-click/Escape
+      // close handling — nothing cached or wired here.
 
       // Section elements
       heroSection: document.querySelector(".hero-section"),
@@ -138,77 +138,40 @@ export class DOMManager {
       );
     }
 
+    // Years: two typeable/steppable number inputs (min=1900, max=2026).
+    // Validated on blur/change rather than every keystroke, so a user
+    // can freely type "19" while still building "1990" without it
+    // being clamped mid-entry.
     if (elements.yearMin && elements.yearMax) {
-      const onMinSliderInput = function () {
-        this.updateSingleSlider("min");
+      const onYearChange = function () {
+        this.validateYearRange();
       }.bind(this);
-
-      const onMaxSliderInput = function () {
-        this.updateSingleSlider("max");
-      }.bind(this);
-
-      elements.yearMin.addEventListener("input", onMinSliderInput);
-      elements.yearMax.addEventListener("input", onMaxSliderInput);
-
-      // Add tooltip event listeners for min slider
+      elements.yearMin.addEventListener("change", onYearChange);
+      elements.yearMax.addEventListener("change", onYearChange);
       elements.yearMin.addEventListener(
-        "mousedown",
-        function (e) {
-          this.activeSlider = this.elements.yearMin;
-          this.showTooltip("min");
-        }.bind(this),
-      );
-      elements.yearMin.addEventListener(
-        "mouseup",
+        "blur",
         function () {
-          this.hideTooltip("min");
-        }.bind(this),
-      );
-      elements.yearMin.addEventListener(
-        "touchstart",
-        function (e) {
-          this.activeSlider = this.elements.yearMin;
-          this.showTooltip("min");
-        }.bind(this),
-      );
-      elements.yearMin.addEventListener(
-        "touchend",
-        function () {
-          this.hideTooltip("min");
-        }.bind(this),
-      );
-
-      // Add tooltip event listeners for max slider
-      elements.yearMax.addEventListener(
-        "mousedown",
-        function (e) {
-          this.activeSlider = this.elements.yearMax;
-          this.showTooltip("max");
+          this.validateYearRange();
         }.bind(this),
       );
       elements.yearMax.addEventListener(
-        "mouseup",
+        "blur",
         function () {
-          this.hideTooltip("max");
-        }.bind(this),
-      );
-      elements.yearMax.addEventListener(
-        "touchstart",
-        function (e) {
-          this.activeSlider = this.elements.yearMax;
-          this.showTooltip("max");
-        }.bind(this),
-      );
-      elements.yearMax.addEventListener(
-        "touchend",
-        function () {
-          this.hideTooltip("max");
+          this.validateYearRange();
         }.bind(this),
       );
 
-      this.updateSingleSlider("min");
-      this.updateSingleSlider("max");
+      // Clears a stale correction message once the user starts editing
+      // a year field again, rather than leaving it up until the next
+      // blur (which may be on the other, unrelated field).
+      const clearYearError = function () {
+        if (elements.yearError) elements.yearError.hidden = true;
+      };
+      elements.yearMin.addEventListener("input", clearYearError);
+      elements.yearMax.addEventListener("input", clearYearError);
     }
+
+    this.setupAdvancedOptionsToggle();
 
     // Research view listeners
     // Follow-up submissions now open the paper analysis page (see
@@ -296,17 +259,6 @@ export class DOMManager {
         } else if (window.appState.isResearchView && elements.researchInput) {
           elements.researchInput.focus();
         }
-      }
-    });
-    
-    // Outside click for dropdown
-    document.addEventListener("click", function (e) {
-      if (
-        elements.profileDropdown &&
-        !e.target.closest("#profileDropdown") &&
-        !e.target.closest('button[onclick="toggleProfileDropdown()"]')
-      ) {
-        elements.profileDropdown.classList.remove("show");
       }
     });
   }

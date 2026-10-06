@@ -1,4 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap");
+/* ============================================================================
+   Scholara — research workspace
+   Same academic-green + warm-paper language as the landing page (see
+   templates/static/css/landing/landing.css). Palette copied as literal
+   values here rather than imported, matching the existing pattern used
+   by analysis.css — this file has no dependency on landing.css and
+   cannot be affected by changes to it, or vice versa. Fonts (Newsreader,
+   Inter, JetBrains Mono) are loaded via <link> in base.html.
+   ========================================================================== */
 
 /* ===== BASE STYLES ===== */
 * {
@@ -6,10 +14,10 @@
 }
 
 body {
-  font-family: "Inter", system_ui, sans-serif;
-  font-size: 0.94rem;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 0.95rem;
   line-height: 1.58;
-  background: #0a0a0a;
+  background: #ece9dc;
   margin: 0;
   padding: 0;
   width: 100%;
@@ -17,10 +25,276 @@ body {
 }
 
 .app-body {
-  background-color: #000000;
-  color: #ffffff;
+  --paper: #f4f2e9;
+  --paper-raised: #faf8f1;
+  --paper-sunk: #ece9dc;
+
+  --ink: #16261d;
+  --ink-body: #3d4b43;
+  --ink-meta: #6d7970;
+
+  --forest: #1c4633;
+  --forest-deep: #123024;
+  --emerald: #2f7d5d;
+  --emerald-bright: #3f9b73;
+  --mint: #a9d4be;
+  --mint-wash: #e2eee4;
+
+  --gold: #b0894e;
+  --gold-soft: #c9a86f;
+
+  --rule: rgba(22, 38, 29, 0.14);
+  --rule-soft: rgba(22, 38, 29, 0.08);
+  --panel: rgba(28, 70, 51, 0.05);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  background-color: var(--paper-sunk);
+  color: var(--ink-body);
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+.app-body :focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Several elements below (e.g. .profile-item, .ws-advanced-panel) set
+   their own `display`, which otherwise beats the UA stylesheet's
+   [hidden]{display:none} at equal specificity (author rules win ties).
+   Toggle visibility with el.hidden, never style.display, and this
+   keeps [hidden] authoritative. */
+.app-body [hidden] {
+  display: none !important;
+}
+
+/* ===== AMBIENT WORKSPACE BACKGROUND =====
+   Viewport-fixed canvas painted by js/workspace-bg.js: broad gradient
+   depth over the approved cream, a soft pointer-following glow, and a
+   sparse node network sized to the "Number of papers" selection. Fixed
+   positioning takes it out of document flow entirely (no layout/scroll
+   impact) and keeps it present while the page scrolls, without needing
+   to span the full document height. z-index:-1 is enough to sit behind
+   all normal-flow content without needing to coordinate with anything
+   else's stacking -- CSS paints the root background (the plain cream
+   body color, the pre-JS/no-JS fallback) behind even negative-z-index
+   children, and the navbar's own z-index:50 keeps it on top regardless.
+   Decorative only: pointer-events:none and aria-hidden keep it fully
+   out of interaction, focus order, and assistive-tech trees. */
+.ws-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  display: block;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===== NAVBAR ===== */
+.navbar {
+  border-bottom: 1px solid var(--rule);
+  background-color: rgba(244, 242, 233, 0.86);
+  backdrop-filter: blur(14px) saturate(120%);
+  position: fixed;
+  width: 100%;
+  z-index: 50;
+}
+
+.navbar-container {
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-top: 1.1rem;
+  padding-bottom: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navbar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: var(--forest);
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.logo-text {
+  color: #f6f7f0;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.app-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--forest);
+  margin: 0;
+}
+
+.app-subtitle {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.62rem;
+  color: var(--ink-meta);
+  margin-top: -0.15rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ===== ACCOUNT MENU ===== */
+.profile-section {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background-color: transparent;
+  border: 1px solid transparent;
+  padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+  border-radius: 999px;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+
+.profile-button:hover {
+  background-color: var(--panel);
+  border-color: var(--rule);
+}
+
+.profile-avatar {
+  width: 2.15rem;
+  height: 2.15rem;
+  flex-shrink: 0;
+  background: var(--forest);
+  background-size: cover;
+  background-position: center;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f6f7f0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.profile-avatar--photo {
+  color: transparent;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  min-width: 0;
+}
+
+.profile-name {
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin: 0;
+  color: var(--ink);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-role {
+  font-size: 0.72rem;
+  color: var(--ink-meta);
+  margin: 0;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-chevron {
+  font-size: 0.7rem;
+  color: var(--ink-meta);
+  transition: transform 0.15s var(--ease);
+}
+
+.profile-button[aria-expanded="true"] .profile-chevron {
+  transform: rotate(180deg);
+}
+
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 15rem;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(15, 30, 22, 0.16);
+  padding: 0.4rem;
+  z-index: 60;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--ink-body);
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.profile-item i {
+  width: 1em;
+  color: var(--ink-meta);
+}
+.profile-item:hover,
+.profile-item:focus-visible {
+  background-color: var(--panel);
+  color: var(--forest);
+}
+.profile-item--danger:hover,
+.profile-item--danger:focus-visible {
+  background-color: rgba(178, 68, 40, 0.08);
+  color: #7a2e1f;
+}
+.profile-item--danger:hover i,
+.profile-item--danger:focus-visible i {
+  color: #7a2e1f;
 }
 
 /* ===== PAGINATION STYLES ===== */
@@ -81,182 +355,6 @@ body {
   color: #d1d5db;
 }
 
-/* ===== NAVBAR ===== */
-.navbar {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(24px);
-  position: fixed;
-  width: 100%;
-  z-index: 50;
-}
-
-.navbar-container {
-  max-width: 80rem;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 2rem;
-  padding-right: 2rem;
-  padding-top: 1.25rem;
-  padding-bottom: 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.navbar-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.logo {
-  width: 2.5rem;
-  height: 2.5rem;
-  background-color: #ffffff;
-  border-radius: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
-  text-decoration: none;
-}
-
-.logo-text {
-  color: #000000;
-  font-size: 1.875rem;
-  font-weight: 700;
-  font-family: "Inter", system_ui, sans-serif;
-  letter-spacing: -0.015em;
-}
-
-.app-title {
-  font-family: "Inter", system_ui, sans-serif;
-  font-size: 1.875rem;
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  margin: 0;
-}
-
-.app-subtitle {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: -0.25rem;
-  letter-spacing: 3px;
-}
-
-/* ===== PROFILE SECTION ===== */
-.profile-section {
-  position: relative;
-}
-
-.profile-button {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background-color: transparent;
-  border: none;
-  padding-left: 1rem;
-  padding-right: 1rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-radius: 1.5rem;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-  cursor: pointer;
-}
-
-.profile-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.profile-avatar {
-  width: 2.25rem;
-  height: 2.25rem;
-  background: linear-gradient(to bottom right, #a855f7, #ec4899);
-  border-radius: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.profile-info {
-  text-align: left;
-}
-
-.profile-name {
-  font-weight: 500;
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-.profile-role {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
-
-.profile-chevron {
-  font-size: 0.75rem;
-  transition: transform 0.15s ease;
-}
-
-.profile-section:active .profile-chevron {
-  transform: rotate(180deg);
-}
-
-.profile-dropdown {
-  display: none;
-  position: absolute;
-  right: 0;
-  top: 0.75rem;
-  width: 13rem;
-  background-color: #09090b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  z-index: 50;
-}
-
-.profile-dropdown.show {
-  display: block;
-}
-
-.profile-logout {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  text-decoration: none;
-  color: #ffffff;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.profile-logout:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.logout-icon {
-  width: 1rem;
-}
-
 .nav-spacer {
   height: 5rem;
 }
@@ -270,121 +368,146 @@ body {
   padding-right: 2rem;
 }
 
-/* ===== HERO SECTION ===== */
+/* ===== HERO / RESEARCH INPUT =====
+   Fills the viewport below the fixed navbar (matching .nav-spacer's
+   5rem) and centers the search box within that space, so it reads as
+   the page's main focus on load. min-height is a floor, not a cap: on
+   short viewports, or once Advanced options grows the card, the section
+   simply grows to fit its content in normal flow -- nothing here is
+   absolutely positioned, so there is no overlap risk at any size. */
 .hero-section {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  min-height: 70vh;
-  padding-top: 2rem;
-  padding-bottom: 3rem;
+  /* Top-anchored rather than flex-centered on purpose: centering via
+     justify-content would re-balance around the block's midpoint every
+     time Advanced options changes its height, making the search box
+     itself drift upward as it opens. Anchoring from the top instead
+     means the box stays put and only the space below it (ultimately,
+     the binders section) grows or shrinks -- the "push down naturally"
+     behavior, entirely through normal flow. padding-top is tuned to
+     read as roughly centered in the viewport for the common case.
+     Capped 4rem lower than a pure center (~64px) at typical desktop
+     height, per explicit feedback that centered read as slightly too
+     low -- binders-section's margin-top below is raised by the same
+     4rem so this doesn't pull the binders section up with it. */
+  padding-top: clamp(3rem, 38vh, 12rem);
+  padding-bottom: clamp(2rem, 6vh, 3.5rem);
   padding-left: 1rem;
   padding-right: 1rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+  .hero-section {
+    padding-top: clamp(2rem, 14vh, 6rem);
+    padding-bottom: clamp(1.5rem, 5vh, 2.5rem);
+  }
 }
 
 .hero-container {
   position: relative;
   width: 100%;
-  max-width: 60rem;
+  max-width: 42rem;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .hero-label {
-  position: absolute;
-  top: -1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #ffffff;
-  color: #000000;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-  padding-top: 0.375rem;
-  padding-bottom: 0.375rem;
-  border-radius: 1.5rem;
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  z-index: 10;
+  /* Tuned so the search card's own top lands on its approved position
+     (304.09px at the 1440x900 desktop viewport) regardless of this
+     label's own font-size. */
+  margin-bottom: 0.81rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  /* Muted deep teal-green, per reference/picture 1.png -- a modest
+     label above the box, not a large title. */
+  color: #104d43;
+}
+.hero-label i {
+  font-size: 0.85em;
 }
 
+/* Search card: the input plus its attached advanced-options panel read
+   as one connected sheet, not a floating input above a separate card.
+   Radius and shadow tuned to the reference's proportions (corner
+   radius ~2% of the box's own width; a soft ambient shadow plus a
+   tight, slightly darker contact shadow right at the bottom edge --
+   that thin dark line is the box's own edge, not a separate rail). */
 .search-card {
-  background-color: #09090b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  width: 100%;
+  background-color: #fcfbf7;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  /* The middle layer used to be 0 14px 26px at 0.08 opacity -- offset and
+     blurred enough that, right in the narrow seam above the sheets, it read
+     as a solid flat gray band across the card's full width rather than a
+     shadow that fades. Tightened so the ambient layer falls off fast.
+     The close contact layer (last) is measured against a user-supplied
+     target crop: its contact point drops ~64% below interior brightness
+     over a ~5px-thick dark core before fading -- this card's earlier
+     0.62-opacity/2px-blur version only reached ~44% over ~2-3px, reading
+     as a thin line rather than a shadow with body. 3.5px blur gives it
+     vertical thickness without widening into a rectangular strip; 0.78
+     opacity reaches the darker contact point. */
+  box-shadow:
+    0 1px 1px rgba(18, 33, 25, 0.1),
+    0 5px 10px rgba(18, 33, 25, 0.07),
+    0 2px 3.5px rgba(18, 33, 25, 0.78);
 }
 
 /* ===== SEARCH INPUT ===== */
 .search-input-section {
   position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.6rem 0.6rem 1.1rem;
 }
 
 .search-input {
-  width: 100%;
-  background-color: #27272a;
-  color: #ffffff;
-  font-size: 1.25rem;
-  padding-top: 2rem;
-  padding-bottom: 2rem;
-  padding-left: 2rem;
-  padding-right: 8rem;
-  border: 1px solid transparent;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1.18rem;
+  padding: 0.5rem 0.6rem;
+  border: none;
   outline: none;
-  transition: all 0.15s ease;
-  display: block;
 }
 
 .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-  transition: color 0.15s ease;
-}
-
-.search-input:focus::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.search-input:focus {
-  border-color: rgba(255, 255, 255, 0.2);
-  background-color: #2a2a2d;
+  color: var(--ink-meta);
 }
 
 .search-button {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: #ffffff;
-  color: #000000;
-  font-weight: 600;
-  padding-left: 2rem;
-  padding-right: 2rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  border-radius: 1rem;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: all 0.15s ease;
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  justify-content: center;
+  background-color: #104d43;
+  color: #f6f7f0;
+  border-radius: 999px;
   border: none;
   cursor: pointer;
+  transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
 }
 
 .search-button:hover {
-  background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  background-color: #0b352e;
 }
 
 .search-button:active {
-  transform: translateY(-50%) scale(0.95);
+  transform: scale(0.94);
 }
 
 .search-button:disabled {
@@ -392,442 +515,630 @@ body {
   cursor: not-allowed;
 }
 
-/* ===== FILTERS SECTION ===== */
-.filters-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 1.5rem;
+.search-button i {
+  font-size: 1rem;
 }
 
-.filters-container {
+/* ===== ADVANCED OPTIONS TOGGLE ===== */
+.ws-toggle-row {
   display: flex;
+  justify-content: flex-end;
+  padding: 0 0.9rem 0.5rem;
+}
+
+.ws-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.76rem;
+  color: var(--ink-meta);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s var(--ease);
+}
+.ws-advanced-toggle:hover,
+.ws-advanced-toggle:focus-visible {
+  color: #104d43;
+}
+.ws-advanced-toggle__chev {
+  font-size: 0.65rem;
+  transition: transform 0.2s var(--ease);
+}
+.ws-advanced-toggle[aria-expanded="true"] .ws-advanced-toggle__chev {
+  transform: rotate(180deg);
+}
+
+/* ===== ADVANCED OPTIONS PANEL =====
+   Four independent hanging paper sheets, per reference/picture 1.png:
+   each sheet hangs on two vertical silver loops that extend from the
+   search card's own bottom seam (its existing border -- no separate
+   rail element) down to a hole in the sheet. The panel itself carries
+   no background/border/shadow of its own -- it is a sibling of
+   .search-card, not a child (see _hero_search.html), so the page's own
+   background shows through both the open gap above the sheets and the
+   gaps between them, instead of everything reading as sitting inside
+   one enclosing box. .ws-tab-wrap never rotates (it IS the ring's
+   mount point); only .ws-tab inside it flips, so the rings read as
+   staying put while the paper swings.
+
+   Each sheet's paper silhouette is an inline SVG path (.ws-tab__paper),
+   not clip-path: a `path` can curve with real Bezier control points,
+   so the bottom edge is a genuine smooth wave at any sheet width,
+   instead of a polygon's straight-line segments approximating one.
+   The SVG carries its own drop-shadow filter, so the shadow follows
+   the paper's actual silhouette rather than its invisible rectangular
+   box. Real controls render in .ws-tab, stacked above both the paper
+   and the rings by z-index. */
+.ws-advanced-panel {
+  position: relative;
+  /* Bleeds 24px past the card's own left/right edges, compensated by
+     equal padding below so .ws-tabs (100% width child) still renders at
+     exactly the same horizontal position/width as a plain 100%-wide
+     panel would. This exists because overflow:hidden (required below
+     for the flip-animation max-height trick) was clipping each paper
+     sheet's own wide diffuse shadow at the panel's edge: the first/last
+     sheets sit only 13px in from that edge, while the shadow's blur
+     wants ~20-40px of room to fade out -- a narrow margin, not a reason
+     to accept a clipped shadow. */
+  width: calc(100% + 48px);
+  margin-left: -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+  /* .hero-container is a flex column with align-items:center, which
+     re-centers any cross-axis-wider child -- at width:100% the panel's
+     width always equalled the container's so this never mattered before,
+     but now that it's 48px wider, centering would shift it by its own
+     math and throw off the margin-left/padding compensation above.
+     Opt out so the panel's position is simple: relative to the
+     container's own left edge, exactly like every other 100%-width
+     sibling here. */
+  align-self: flex-start;
+  /* Negative: the panel's own box (and hence its overflow:hidden
+     clipping boundary) starts *above* the card's bottom edge, inside
+     it -- otherwise the upper eyelets can never render "inside the
+     search box" without being clipped, since nothing can paint above
+     y=0 of an overflow:hidden box. Harmless while closed: [hidden]
+     sets display:none, so margin has no layout effect until open.
+     NOTE: this margin shifts the panel's clip boundary and everything
+     inside it together, so it cannot change the ring's position
+     *relative to* that boundary -- the actual top-of-ring clipping fix
+     is .ws-tab__rings' own `top` offset below. */
+  margin-top: -12px;
+  overflow: hidden;
+  max-height: 0;
+  /* 400ms to match .ws-tab__fold's rotation below, so the panel's growing
+     "room" and the sheets' visible unfold finish at the same moment. The
+     actual open-state value is set by JS (search.js) as the panel's real
+     measured content height, not a guessed constant: an arbitrary cap
+     (this used to be a flat 640px) makes the *declared* transition run
+     for its full duration while the *visible* motion already stopped
+     once real content height was reached partway through -- a mismatch
+     between "when it looks done" and "when the transition says it's
+     done" that reads as a pause or a sudden late settle. */
+  transition: max-height 400ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-advanced-panel {
+    transition: none;
+  }
+}
+
+.ws-tabs {
+  display: flex;
+  align-items: stretch;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1.5rem;
+  /* ~1.5% of the search box's own width. */
+  gap: 10px;
+  /* ~2% side inset. padding-top pairs with .ws-advanced-panel's
+     negative margin-top above: panel-top sits 12px above the card's
+     own bottom edge, so 15px of padding here puts the sheet's own top
+     about 3px below the card -- measured against reference/picture 1.png
+     at equal card width (card border->shadow trough->sheet top spans
+     ~0.62% of the card's own width there, which scales to ~4px on this
+     card; 3px lands inside that, down from the previous 6px). */
+  padding: 15px 13px 1.2rem;
+  /* Establishes 3D space for each sheet's rotateX flip below --
+     without it, rotateX just looks like a vertical squash. */
+  perspective: 1000px;
+}
+
+.ws-tab-wrap {
+  position: relative;
+  /* Years : Search by : Number of papers : Reset ~= 29 : 27 : 30 : 14,
+     per reference/picture 1.png -- Reset is the clear outlier, the
+     other three are substantial and near-equal. flex-basis:0 makes
+     flex-grow alone decide the split. */
+  flex: 1 1 0;
+  min-width: 96px;
+  /* ~18% of the search box's own width -- short enough to keep the
+     label/control row near the top, not centered in a tall column. */
+  min-height: 122px;
+}
+.ws-tab-wrap--years { flex-grow: 29; }
+.ws-tab-wrap--searchby { flex-grow: 27; }
+.ws-tab-wrap--papers { flex-grow: 30; }
+.ws-tab-wrap--reset {
+  flex-grow: 14;
+  min-width: 76px;
+}
+
+/* The paper silhouette. Sibling of the rotating .ws-tab, not a parent
+   of it -- it never flips, only sits behind as backdrop + shadow. */
+.ws-tab__paper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  /* Browsers default svg elements to overflow:hidden, which clipped the
+     drop-shadow filter right at the sheet's own box edge -- the filter's
+     generous x/y/width/height region never mattered because the element
+     itself cut it off first. Without this, the shadow can only read as a
+     thin strip of whatever sliver survived the clip. */
+  overflow: visible;
+}
+.ws-tab__paper path {
+  fill: url(#wsPaperFill);
+  filter: url(#wsPaperShadow);
+}
+
+/* The search-card's own box-shadow can never visibly "land" on the paper:
+   box-shadow is a painted effect of the card element itself, and the paper
+   (a later, opaque sibling) simply paints over that same screen region on
+   top of it. Reference/picture 1.png shows the card's shadow continuing a
+   short way down across each sheet's own top -- not just visible in the
+   narrow gap above it -- so that has to be reproduced as something that
+   paints on the paper's own surface. Same z-index as .ws-tab__paper (0):
+   later in DOM, so it paints after/above the paper fill+shadow, but still
+   below .ws-tab__rings (z-index 1) and .ws-tab (z-index 2), matching "over
+   the upper paper surfaces, behind the rings and controls." Height/opacity
+   tuned to meet the card's own contact shadow with no visible seam.
+   Peak lowered (0.1 -> 0.05) after the card's own box-shadow contact layer
+   was strengthened: that shadow's blur already reaches a few px past the
+   sheet's own top, so the old peak stacked with it there and read as
+   extra-dark over sheets specifically vs. the gaps between them, where
+   only the box-shadow applies -- the opposite of the "consistent shading
+   across the seam, including gaps" this is meant to achieve. */
+.ws-tab__topshade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(18, 33, 25, 0.05),
+    rgba(18, 33, 25, 0.022) 28%,
+    rgba(18, 33, 25, 0.008) 56%,
+    rgba(18, 33, 25, 0) 100%
+  );
+}
+
+/* The whole sheet -- paper backdrop, its shadow/topshade, and the real
+   controls -- rotating together as one rigid hinged unit, so the paper
+   itself visibly folds rather than the controls animating while the
+   paper backdrop just appears via the panel's height reveal. Sibling of
+   .ws-tab__rings, which stays OUTSIDE this wrapper and never rotates --
+   it's the fixed attachment point the sheet swings from.
+   transform-origin sits at the fold's own top edge (where the rings
+   attach), so it pivots exactly where it's "attached." Closed = folded
+   back to edge-on (-90deg, effectively invisible); open = flat and
+   visible. Capped at -90deg rather than further so the browser's
+   default mirrored backface is never in view -- a plane exactly edge-on
+   to the camera has no back face to show. No stagger: all four sheets
+   share this one rule and move together. */
+.ws-tab__fold {
+  position: relative;
+  height: 100%;
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  backface-visibility: hidden;
+  transition: transform 400ms var(--ease);
+}
+.ws-panel--open .ws-tab__fold {
+  transform: rotateX(0deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-tab__fold {
+    transition: none !important;
+  }
+}
+
+/* The real controls, inside the fold. position+z-index promotes them
+   above the paper svg within the fold's own stacking context. A short
+   opacity fade is a secondary polish on top of the fold's rotation
+   (which is the primary, load-bearing motion) -- it keeps label/input
+   text looking crisp through the steepest part of the rotation rather
+   than relying on the rotation alone to hide any sub-pixel artifacts
+   near edge-on. */
+.ws-tab {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+.ws-panel--open .ws-tab {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-tab {
+    transition: none !important;
+  }
+}
+
+/* Two vertical ring attachments per sheet, siblings of the rotating
+   .ws-tab so they never move even while the paper flips. Each is an
+   inline SVG: a metal loop layered BEHIND two eyelet circles (drawn
+   after it, so their darker "opening" fill covers the loop's ends --
+   the illusion of the loop passing into a hole, not a single bordered
+   capsule floating on top of both surfaces). */
+.ws-tab__rings {
+  position: absolute;
+  /* Places the upper eyelet ~5px inside the search box above its
+     bottom edge, and the lower eyelet ~15px into the sheet, per
+     reference/picture 1.png's proportionally longer attachments.
+     -18px was too aggressive after the card-to-sheet gap was tightened
+     to 3px (padding-top:15px on .ws-tabs): the ring container's top
+     landed 3px above .ws-advanced-panel's own overflow:hidden boundary,
+     silently clipping ~0.8px off the rounded top of the upper eyelet's
+     rim -- confirmed via getBoundingClientRect comparison (circle-top
+     381.78 vs panel-top 382.56), not a mask or downsampling defect.
+     -16px clears the clip boundary by >1px while keeping both eyelets
+     well inside their respective surfaces. */
+  top: -16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  /* ~8-12% inward from the sheet's own edges. */
+  padding: 0 10%;
+  pointer-events: none;
+  z-index: 1;
+}
+.ws-tab__ring {
+  width: 16px;
+  height: 34px;
+  overflow: visible;
+}
+/* Photo-extracted preview (see ws-ring-attachment.png): object-fit
+   preserves the source asset's own aspect ratio within the same 16x34
+   box the SVG used, instead of stretching it to an exact 16:34 ratio
+   that doesn't match the cropped photo's real proportions. */
+.ws-tab__ring--photo {
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+}
+/* Traced from ring-target.png, with proportions cross-checked by pixel
+   sampling that image (connector width ~25% of the eyelet's outer
+   diameter; eyelets set closer together than the previous round).
+   Z-order fixes the "complete dark dot over the end" problem: holes
+   are drawn FIRST (so they sit fully behind), then the connector
+   (whose ends land inside each hole's footprint, so metal is visibly
+   entering the recess), then the rims LAST on top (so their band
+   crosses over the connector right at the boundary, the "appropriate
+   portion of the rim overlaps its end"). Only the rim + its concentric
+   detail line share an embossed drop-shadow, lifting the raised metal
+   off the paper; the recessed hole stays outside that group, unfiltered,
+   so it reads as sunk rather than also raised. */
+.ws-tab__ring .ring-metal-group {
+  filter: url(#wsRingEmboss);
+}
+.ws-tab__ring .ring-loop {
+  fill: none;
+  stroke: url(#wsRingMetal);
+  stroke-width: 2.7;
+  stroke-linecap: round;
+}
+.ws-tab__ring .ring-rim {
+  fill: none;
+  stroke: url(#wsRingMetal);
+  stroke-width: 2.4;
+}
+.ws-tab__ring .ring-rim-detail {
+  fill: none;
+  stroke: #6d7377;
+  stroke-width: 0.25;
+  opacity: 0.5;
+}
+.ws-tab__ring .ring-hole {
+  fill: url(#wsRingHole);
+}
+
+.ws-tab__inner,
+.reset-button {
+  position: relative;
+  background: transparent;
+  border: none;
+}
+
+.ws-tab__inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Content sits in the upper-middle of the sheet, per
+     reference/picture 1.png -- not vertically centered in the whole
+     paper. Label ~28% of the sheet's height down from its top,
+     controls ~45% down; translated here into padding-top plus the
+     label's own line-height/margin below. Trimmed from 35px so the
+     Years row (the tallest control) still clears the curved bottom
+     with comfortable paper to spare. */
+  padding: 29px 0.75rem 1rem;
+}
+
+/* Reset's own card is the button -- centered text, no visible control
+   surface of its own (the shared .ws-tab__paper behind it is the
+   sheet). */
+.ws-tab-wrap--reset .ws-tab__inner {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .filter-label {
-  font-size: 0.75rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 0.75rem;
+  color: var(--ink-meta);
+  margin-bottom: 0.4rem;
   display: block;
 }
 
-.year-range {
-  flex: 1;
-  min-width: 300px;
-}
-
-.year-sliders {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.slider-group {
-  flex: 1;
-}
-
-.slider-labels {
+.ws-year-fields {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  margin-bottom: 0.25rem;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 0.4rem;
 }
-
-.year-display {
-  font-family: ui-monospace, monospace;
-  font-weight: 500;
-}
-
-.year-slider {
-  width: 100%;
-  accent-color: white;
-}
-
-.slider-container {
-  position: relative;
-  width: 100%;
-}
-
-.dual-slider-wrapper {
-  position: relative;
-  padding-bottom: 0.5rem;
-}
-
-.dual-slider-track {
-  position: relative;
-  height: 4px;
-  margin: 1.5rem 0 0.5rem;
-}
-
-.slider-track-base {
-  position: absolute;
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-  top: 0;
-}
-
-.slider-fill {
-  position: absolute;
-  height: 4px;
-  background: white;
-  border-radius: 2px;
-  top: 0;
-}
-
-.year-slider.thumb-min,
-.year-slider.thumb-max {
-  position: absolute;
-  width: 100%;
-  top: -7px; /* vertically center thumb over the 4px track */
-  height: 4px;
-  background: transparent;
-  pointer-events: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.year-slider.thumb-min::-webkit-slider-thumb,
-.year-slider.thumb-max::-webkit-slider-thumb {
-  pointer-events: all;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  cursor: pointer;
-  border: 2px solid #6366f1;
-}
-
-.slider-display-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 0.25rem;
-}
-
-.year-sliders-container {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.single-slider-group {
+.ws-year-field {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.1rem;
+  /* Shrunk from 0.4rem/0.45rem -- the Years sheet is the tallest
+     control stack, and this row was nearly touching the paper's
+     curved bottom edge with no clearance to spare. */
+  padding: 0.28rem 0.4rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  transition: border-color 0.15s var(--ease);
 }
-
-.single-slider-track {
-  position: relative;
+.ws-year-field:focus-within {
+  border-color: var(--emerald);
+}
+.ws-year-field__hint {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+}
+.ws-year-field input[type="number"] {
   width: 100%;
-  height: 28px;
-  display: flex;
-  align-items: center;
-}
-
-.slider-range-text {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: center;
-  font-family: ui-monospace, monospace;
-  margin-bottom: 0.25rem;
-}
-
-.single-slider {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 100%;
-  margin: 0;
+  border: none;
+  outline: none;
   background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.86rem;
+  padding: 0;
+  -moz-appearance: textfield;
 }
-
-.single-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  background: transparent;
-  border-radius: 9999px;
-}
-
-.single-slider::-moz-range-track {
-  height: 4px;
-  background: transparent;
-  border-radius: 9999px;
-}
-
-.single-slider::-webkit-slider-thumb {
-  pointer-events: all;
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border-radius: 50%;
-  cursor: pointer;
-  margin-top: -6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-}
-
-.single-slider::-moz-range-thumb {
-  pointer-events: all;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-}
-
-.dual-slider-track {
-  position: relative;
-  width: 100%;
-  height: 28px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-}
-
-.dual-slider-track input[type="range"] {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 100%;
-  margin: 0;
-  pointer-events: none;
-  background: transparent;
-}
-
-.dual-slider-track input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 9999px;
-}
-
-.dual-slider-track input[type="range"]::-moz-range-track {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 9999px;
-}
-
-.dual-slider-track input[type="range"]::-webkit-slider-thumb {
-  pointer-events: all;
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border-radius: 50%;
-  cursor: pointer;
-  margin-top: -6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-}
-
-.dual-slider-track input[type="range"]::-moz-range-thumb {
-  pointer-events: all;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-}
-
-.slider-track-base {
-  position: absolute;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  border-radius: 9999px;
-  pointer-events: none;
-}
-
-.slider-fill {
-  position: absolute;
-  height: 4px;
-  background: #ffffff;
-  top: 50%;
-  transform: translateY(-50%);
-  border-radius: 9999px;
-  left: 0;
-  width: 0;
-  pointer-events: none;
-}
-
-.slider-tooltip {
-  position: absolute;
-  top: -32px;
-  left: 0;
-  background: #6366f1;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  pointer-events: none;
-  transform: translateX(-50%);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.slider-tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-top-color: #6366f1;
-}
-
-.slider-tooltip.show {
+.ws-year-field input[type="number"]::-webkit-inner-spin-button,
+.ws-year-field input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
 }
-
-.filter-dropdown {
-  min-width: 150px;
+.ws-year-sep {
+  color: var(--ink-meta);
+  flex: none;
+}
+.ws-year-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.74rem;
+  color: var(--gold);
 }
 
 .filter-select {
   width: 100%;
-  background-color: #18181b;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  border-radius: 1.5rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.55rem 0.4rem;
   outline: none;
-  font-size: 1rem;
+  font: inherit;
+  font-size: 0.84rem;
+  transition: border-color 0.15s var(--ease);
+}
+.filter-select:focus-visible {
+  border-color: var(--emerald);
 }
 
 .reset-button {
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 1.5rem;
-  font-size: 0.875rem;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-  background-color: transparent;
-  color: #ffffff;
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  /* Simple deep-green text -- the shared .ws-tab__paper behind it is
+     the only visible surface; no separate button rectangle. */
+  color: #104d43;
   cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
 }
 
 .reset-button:hover {
-  border-color: rgba(255, 255, 255, 0.6);
+  background-color: var(--panel);
+  color: #0b352e;
+}
+
+/* "Remove the current sheet, reveal a fresh one" — brief, decorative,
+   values are already reset synchronously by the time this plays. */
+@keyframes ws-sheet-swap {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  38% { opacity: 0; transform: translateY(-5px) rotate(-0.5deg); }
+  56% { opacity: 0; transform: translateY(4px) rotate(0.4deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+.ws-filters--resetting {
+  animation: ws-sheet-swap 0.42s var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-filters--resetting {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Undoes .ws-advanced-panel's desktop horizontal bleed (added so wide
+     paper shadows have room to fade without the panel's own
+     overflow:hidden clipping them). On narrow viewports the 24px bleed
+     can push the panel's box past x=0, which would introduce a
+     horizontal scrollbar -- not worth it here anyway, since sheets
+     stack full-width and no longer need side room for a shadow beside
+     an adjacent sheet. Resetting width/margin/padding together keeps
+     the stacked sheets at the same position/width as before the bleed
+     was introduced. */
+  .ws-advanced-panel {
+    width: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  /* Stacked, full-width sheets, each still flipping down in place.
+     Rings are dropped here: once the sheets wrap into a column, only
+     the first is actually adjacent to the search box, so rings on
+     every one would misleadingly suggest each is independently
+     attached to it. */
+  .ws-tabs {
+    flex-direction: column;
+    padding-top: 1.35rem;
+  }
+  .ws-tab-wrap,
+  .ws-tab-wrap--years,
+  .ws-tab-wrap--searchby,
+  .ws-tab-wrap--papers,
+  .ws-tab-wrap--reset {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+  }
+  .ws-tab__rings {
+    display: none;
+  }
+  .ws-tab__inner {
+    padding-top: 1.1rem;
+  }
+  .reset-button {
+    min-height: 2.75rem;
+  }
 }
 
 /* ===== BINDERS SECTION ===== */
 .binders-section {
-  margin-bottom: 2rem;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding-left: 2rem;
-  padding-right: 2rem;
-  background-color: #000000;
+  max-width: 80rem;
+  /* Generous, viewport-relative breathing room below the hero -- not a
+     fixed pixel offset, so it scales down naturally on shorter/narrower
+     screens instead of ever overlapping the search card above it.
+     Raised by the same 4rem the hero section's padding-top was lowered
+     by, so pulling the search box up doesn't drag this section's
+     position up with it -- it stays where it was. The + 6.33px nudges
+     this section's approved closed-state position back after the
+     search card's own height shrank (to match reference/picture 1.png's
+     proportions) by that same amount. */
+  margin: calc(clamp(7rem, calc(10vh + 4rem), 10rem) + 6.33px) auto 3rem;
+  padding: 0 1rem;
+}
+
+@media (max-width: 720px) {
+  .binders-section {
+    margin-top: clamp(2.5rem, 8vh, 4rem);
+  }
 }
 
 .binders-header {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .binders-title {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  align-items: baseline;
+  gap: 0.85rem;
 }
 
 .binders-title h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  font-family: "Inter", system_ui, sans-serif;
-  letter-spacing: -0.05em;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--ink);
   margin: 0;
 }
 
 .binder-count {
-  padding-left: 1rem;
-  padding-right: 1rem;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
-  background-color: rgba(255, 255, 255, 0.1);
-  font-size: 0.75rem;
-  border-radius: 1.5rem;
-  font-family: ui-monospace, monospace;
+  padding: 0.2rem 0.7rem;
+  background-color: var(--panel);
+  color: var(--forest);
+  font-size: 0.72rem;
+  border-radius: 999px;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .new-binder-button {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  background-color: #ffffff;
-  color: #000000;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-radius: 1.5rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
+  gap: 0.6rem;
+  background-color: var(--forest);
+  color: #f6f7f0;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
   border: none;
   cursor: pointer;
 }
 
 .new-binder-button:hover {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--forest-deep);
 }
 
 .new-binder-button:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
+/* A loose board of sticky notes, not a horizontal-scroll strip -- wraps
+   responsively at every width instead of hiding cards off-screen. */
 .binders-container {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  padding-bottom: 2.5rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
-  scroll-snap-type: x mandatory;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.4rem 1.6rem;
+  padding-bottom: 0.5rem;
 }
 
-.binders-container::-webkit-scrollbar {
-  display: none;
-}
-
-.binders-container {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.binders-empty {
+  grid-column: 1 / -1;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--ink-meta);
+  border: 1px dashed var(--rule);
+  border-radius: 12px;
+  background: var(--panel);
 }
 
 /* ===== MODAL ===== */
@@ -1180,23 +1491,6 @@ body {
   margin-top: 0.5rem;
 }
 
-/* ===== BINDER CARDS ===== */
-.binder-card {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
-  width: 20rem;
-  min-width: 18rem;
-  max-width: 22rem;
-  border-radius: 1.5rem;
-  flex-shrink: 0;
-  scroll-snap-align: center;
-}
-
-.binder-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4);
-}
-
 /* ===== UTILITY CLASSES ===== */
 .space-y-4 > * + * {
   margin-top: 1rem;
@@ -1485,53 +1779,71 @@ body {
   font-size: 0.75rem;
 }
 
-/* ===== BINDER CARDS ===== */
+/* ===== BINDER CARDS =====
+   Organized sticky notes: warm paper cards with a slight, alternating
+   tilt (scattered-on-a-board feel), straightening on hover/focus. The
+   binder's chosen color becomes a small pin, not a loud full-width bar. */
 .binder-card {
-  background-color: #18181b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
-  overflow: hidden;
-  flex-shrink: 0;
-  scroll-snap-align: center;
+  position: relative;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: visible;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
-  width: 20rem;
-  min-width: 18rem;
-  max-width: 22rem;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.05), 0 6px 16px rgba(18, 33, 25, 0.08);
+}
+.binder-card:nth-child(odd) {
+  transform: rotate(-0.6deg);
+}
+.binder-card:nth-child(even) {
+  transform: rotate(0.5deg);
 }
 
-.binder-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4);
-  border-color: rgba(255, 255, 255, 0.2);
+.binder-card:hover,
+.binder-card:focus-within {
+  transform: rotate(0deg) translateY(-3px);
+  box-shadow: 0 10px 24px rgba(18, 33, 25, 0.14);
+  border-color: var(--rule);
+}
+@media (prefers-reduced-motion: reduce) {
+  .binder-card {
+    transition: box-shadow 0.2s var(--ease);
+  }
 }
 
+/* Pin: the binder's own color, as a small round marker instead of a bar. */
 .binder-color-bar {
-  height: 0.5rem;
-  width: 100%;
+  position: absolute;
+  top: -7px;
+  left: 20px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid var(--paper-raised);
+  box-shadow: 0 1px 3px rgba(18, 33, 25, 0.25);
 }
 
 .binder-content {
-  padding: 1.5rem;
+  padding: 1.35rem 1.35rem 1.15rem;
 }
 
 .binder-delete-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--ink-meta);
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
+  padding: 0.4rem;
+  border-radius: 6px;
+  transition: color 0.15s var(--ease), background-color 0.15s var(--ease);
   margin-left: auto;
   flex-shrink: 0;
 }
 
-.binder-delete-btn:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-  transform: scale(1.05);
+.binder-delete-btn:hover,
+.binder-delete-btn:focus-visible {
+  color: #7a2e1f;
+  background: rgba(178, 68, 40, 0.08);
 }
 
 .binder-delete-btn:active {
@@ -1541,12 +1853,12 @@ body {
 .binder-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
 }
 
 .binder-delete-btn i {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
 }
 
 /* ===== PAPER SORT BAR ===== */
@@ -1584,46 +1896,51 @@ body {
 }
 
 .binder-color-dot {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  border: 2px solid var(--paper-raised);
+  box-shadow: 0 0 0 1px var(--rule);
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s var(--ease);
 }
 
 .binder-color-dot:hover {
-  transform: scale(1.1);
+  transform: scale(1.12);
 }
 
 .binder-title {
   flex: 1;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #ffffff;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--ink);
   outline: none;
   border-bottom: 1px solid transparent;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s var(--ease);
 }
 
 .binder-title:focus {
-  border-bottom-color: rgba(255, 255, 255, 0.3);
+  border-bottom-color: var(--emerald);
 }
 
 .binder-paper-preview {
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .binder-paper-label {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 0.25rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+  margin-bottom: 0.3rem;
 }
 
 .binder-paper-title {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.25;
+  font-size: 0.86rem;
+  color: var(--ink-body);
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -1635,8 +1952,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.74rem;
+  color: var(--ink-meta);
 }
 
 .binder-stats-left {
@@ -1648,23 +1965,25 @@ body {
 .binder-stat {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .binder-status {
-  font-family: ui-monospace, monospace;
-  color: #22c55e;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--emerald);
 }
 
 .binder-last-message {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule-soft);
 }
 
 .binder-last-message-text {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-meta);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -2027,3 +2346,181 @@ body {
 .load-more-container { border-top: 1px solid rgba(255,255,255,0.08); }
 .load-more-btn { background: transparent; color: #3f9b73; border: 1px solid rgba(96,165,250,0.4); }
 .load-more-btn:hover:not(:disabled) { background: rgba(37,99,235,0.15); color: #93c5fd; }
+
+/* =====================================================================
+   TEMPORARY DIAGNOSTIC -- Advanced-options open/close animation reported
+   as snapping instantly instead of visibly animating. Slows the paper
+   rotation and panel-height transitions to 2000ms (from the approved
+   400ms) so the motion can be inspected/recorded frame by frame in a
+   real browser. Does not change any approved artwork, color, spacing,
+   or settled layout -- only transition-duration. DELETE THIS BLOCK to
+   restore the approved 400ms timing once the recording has been
+   reviewed. */
+.ws-tab__fold,
+.ws-advanced-panel,
+.ws-tab {
+  transition-duration: 2000ms !important;
+}
+/* ===================================================================== */
+
+/* ===== THEME TOGGLE BUTTON =====
+   Compact moon/sun icon button placed immediately before the profile control
+   in the navbar. .profile-section is now a flex row (display:flex added
+   above) so the two buttons sit side-by-side without touching
+   .profile-button or .profile-dropdown measurements.
+   Moon = visible in light mode; Sun = visible in dark mode. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--ink-meta);
+  flex-shrink: 0;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.theme-toggle:hover {
+  background-color: var(--panel);
+  border-color: var(--rule);
+  color: var(--ink);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
+
+/* Light mode: show moon, hide sun */
+.theme-toggle__sun { display: none; }
+
+/* Dark mode: hide moon, show sun */
+[data-theme="dark"] .theme-toggle__moon { display: none; }
+[data-theme="dark"] .theme-toggle__sun  { display: block; }
+
+
+/* ===== DARK MODE =====
+   Activated by data-theme="dark" on <body class="app-body">, set by the
+   inline flash-prevention script at body-open and managed by theme.js.
+   The canvas ws-bg is repainted by workspace-bg.js on "scholara-theme-change";
+   CSS handles all interface surfaces, text, and borders.
+
+   Landing palette reused exactly:
+     background canvas: linear-gradient(180deg, #0f2a1e 0%, #071009 70%, #05100a 100%)
+     node/line mint: rgba(169,212,190,...)
+     glow: rgba(63,155,115,0.20) centre — original values, NOT boosted cream alphas.
+
+   Light mode is fully preserved; only [data-theme="dark"] selectors are new.
+   The DIAGNOSTIC transition block above is untouched.
+   ===================================================================== */
+
+/* Re-resolve semantic design tokens for dark mode */
+.app-body[data-theme="dark"] {
+  --paper:           #1a3326;
+  --paper-raised:    #1e3a2c;
+  --paper-sunk:      #071009;
+  --ink:             #f1f5ee;
+  --ink-body:        rgba(238, 243, 236, 0.78);
+  --ink-meta:        rgba(238, 243, 236, 0.50);
+  --forest:          #3f9b73;
+  --forest-deep:     #2f7d5d;
+  --emerald:         #5cb891;
+  --emerald-bright:  #6fd4a0;
+  --mint:            #a9d4be;
+  --mint-wash:       rgba(169, 212, 190, 0.12);
+  --gold:            #c9a86f;
+  --gold-soft:       #d4b882;
+  --rule:            rgba(169, 212, 190, 0.15);
+  --rule-soft:       rgba(169, 212, 190, 0.08);
+  --panel:           rgba(63, 155, 115, 0.08);
+  background-color: #071009;
+  color: rgba(238, 243, 236, 0.78);
+}
+
+/* Navbar — muted forest green, drawn from the canvas top (#0f2a1e). A soft
+   tonal gradient helps it merge into the page without a hard edge. The
+   backdrop-filter blur (from the base .navbar rule) is still active, so a
+   small amount of the canvas glow bleeds through when the pointer is near. */
+.app-body[data-theme="dark"] .navbar {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 50, 35, 0.86) 0%,
+    rgba(13, 34, 23, 0.82) 100%
+  );
+  border-bottom-color: rgba(169, 212, 190, 0.06);
+}
+
+/* Search card */
+.app-body[data-theme="dark"] .search-card {
+  background-color: rgba(26, 51, 38, 0.96);
+  border-color: rgba(63, 155, 115, 0.22);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.25),
+    0 5px 10px rgba(0, 0, 0, 0.35),
+    0 2px 3.5px rgba(0, 0, 0, 0.55);
+}
+
+/* Search button */
+.app-body[data-theme="dark"] .search-button {
+  background-color: #2f7d5d;
+}
+.app-body[data-theme="dark"] .search-button:hover {
+  background-color: #3f9b73;
+}
+
+/* Advanced options toggle */
+.app-body[data-theme="dark"] .ws-advanced-toggle:hover,
+.app-body[data-theme="dark"] .ws-advanced-toggle:focus-visible {
+  color: #a9d4be;
+}
+
+/* Label above the search card */
+.app-body[data-theme="dark"] .hero-label {
+  color: #a9d4be;
+}
+
+/* Paper sheet fill and shadow.
+   CSS fill overrides the SVG paint-server reference (fill:url(#wsPaperFill)).
+   CSS drop-shadow replaces the warm feColorMatrix filter — the warm-paper
+   shadow would read as the wrong hue on a dark-green surface. */
+.app-body[data-theme="dark"] .ws-tab__paper path {
+  fill: #162c20;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.60));
+}
+
+/* Top-edge shading (simulates card shadow falling on paper surface) */
+.app-body[data-theme="dark"] .ws-tab__topshade {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.22),
+    rgba(0, 0, 0, 0.055) 28%,
+    rgba(0, 0, 0, 0.018) 56%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Reset button */
+.app-body[data-theme="dark"] .reset-button {
+  color: #a9d4be;
+}
+.app-body[data-theme="dark"] .reset-button:hover {
+  color: #c4e4d1;
+  background-color: rgba(63, 155, 115, 0.10);
+}
+
+/* Binder delete button danger state */
+.app-body[data-theme="dark"] .binder-delete-btn:hover,
+.app-body[data-theme="dark"] .binder-delete-btn:focus-visible {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.10);
+}
+
+/* Override default emerald focus-ring colour for dark surfaces */
+.app-body[data-theme="dark"] :focus-visible {
+  outline-color: #5cb891;
+}
