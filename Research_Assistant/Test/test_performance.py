@@ -249,7 +249,7 @@ def main():
     print("\nTo view detailed performance data:")
     print("1. Visit Django admin: http://127.0.0.1:8080/admin/")
     print("2. Check Model Performance and Response Log sections")
-    print("3. Use the performance dashboard: http://127.0.0.1:8080/admin/performance/")
+    print("3. Use the performance dashboard (admin login required): http://127.0.0.1:8080/performance/")
 
 if __name__ == "__main__":
     main()

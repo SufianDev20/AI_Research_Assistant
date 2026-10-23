@@ -18,7 +18,7 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
 - **PDF-to-Markdown Extraction**: Converts open-access PDFs to page-tagged Markdown (PyMuPDF4LLM), cached per paper so repeat questions skip re-downloading and re-OCRing
 - **Multi-Paper Q&A with Verified Citations**: Ask questions across up to 10 selected papers at once; every citation is checked deterministically against the source page text (page existence + fuzzy snippet match) before being shown as verified
-- **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side. Every endpoint except `/api/`, `/api/search/` and `/api/multi-paper-qa/` requires a valid token (`/api/summarise/`, `/api/generate_title/`, `/api/openalex/authors/` and `/api/performance/*`)
+- **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side. Only `/api/` and `/api/search/` are open to signed-out visitors; the LLM and PDF endpoints require a valid token (`/api/summarise/`, `/api/generate_title/`, `/api/multi-paper-qa/`, `/api/openalex/authors/` and `/api/performance/*`)
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
 - **Circuit Breaker Pattern**: Models are automatically disabled after consecutive failures, tried last while disabled, and re-enabled 30 minutes after their last failure (or on their next success)
 - **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
@@ -350,7 +350,7 @@ python Test/test_performance.py
 - **Environment Variables**: All API keys stored in `.env` file
 - **No Hardcoded Secrets**: Zero hardcoded API keys in codebase
 - **Rate Limiting**: Proper rate limiting for OpenAlex (100 req/s) and OpenRouter (20 req/min), plus per-endpoint throttles on the API
-- **Authenticated API**: Endpoints that spend LLM credit or expose internals (`/api/summarise/`, `/api/generate_title/`, `/api/openalex/authors/`, `/api/performance/*`) require a valid Clerk token; only search, the API root and multi-paper Q&A are open
+- **Authenticated API**: Endpoints that spend LLM credit, fetch PDFs or expose internals (`/api/summarise/`, `/api/generate_title/`, `/api/multi-paper-qa/`, `/api/openalex/authors/`, `/api/performance/*`) require a valid Clerk token; only search and the API root are open
 - **SSRF Guard**: Server-side PDF fetches reject non-http(s) URLs and hosts that resolve to private, loopback or link-local addresses
 - **Bounded PDF Downloads**: PDFs are streamed and abandoned as soon as they pass 50 MB, even if the server omits or misreports `Content-Length`
 - **Cache Integrity**: Cached Q&A chunks are only reused when they were built from one of the PDF URLs in the current request

@@ -4,6 +4,7 @@ Provides API endpoints for model performance data and insights.
 """
 
 import logging
+from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, throttle_classes
@@ -286,13 +287,14 @@ def model_comparison(request):
         )
 
 
-@api_view(["GET"])
-@throttle_classes([modelPerformanceRateThrottle])
+@staff_member_required
 def performance_dashboard(request):
     """
-    Render performance monitoring dashboard.
+    Render performance monitoring dashboard. Restricted to Django staff
+    users (logged in via /admin/login/); unauthenticated or non-staff
+    visitors are redirected to the admin login page.
 
-    GET /admin/performance/
+    GET /performance/
     """
     try:
         # Get top performers

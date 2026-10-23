@@ -1343,3 +1343,42 @@ class TestQAChunkCache(TestCase):
 
         mock_fetch.assert_called_once()
         self.assertEqual(result["chunks"], [{"paper_id": "W1", "page": 1, "text": "real"}])
+
+
+# ---------------------------------------------------------------------------
+# Multi-paper Q&A auth tests
+# ---------------------------------------------------------------------------
+
+
+class TestMultiPaperQAAuth(TestCase):
+    """multi_paper_qa must require a Clerk token (it spends LLM credit and
+    fetches client-supplied URLs). Real ClerkAuthentication runs here; only
+    the token check is replaced, so these tests exercise the auth layer."""
+
+    def _post(self):
+        return self.client.post(
+            reverse("research_ai_assistant:multi_paper_qa"),
+            data=json.dumps({"paper_ids": ["W1"], "question": "q", "pdf_urls": {"W1": "https://example.test/a.pdf"}}),
+            content_type="application/json",
+        )
+
+    def test_unauthenticated_request_is_rejected(self):
+        """No Authorization header: 401, before any PDF fetch or LLM call."""
+        with patch(
+            "Research_AI_Assistant.services.qa_chunk_cache.QAChunkCache.get_or_chunk"
+        ) as mock_chunk:
+            resp = self._post()
+        self.assertEqual(resp.status_code, 401)
+        mock_chunk.assert_not_called()
+
+    @patch("Research_AI_Assistant.authentication.ClerkAuthentication.authenticate")
+    def test_authenticated_request_reaches_view(self, mock_auth):
+        """A verified token gets past auth; the view then runs (here it fails
+        on the chunk step, which is what we want to show was reached)."""
+        mock_auth.return_value = (User.objects.create(clerk_id="qa-user"), None)
+        with patch(
+            "Research_AI_Assistant.views.QAChunkCache.get_or_chunk",
+            side_effect=Exception("reached view"),
+        ) as mock_chunk:
+            self._post()
+        mock_chunk.assert_called_once()

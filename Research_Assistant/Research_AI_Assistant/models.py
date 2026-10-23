@@ -5,6 +5,7 @@ Django models reference: https://docs.djangoproject.com/en/6.0/topics/db/models/
 
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 
 
@@ -260,11 +261,43 @@ class PaperPDF(models.Model):
         self.extraction_success = value
 
 
+class UserManager(BaseUserManager):
+    """
+    Manager for the custom User model, keyed by clerk_id instead of
+    username. Regular app users are created via ClerkAuthentication's
+    get_or_create (services/authentication.py); this manager mainly
+    exists so `createsuperuser` and Django admin login work for
+    locally-created staff accounts.
+    """
+
+    def create_user(self, clerk_id, email=None, password=None, **extra_fields):
+        if not clerk_id:
+            raise ValueError("Users must have a clerk_id")
+        user = self.model(clerk_id=clerk_id, email=email or "", **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, clerk_id, email=None, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        if not extra_fields.get("is_staff"):
+            raise ValueError("Superuser must have is_staff=True")
+        if not extra_fields.get("is_superuser"):
+            raise ValueError("Superuser must have is_superuser=True")
+        return self.create_user(clerk_id, email=email, password=password, **extra_fields)
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     clerk_id = models.CharField(max_length=255, unique=True, db_index=True)
     email = models.EmailField(blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
+    objects = UserManager()
+
     USERNAME_FIELD = "clerk_id"
     REQUIRED_FIELDS = []
+
+    def __str__(self):
+        return self.clerk_id

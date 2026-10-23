@@ -584,8 +584,6 @@ class MultiPaperQAThrottle(AnonRateThrottle):
 
 
 @api_view(["POST"])
-@authentication_classes([])
-@permission_classes([AllowAny])
 @throttle_classes([MultiPaperQAThrottle])
 def multi_paper_qa(request):
     """
