@@ -144,7 +144,7 @@ class ResponseLog(models.Model):
         choices=[
             ("summary", "Paper Summary"),
             ("title", "Title Generation"),
-            ("paper qa", "Paper Q&A"),
+            ("qa", "Multi-Paper Q&A"),
             ("other", "Other"),
         ],
     )

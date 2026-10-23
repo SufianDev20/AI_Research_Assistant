@@ -43,9 +43,13 @@ class QAChunkCache:
         Args:
             pdf_url: A direct PDF URL or an ordered list of candidates, as
                 accepted by QAChunkService.fetch_and_chunk.
-            openalex_id: OpenAlex work ID; the sole cache key. Not keyed on
-                the URL, because the caller sends a candidate list and which
-                candidate succeeds varies between requests.
+            openalex_id: OpenAlex work ID; the cache key. Not keyed on the
+                URL alone, because the caller sends a candidate list and
+                which candidate succeeds varies between requests — but a
+                cache hit is still required to have been built from one of
+                *this* request's candidates (see below), since paper_id is
+                client-supplied and otherwise nothing stops one request's
+                PDF from being served back as another paper's content.
 
         Returns:
             The same dict shape as QAChunkService.fetch_and_chunk:
@@ -58,6 +62,19 @@ class QAChunkCache:
                 stop Q&A for the rest of the selected set.
         """
         record = PaperPDF.objects.filter(openalex_id=openalex_id).first()
+
+        candidates = [pdf_url] if isinstance(pdf_url, str) else list(pdf_url or [])
+        if record and record.qa_source_pdf_url and record.qa_source_pdf_url not in candidates:
+            # Cached content was fetched from a URL this request didn't send
+            # for this paper_id — e.g. an earlier caller associated a
+            # different PDF with this id. Treat as a miss rather than
+            # serving content this request never vouched for.
+            logger.warning(
+                "Q&A chunk cache: cached source for %s does not match this "
+                "request's candidates; re-fetching instead of trusting it.",
+                openalex_id,
+            )
+            record = None
 
         if record:
             if record.qa_chunk_version == CHUNK_SCHEMA_VERSION and record.qa_chunks:

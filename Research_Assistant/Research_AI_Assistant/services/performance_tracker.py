@@ -230,8 +230,14 @@ class PerformanceTracker:
         A model that recovers from a transient outage should not stay permanently disabled if never called again.
         """
         cutoff = timezone.now() - timedelta(minutes=CIRCUIT_BREAKER_RESET_MIN)
+        # consecutive_failures__gt=0 tells a real trip apart from a model an
+        # admin switched off by hand (admin.py's "Deactivate selected
+        # models" action, which leaves consecutive_failures at 0). Without
+        # it, a manual deactivation gets silently undone by the next
+        # request that happens to land more than 30 minutes later.
         recovered = ModelPerformance.objects.filter(
             is_active=False,
+            consecutive_failures__gt=0,
             last_failure__lte=cutoff,
         ).update(is_active=True, consecutive_failures=0)
 
@@ -312,6 +318,21 @@ class PerformanceTracker:
 
             # Return just the model names
             ordered_models = [model for model, score in sorted_models]
+
+            # A model the circuit breaker disabled keeps its tier score (tiers
+            # live on ModelReliability, which has no is_active), so without
+            # this partition a tripped model is still tried first. Inactive
+            # models stay in the list as a last-resort fallback rather than
+            # being dropped.
+            inactive = set(
+                ModelPerformance.objects.filter(
+                    model_name__in=free_models, is_active=False
+                ).values_list("model_name", flat=True)
+            )
+            if inactive:
+                ordered_models = [
+                    model for model in ordered_models if model not in inactive
+                ] + [model for model in ordered_models if model in inactive]
 
             # Add any remaining models that weren't scored
             for model in free_models:

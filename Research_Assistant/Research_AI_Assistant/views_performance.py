@@ -6,7 +6,6 @@ Provides API endpoints for model performance data and insights.
 import logging
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
@@ -22,7 +21,7 @@ class modelPerformanceRateThrottle(AnonRateThrottle):
     rate = "60/m"
 
 
-@require_GET
+@api_view(["GET"])
 @throttle_classes([modelPerformanceRateThrottle])
 def model_performance_stats(request):
     """

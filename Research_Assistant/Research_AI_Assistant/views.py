@@ -10,7 +10,6 @@ import re
 from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET, require_POST
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -22,7 +21,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import QueryLog, PaperPDF
+from .models import QueryLog
 from .services.openalex_service import OpenAlexAPIError, OpenAlexService
 from .services.extract_service import ExtractionService
 from .services.openrouter_service import OpenRouterAPIError, OpenRouterService
@@ -32,10 +31,8 @@ from .services.prompt_builder import (
     extract_final_summary,
     InvalidSummaryFormat,
 )
-from .services.pdf_service import PDFService, PDFExtractionError
-
-# Multi-Paper Q&A backend (separate feature from ask_paper above:
-# multi-paper, page-level citations, deterministic citation validation).
+# Multi-Paper Q&A backend: multi-paper, page-level citations, deterministic
+# citation validation.
 from .services.qa_pipeline import (
     QAChunkError,
     QAContextError,
@@ -283,7 +280,7 @@ def search(request):
     )
 
 
-@require_POST
+@api_view(["POST"])
 @throttle_classes([GenerateTitle])
 def generate_title(request):
     """
@@ -403,7 +400,7 @@ def analysis(request):
     )
 
 
-@require_POST
+@api_view(["POST"])
 @throttle_classes([GenerateTitle])
 def summarise(request):
     """
@@ -505,7 +502,7 @@ def summarise(request):
         )
 
 
-@require_GET
+@api_view(["GET"])
 @throttle_classes([SearchRateThrottle])
 def search_authors(request):
     """
@@ -582,217 +579,8 @@ def search_authors(request):
         return JsonResponse({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
-class PDFThrottle(AnonRateThrottle):
-    rate = "10/m"  # PDF fetches are expensive
-
-
-class SummariseThrottle(AnonRateThrottle):
-    rate = "10/m"  # Summarisation is expensive
-
-
-@api_view(["POST"])
-@authentication_classes([])
-@permission_classes([AllowAny])
-@throttle_classes([PDFThrottle])
-def extract_pdf(request):
-    """
-    POST /api/extract-pdf/
-    Body: { "openalex_id": "https://openalex.org/W123", "pdf_url": "https://..." }
-    """
-    openalex_id = request.data.get("openalex_id", "").strip()
-    pdf_url = request.data.get("pdf_url", "").strip()
-    open_access = request.data.get("is_open_access", False)
-
-    if not openalex_id:
-        return Response(
-            {"error": "openalex_id is required."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Match the PaperPDF model's field limits so bad input fails as a
-    # clean 400 here instead of a DB error inside get_or_create() below.
-    if len(openalex_id) > 100:
-        return Response(
-            {"error": "openalex_id must be 100 characters or fewer."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if pdf_url and len(pdf_url) > 500:
-        return Response(
-            {"error": "pdf_url must be 500 characters or fewer."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not pdf_url or not open_access:
-        return Response(
-            {
-                "success": False,
-                "error": "Full text PDF unavailable for extraction.",
-                "fallback_to_abstract": True,
-                "markdown": "",
-                "page_count": 0,
-                "image_paths": [],
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    # Return cached result
-    cached = PaperPDF.objects.filter(
-        openalex_id=openalex_id, extraction_success="success"
-    ).first()
-    if cached:
-        return Response(
-            {
-                "success": True,
-                "openalex_id": openalex_id,
-                "markdown": cached.markdown_content,
-                "page_count": cached.page_count,
-                "image_paths": cached.image_paths,
-                "cached": True,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    # Prevent duplicate concurrent fetches
-    record, created = PaperPDF.objects.get_or_create(
-        openalex_id=openalex_id,
-        defaults={"pdf_url": pdf_url, "extraction_success": "pending"},
-    )
-
-    if not created and record.extraction_success == "pending":
-        from django.utils import timezone
-        from datetime import timedelta
-
-        if timezone.now() - record.created_at > timedelta(minutes=2):
-            record.extraction_success = "pending"
-            record.save(update_fields=["extraction_success"])
-        else:
-            return Response(
-                {"error": "Extraction already in progress."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-    if not created and record.extraction_success == "failed":
-        record.extraction_success = "pending"
-        record.pdf_url = pdf_url
-        record.save(update_fields=["extraction_success", "pdf_url"])
-
-    try:
-        result = PDFService.fetch_and_extract(pdf_url, openalex_id)
-
-        record.markdown_content = result["markdown"]
-        record.page_count = result["page_count"]
-        record.image_paths = result["image_paths"]
-        record.extraction_success = "success"
-        record.pdf_url = pdf_url
-        record.error_message = None
-        record.save()
-
-        return Response(
-            {
-                "success": True,
-                "openalex_id": openalex_id,
-                "markdown": result["markdown"],
-                "page_count": result["page_count"],
-                "image_paths": result["image_paths"],
-                "cached": False,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    except PDFExtractionError as exc:
-        record.extraction_success = "failed"
-        record.error_message = str(exc)
-        record.save(update_fields=["extraction_success", "error_message"])
-        logger.warning("PDF extraction failed for %s: %s", openalex_id, exc)
-
-        # Graceful response so frontend falls back to abstract instead of 502ing
-        return Response(
-            {
-                "success": False,
-                "error": f"Publisher blocked automated PDF access ({str(exc)})",
-                "fallback_to_abstract": True,
-                "markdown": "",
-                "page_count": 0,
-                "image_paths": [],
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-@api_view(["POST"])
-@authentication_classes([])
-@permission_classes([AllowAny])
-@throttle_classes([SummariseThrottle])
-def ask_paper(request):
-    """
-    POST /api/ask-paper/
-    Body: { "openalex_id": "https://openalex.org/W123", "question": "What method did they use?" }
-    """
-    openalex_id = request.data.get("openalex_id", "").strip()
-    question = request.data.get("question", "").strip()
-
-    if not openalex_id or not question:
-        return Response(
-            {"error": "Both 'openalex_id' and 'question' are required."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # question was previously unbounded, i.e. any length was forwarded
-    # straight into a paid OpenRouter call. Cap it to the same limit
-    # multi_paper_qa already enforces via QARequestSerializer.
-    if len(question) > 2000:
-        return Response(
-            {"error": "question must be 2000 characters or fewer."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if len(openalex_id) > 100:
-        return Response(
-            {"error": "openalex_id must be 100 characters or fewer."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    record = PaperPDF.objects.filter(
-        openalex_id=openalex_id, extraction_success="success"
-    ).first()
-    if not record:
-        return Response(
-            {"error": "Paper not extracted yet. Call /api/extract-pdf/ first."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    # 6000 chars covers roughly 3-4 pages within free model token limits
-    context = record.markdown_content[:6000]
-
-    try:
-        openrouter_service = OpenRouterService()
-        answer = openrouter_service.complete(
-            system_prompt=(
-                "You are a research assistant. Answer questions about the provided "
-                "academic paper content accurately and concisely. "
-                "Cite specific sections when relevant. "
-                "If the answer is not in the paper, say so explicitly."
-            ),
-            user_message=f"Paper content:\n\n{context}\n\n---\n\nQuestion: {question}",
-            request_type="paper_qa",
-        )
-        return Response({"answer": answer, "openalex_id": openalex_id})
-
-    except OpenRouterAPIError as exc:
-        logger.error("OpenRouter ask_paper error: %s", exc)
-        return Response(
-            {"error": "LLM service temporarily unavailable."},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-    except Exception as exc:
-        logger.error("Unexpected error in ask_paper: %s", exc, exc_info=True)
-        return Response(
-            {"error": "Internal server error."},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-
 class MultiPaperQAThrottle(AnonRateThrottle):
-    rate = "10/m"  # Same cost profile as SummariseThrottle: PDF fetch + LLM call
+    rate = "10/m"  # PDF fetch + LLM call makes this an expensive endpoint
 
 
 @api_view(["POST"])
@@ -816,9 +604,7 @@ def multi_paper_qa(request):
 
     Multi-paper Q&A scoped to user-selected papers, with page-level
     citations validated deterministically (page-exists + text-overlap
-    check) before being returned. Distinct from ask_paper() above, which
-    answers against a single already-extracted paper with no citation
-    validation.
+    check) before being returned.
 
     Failure isolation: each paper is chunked independently. One paper's
     PDF failing to fetch does not block the others; failures are reported

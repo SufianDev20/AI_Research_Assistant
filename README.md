@@ -9,6 +9,7 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 
 - **OpenAlex API Integration**: Full integration with OpenAlex API using pyalex library
 - **OpenRouter LLM Integration**: Uses free models from OpenRouter to generate individual paper summaries with intelligent fallback
+- **Live Free-Model Discovery**: The free-model list is fetched from OpenRouter's `/models` API and cached (6 hours by default), so there is no hardcoded model list to keep up to date. Non-chat models (classifiers, embedders, guardrails) are excluded using OpenRouter's own `supported_parameters` / `output_modalities` fields
 - **Performance Tracking System**: Comprehensive monitoring of model performance with reliability scoring
 - **Intelligent Model Selection**: Automatic fallback to best-performing models based on success rates and response times
 - **Paper Search Service**: Search academic papers with advanced filtering options (year range, open access status, random sampling)
@@ -17,9 +18,9 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
 - **PDF-to-Markdown Extraction**: Converts open-access PDFs to page-tagged Markdown (PyMuPDF4LLM), cached per paper so repeat questions skip re-downloading and re-OCRing
 - **Multi-Paper Q&A with Verified Citations**: Ask questions across up to 10 selected papers at once; every citation is checked deterministically against the source page text (page existence + fuzzy snippet match) before being shown as verified
-- **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side on protected endpoints
+- **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side. Every endpoint except `/api/`, `/api/search/` and `/api/multi-paper-qa/` requires a valid token (`/api/summarise/`, `/api/generate_title/`, `/api/openalex/authors/` and `/api/performance/*`)
 - **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
-- **Circuit Breaker Pattern**: Automatic disabling of consistently failing models
+- **Circuit Breaker Pattern**: Models are automatically disabled after consecutive failures, tried last while disabled, and re-enabled 30 minutes after their last failure (or on their next success)
 - **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
 
 ## Performance Tracking System
@@ -30,7 +31,7 @@ The application includes a comprehensive performance tracking system for OpenRou
 
 - **Reliability Scoring**: Dynamic scoring (0.0-1.0) based on success rate, response time, recent activity, consecutive failures, and **format compliance (30% weight)**
 - **Intelligent Fallback**: Models automatically tried in performance order, not randomly
-- **Circuit Breaker Pattern**: Failing models automatically disabled after configurable thresholds
+- **Circuit Breaker Pattern**: Failing models are disabled after a configurable number of consecutive failures (default 5), sorted behind every active model (kept as a last-resort fallback), and automatically retried once 30 minutes have passed since their last failure. A model switched off by hand in the admin ("Deactivate selected models") stays off
 - **Real-time Monitoring**: Live dashboard with colored metrics and error analysis
 - **Model Tiers**: Configurable tiers (Primary, Secondary, Emergency, Disabled)
 - **Request Logging**: Detailed logging of every API request with error tracking
@@ -49,7 +50,7 @@ The application includes a comprehensive performance tracking system for OpenRou
 
 A dedicated admin interface for real-time monitoring of AI model performance:
 
-- **Web Interface**: Accessible at `/admin/performance-dashboard/`
+- **Web Interface**: Accessible at `/performance/`
 - **Live Statistics**: Total models, active models, tier categories, and recent activities
 - **Top Performing Models**: Real-time ranking with reliability scores and response times
 - **Recent Activity Log**: Success/failure tracking with timestamps
@@ -69,11 +70,7 @@ The system automatically validates every LLM response for required academic form
 
 ### Top Performing Models
 
-Based on actual format compliance testing:
-
-1. **arcee-ai/trinity-large-preview:free** - 71.4% format compliance, 0.695 reliability score
-2. **stepfun/step-3.5-flash:free** - 0.0% format compliance, 0.600 reliability score
-3. **google/gemma-3-4b-it:free** - 0.0% format compliance, 0.244 reliability score
+Free models come and go, so no ranking is hardcoded here. The live ranking (reliability score, success rate, format compliance, response time) is built from your own request history and shown on the performance dashboard at `/performance/`, or via `python manage.py initialize_models`, which prints the top models by reliability and by format compliance.
 
 ### Frontend Features
 
@@ -163,9 +160,11 @@ AIResearchAssistant/
 ├── requirements.txt                    # Python dependencies
 └── Research_Assistant/                 # Main Django project
     ├── manage.py                       # Django management script
-    ├── test_api.py                     # API testing script
-    ├── test_changes.py                 # Change verification script
     ├── summarise.py                    # LLM summarization test script
+    ├── Test/                           # Standalone scripts (not run by `manage.py test`)
+    │   ├── test_qa_services.py         # Offline unittest for the Q&A / PDF services
+    │   ├── test_openrouter.py, test_performance.py, test_consistency.py,
+    │   │   test_format_validation.py, quick_consistency_test.py, test_api.py
     ├── .env                            # Environment variables (create this)
     ├── Research_Assistant/             # Django project config
     │   ├── settings.py                 # Django settings
@@ -251,6 +250,8 @@ AIResearchAssistant/
 
    `CLERK_SECRET_KEY` has no default and is required for Django to start. Get both keys from your [Clerk dashboard](https://dashboard.clerk.com/).
 
+   Optional OpenRouter settings: `OPENROUTER_MODELS` (comma-separated model ids; pins the model list and skips live discovery), `OPENROUTER_MODELS_CACHE_SECONDS` (how long the discovered list is cached, default 21600), `OPENROUTER_MODEL` (preferred default model), `OPENROUTER_PIN_DEFAULT_MODEL` (force that model first, overriding the reliability ranking and circuit breaker), `OPENROUTER_TIMEOUT_SECONDS`.
+
 5. **Run database migrations**:
 
    ```bash
@@ -262,6 +263,8 @@ AIResearchAssistant/
    ```bash
    python manage.py initialize_models
    ```
+
+   This discovers the current free models from OpenRouter, so it needs a valid `OPENROUTER_API_KEY` and network access. If discovery fails it stops with an error rather than falling back to a built-in list.
 
 7. **Create superuser account**:
 
@@ -301,8 +304,11 @@ AIResearchAssistant/
 ### API Testing
 
 ```bash
-# Run all tests
+# Run all tests (the suite is expected to pass with no failures)
 python manage.py test Research_AI_Assistant.tests
+
+# Offline Q&A / PDF service tests (run from Research_Assistant/)
+python -m unittest Test.test_qa_services
 
 # Test API endpoints
 curl "http://127.0.0.1:{your_chosen_port_number}/api/"
@@ -312,26 +318,29 @@ curl "http://127.0.0.1:{your_chosen_port_number}/api/search/?q=machine+learning&
 ### Performance Testing
 
 ```bash
+# These live in Research_Assistant/Test/ and some call live OpenRouter,
+# so they need real keys. Check how each imports Django before running it.
+
 # Test OpenRouter models and performance tracking
-python test_openrouter.py
+python Test/test_openrouter.py
 
 # Test instruction consistency across models
-python quick_consistency_test.py
+python Test/quick_consistency_test.py
 
 # Test comprehensive model comparison
-python test_consistency.py
+python Test/test_consistency.py
 
 # Test format compliance validation
-python test_format_validation.py
+python Test/test_format_validation.py
 
 # Test performance tracking system
-python test_performance.py
+python Test/test_performance.py
 ```
 
 ### Admin Dashboard Testing
 
 - Visit `http://127.0.0.1:{your_chosen_port_number}/admin/`
-- **Performance Dashboard**: Access `/admin/performance-dashboard/` for real-time monitoring
+- **Performance Dashboard**: Access `/performance/` for real-time monitoring
 - Monitor model performance in "Model Performance" section
 - View response logs and error patterns
 - Configure model tiers and circuit breaker settings
@@ -340,7 +349,11 @@ python test_performance.py
 
 - **Environment Variables**: All API keys stored in `.env` file
 - **No Hardcoded Secrets**: Zero hardcoded API keys in codebase
-- **Rate Limiting**: Proper rate limiting for OpenAlex (100 req/s) and OpenRouter (20 req/min)
+- **Rate Limiting**: Proper rate limiting for OpenAlex (100 req/s) and OpenRouter (20 req/min), plus per-endpoint throttles on the API
+- **Authenticated API**: Endpoints that spend LLM credit or expose internals (`/api/summarise/`, `/api/generate_title/`, `/api/openalex/authors/`, `/api/performance/*`) require a valid Clerk token; only search, the API root and multi-paper Q&A are open
+- **SSRF Guard**: Server-side PDF fetches reject non-http(s) URLs and hosts that resolve to private, loopback or link-local addresses
+- **Bounded PDF Downloads**: PDFs are streamed and abandoned as soon as they pass 50 MB, even if the server omits or misreports `Content-Length`
+- **Cache Integrity**: Cached Q&A chunks are only reused when they were built from one of the PDF URLs in the current request
 - **CSRF Protection**: Django CSRF protection enabled
 - **Input Validation**: Comprehensive parameter validation on all endpoints
 
@@ -352,18 +365,20 @@ python test_performance.py
 2. **API Key Errors**: Verify `.env` file is in `Research_Assistant/` directory
 3. **Port Already in Use**: Change port or kill existing process
 4. **OpenRouter Model Errors**: System automatically falls back to other free models
+   - If the model list itself cannot be fetched from OpenRouter (bad `OPENROUTER_API_KEY`, no network), summarising returns a 503 and `initialize_models` stops with an error. There is no built-in fallback list; fix the key/connection, or set `OPENROUTER_MODELS` to pin a list
 5. **Admin Interface Errors**: Run `python manage.py initialize_models` to set up model tracking
 6. **Performance Data Not Showing**: Check that requests are being made to generate tracking data
 
 ### Performance Monitoring
 
 - **Model Reliability**: Check admin dashboard for success rates, response times, and format compliance
-- **Circuit Breaker**: Models automatically disabled after consecutive failures
+- **Circuit Breaker**: Models are disabled after consecutive failures, tried last while disabled, and retried 30 minutes after their last failure
 - **Format Compliance**: System tracks instruction following with 30% reliability weight
-- **Best Performing Model**: `arcee-ai/trinity-large-preview:free` (71.4% format compliance, 0.695 reliability)
 - **Data-Driven Selection**: Models chosen based on actual instruction-following performance
 
 ### API Endpoints for Monitoring
+
+These require a valid Clerk token (`Authorization: Bearer <token>`).
 
 - **Performance Stats**: `GET /api/performance/stats/`
 - **Model Details**: `GET /api/performance/model/?model_name=<model>`

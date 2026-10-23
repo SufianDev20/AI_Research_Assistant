@@ -157,10 +157,18 @@ def test_intelligent_fallback():
         from Research_AI_Assistant.services.performance_tracker import (
             PerformanceTracker,
         )
-        from Research_AI_Assistant.services.openrouter_service import FREE_MODELS
+
+        # Sample model names to rank; this script just exercises the
+        # ordering logic, so real OpenRouter ids aren't needed (FREE_MODELS
+        # no longer exists — fetch_free_models() discovers models live).
+        sample_models = [
+            "google/gemma-4-31b-it:free",
+            "qwen/qwen3.8-27b:free",
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+        ]
 
         # Get intelligent model order
-        ordered_models = PerformanceTracker.get_intelligent_model_order(FREE_MODELS)
+        ordered_models = PerformanceTracker.get_intelligent_model_order(sample_models)
 
         print("Model order (first 5):")
         for i, model in enumerate(ordered_models[:5], 1):

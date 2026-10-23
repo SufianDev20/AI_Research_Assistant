@@ -29,7 +29,7 @@ Summary: [100-120 words describing the problem, method, and findings using only 
 Repeat this block for every paper. Do not combine papers. Omit a field only if it is absent from the metadata.
 After all paper blocks, output:
 References:
-[N] Surname, I. (Year) 'Title'. Source. doi: DOI.
+Harvard style: [N] Surname, I. (Year) 'Title'. Source. doi: DOI.
 Use up to three authors, then et al. Omit fields not in metadata. Plain text only. No markdown. No abstract available state: Abstract not available - summary based on title and metadata only"""
 # ---------------------------------------------------------------------------
 # User message builder — assembles the numbered paper block for each request.

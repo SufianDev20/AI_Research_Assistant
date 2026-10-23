@@ -62,9 +62,6 @@ __pycache__/
 *$py.class
 
 # Editor folders
-.vscode/
-.idea/
-.windsurf/
 # OS files
 .DS_Store
 .DS_Store?

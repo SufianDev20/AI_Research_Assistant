@@ -366,9 +366,15 @@ class TestPDFService(unittest.TestCase):
                 fetch_pdf_bytes("https://example.test/a.pdf", "W1")
 
     def test_fetch_pdf_bytes_rejects_download_over_limit(self):
+        """
+        A server with no (or a false) Content-Length must still be stopped
+        mid-download, not after the whole body is already in memory.
+        """
         response = MagicMock()
         response.headers = {"Content-Length": "0"}
-        response.content = b"x" * (MAX_PDF_BYTES + 1)
+        chunk = b"x" * 65536
+        chunk_count = MAX_PDF_BYTES // len(chunk) + 2
+        response.iter_content = MagicMock(return_value=iter([chunk] * chunk_count))
 
         with patch(
             "Research_AI_Assistant.services.pdf_service.requests.get",

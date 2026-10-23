@@ -8,7 +8,6 @@ References:
 """
 
 import logging
-import re
 import time
 from typing import Callable, Dict, List, Optional
 
@@ -27,25 +26,6 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "google/gemma-4-31b-it:free"
 DEFAULT_MAX_MODELS_PER_REQUEST = 5
 
-# List of all available free models for fallback. "openrouter/free" routes to
-# a random free model (including classifiers like nemotron content-safety), so
-# it is only a last resort.
-FREE_MODELS = [
-    "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "qwen/qwen3.8-27b:free",
-    "z-ai/glm-5.2:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "nvidia/nemotron-3.5-lightning:free",
-    "nvidia/nemotron-3-ultra-550b-a55b:free",
-    "thinkingmachines/inkling:free",
-    "thinkingmachines/inkling-small:free",
-    "poolside/laguna-s-2.1:free",
-    "nex-agi/nex-n2.5-pro:free",
-    "inclusionai/ling-3.0-flash-fin:free",
-    "openrouter/free",
-]
-
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 FREE_MODELS_CACHE_KEY = "openrouter:free_models"
 DEFAULT_MODELS_CACHE_SECONDS = 6 * 60 * 60
@@ -55,14 +35,21 @@ MODELS_FETCH_TIMEOUT = 10
 # resort and is pushed to the end of the discovered list.
 LAST_RESORT_MODEL = "openrouter/free"
 
-# The free tier also publishes classifiers, guard/moderation models and
-# embedders. They answer nothing useful for summaries or Q&A, so they never
-# enter the fallback chain.
-NON_CHAT_MODEL_PATTERN = re.compile(
-    r"(guard|moderation|content-safety|classifier|embed|rerank|whisper|tts|"
-    r"stable-diffusion|flux)",
-    re.IGNORECASE,
-)
+# Confirmed exceptions: models the supported_parameters/output_modalities
+# check cannot catch because they genuinely expose a full chat-completion
+# parameter set (max_tokens, temperature, ...) while actually being
+# special-purpose moderation/guardrail models, not chat models. This is a
+# short list of specific, verified ids, not a pattern — each entry here was
+# confirmed against a live OpenRouter response (not guessed), and a model
+# only belongs here if letting it into the fallback chain would actually
+# misbehave (e.g. a moderation verdict returned where a research answer was
+# expected), not merely "sounds unrelated to research".
+KNOWN_NON_CHAT_MODEL_IDS = {
+    # Verified 2026-10-23: supported_parameters includes max_tokens/temperature
+    # (so the generic filter below keeps it), but it is NVIDIA's guardrail
+    # model for moderating LLM/VLM input and output, not a chat model.
+    "nvidia/nemotron-3.5-content-safety:free",
+}
 
 
 def _as_bool(value, default: bool = False) -> bool:
@@ -78,20 +65,34 @@ def fetch_free_models() -> List[str]:
     """
     Discover the currently available free models from the OpenRouter API.
 
-    Replaces the hand-maintained FREE_MODELS list, which goes stale as free
-    models are added and withdrawn (a withdrawn id answers HTTP 404 and burns
-    one slot of every request's fallback chain).
+    There is no hand-maintained model list to go stale here: every free
+    model id and every exclusion comes straight from the live API response,
+    so a model OpenRouter adds or withdraws is reflected on the next cache
+    refresh with no code change.
 
-    Keeps only ids ending in ":free", drops anything that cannot return text
-    (classifiers, guards, embedders), orders by context window descending so
-    the largest window is tried first, and pushes LAST_RESORT_MODEL to the
-    end. The result is cached, so discovery costs one HTTP request every
-    OPENROUTER_MODELS_CACHE_SECONDS rather than one per completion.
+    Keeps only ids ending in ":free". Excludes a model only on positive
+    evidence it cannot hold a chat completion: `output_modalities` present
+    and missing "text", or `supported_parameters` present and missing every
+    generation parameter a chat completion needs (`max_tokens`/
+    `temperature`) — this is what filters out classifiers, guard/moderation
+    models and embedders, using OpenRouter's own reported capabilities
+    instead of a hand-maintained keyword list. A model missing either field
+    entirely is kept (benefit of doubt, since OpenRouter doesn't document
+    these as always present). Orders the survivors by context window
+    descending so the largest window is tried first, and pushes
+    LAST_RESORT_MODEL to the end. The result is cached, so discovery costs
+    one HTTP request every OPENROUTER_MODELS_CACHE_SECONDS rather than one
+    per completion.
 
     Returns:
-        Ordered list of free model ids. Falls back to the built-in
-        FREE_MODELS list if the API cannot be reached or returns nothing
-        usable, so a discovery outage never takes summarisation down with it.
+        Ordered list of free model ids.
+
+    Raises:
+        OpenRouterAPIError: if the API cannot be reached or returns nothing
+        usable. There is no built-in fallback list to degrade to, so a
+        discovery outage surfaces the same way any other OpenRouter failure
+        does — propagating out of OpenRouterService.complete() to the view,
+        which already maps OpenRouterAPIError to a 502/503.
 
     Reference: https://openrouter.ai/docs/api/reference/list-available-models
     """
@@ -117,10 +118,15 @@ def fetch_free_models() -> List[str]:
             model_id = (entry or {}).get("id") or ""
             if not model_id.endswith(":free"):
                 continue
-            if NON_CHAT_MODEL_PATTERN.search(model_id):
+            if model_id in KNOWN_NON_CHAT_MODEL_IDS:
                 continue
             outputs = (entry.get("architecture") or {}).get("output_modalities")
             if outputs and "text" not in outputs:
+                continue
+            supported_params = entry.get("supported_parameters")
+            if supported_params is not None and not any(
+                p in supported_params for p in ("max_tokens", "temperature")
+            ):
                 continue
             usable.append((model_id, entry.get("context_length") or 0))
 
@@ -151,13 +157,13 @@ def fetch_free_models() -> List[str]:
 
         return models
 
+    except OpenRouterAPIError:
+        raise
     except Exception as exc:
-        logger.warning(
-            "Could not fetch free models from OpenRouter (%s); "
-            "falling back to the built-in list.",
-            exc,
-        )
-        return FREE_MODELS
+        logger.error("Could not fetch free models from OpenRouter: %s", exc)
+        raise OpenRouterAPIError(
+            f"Could not fetch the free model list from OpenRouter: {exc}"
+        ) from exc
 
 
 class OpenRouterAPIError(Exception):
@@ -260,6 +266,14 @@ class OpenRouterService:
             ]
         if not configured_models:
             configured_models = fetch_free_models()
+
+        # Retry models the circuit breaker disabled, before ranking: nothing
+        # else clears is_active, so a model that recovered from a transient
+        # outage would otherwise stay at the back of the chain forever.
+        try:
+            PerformanceTracker.reset_circuit_breaker()
+        except Exception as exc:
+            logger.warning("Circuit breaker reset failed: %s", exc)
 
         # Get intelligent model order based on performance, then cap the
         # request. Trying every stale or rate-limited free model creates a

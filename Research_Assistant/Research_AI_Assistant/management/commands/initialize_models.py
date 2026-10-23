@@ -3,10 +3,13 @@ Django management command to initialize OpenRouter model reliability data.
 Run: python manage.py initialize_models
 """
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Avg, Count, Q
 from Research_AI_Assistant.models import ModelReliability, ModelPerformance
-from Research_AI_Assistant.services.openrouter_service import fetch_free_models
+from Research_AI_Assistant.services.openrouter_service import (
+    OpenRouterAPIError,
+    fetch_free_models,
+)
 
 
 class Command(BaseCommand):
@@ -19,9 +22,14 @@ class Command(BaseCommand):
         self.stdout.write("Initializing OpenRouter model reliability configuration...")
 
         # Discovered live so withdrawn models drop out and new ones appear
-        # without editing a hard-coded list; falls back to the built-in list
-        # when the API is unreachable.
-        self.free_models = fetch_free_models()
+        # without editing a hard-coded list. There is no built-in fallback
+        # list any more, so a discovery failure is fatal to this command —
+        # surface it as a clear operator-facing error instead of a
+        # traceback.
+        try:
+            self.free_models = fetch_free_models()
+        except OpenRouterAPIError as exc:
+            raise CommandError(f"Could not discover free OpenRouter models: {exc}")
         self.stdout.write(f"Discovered {len(self.free_models)} free models.")
 
         # Get actual performance data to inform tier decisions

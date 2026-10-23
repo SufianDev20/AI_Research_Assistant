@@ -32,12 +32,11 @@ class PDFExtractionError(Exception):
 
 def _reject_unsafe_pdf_url(pdf_url: str, context_id: str) -> None:
     """
-    Basic SSRF guard for a client-supplied PDF URL: both extract_pdf and
-    multi_paper_qa accept a pdf_url straight from the request body and
-    fetch it server-side with no login required, so this is the only
-    checkpoint between an anonymous caller and an outbound request from
-    this server. Rejects non-http(s) schemes and hostnames that resolve to
-    a private, loopback, link-local, or otherwise non-public address
+    Basic SSRF guard for a client-supplied PDF URL: multi_paper_qa accepts a
+    pdf_url straight from the request body and fetches it server-side, so
+    this is the only checkpoint between a caller and an outbound request
+    from this server. Rejects non-http(s) schemes and hostnames that resolve
+    to a private, loopback, link-local, or otherwise non-public address
     (RFC 1918, localhost, link-local, cloud metadata ranges, etc.).
 
     Not a complete SSRF defense: the hostname is re-resolved at fetch time
@@ -108,11 +107,17 @@ def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
                 f"(limit {MAX_PDF_BYTES})"
             )
 
-        pdf_bytes = response.content
-        if len(pdf_bytes) > MAX_PDF_BYTES:
-            raise PDFExtractionError(
-                f"PDF for {context_id} exceeds 50MB limit after download."
-            )
+        # A server can omit or lie about Content-Length, so the real guard is
+        # checked while downloading: stop as soon as the running total passes
+        # the limit instead of pulling the whole body into memory first.
+        chunks = bytearray()
+        for piece in response.iter_content(chunk_size=65536):
+            chunks += piece
+            if len(chunks) > MAX_PDF_BYTES:
+                raise PDFExtractionError(
+                    f"PDF for {context_id} exceeds 50MB limit."
+                )
+        pdf_bytes = bytes(chunks)
 
         # Some publishers (e.g. Springer) answer 200 with an HTML bot-check page
         # instead of a PDF. Worded to match the frontend's publisher-block pattern.
