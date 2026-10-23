@@ -4,6 +4,7 @@ Provides API endpoints for model performance data and insights.
 """
 
 import logging
+from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -311,12 +312,26 @@ def performance_dashboard(request):
             count = ModelReliability.objects.filter(tier=tier_choice).count()
             tier_stats[tier_label] = count
 
+        # Share of each tier among all configured models, for display only
+        tier_total = sum(tier_stats.values())
+        tier_rows = [
+            {
+                "label": label,
+                "count": count,
+                "percent": round(count / tier_total * 100, 1) if tier_total else 0.0,
+            }
+            for label, count in tier_stats.items()
+        ]
+
         context = {
             "top_models": top_models,
             "recent_logs": recent_logs,
             "tier_stats": tier_stats,
+            "tier_rows": tier_rows,
+            "tier_total": tier_total,
             "total_models": ModelPerformance.objects.count(),
             "active_models": ModelPerformance.objects.filter(is_active=True).count(),
+            "clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY,
         }
 
         return render(request, "admin/performance_dashboard.html", context)

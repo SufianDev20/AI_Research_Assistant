@@ -29,13 +29,14 @@ function els() {
     role: document.getElementById("profileRole"),
     menu: document.getElementById("profileMenu"),
     manageItem: document.getElementById("profileManage"),
+    performanceItem: document.getElementById("profilePerformance"),
     signOutItem: document.getElementById("profileSignOut"),
     signInItem: document.getElementById("profileSignIn"),
   };
 }
 
 function renderSignedIn(user) {
-  const { avatar, name, role, manageItem, signOutItem, signInItem } = els();
+  const { avatar, name, role, manageItem, performanceItem, signOutItem, signInItem } = els();
   const displayName = user.fullName || user.firstName || "Researcher";
   const email = user.primaryEmailAddress?.emailAddress || "";
 
@@ -53,16 +54,18 @@ function renderSignedIn(user) {
   }
 
   if (manageItem) manageItem.hidden = false;
+  if (performanceItem) performanceItem.hidden = false;
   if (signOutItem) signOutItem.hidden = false;
   if (signInItem) signInItem.hidden = true;
 }
 
 function renderSignedOut() {
-  const { avatar, name, role, manageItem, signOutItem, signInItem } = els();
+  const { avatar, name, role, manageItem, performanceItem, signOutItem, signInItem } = els();
   if (avatar) avatar.textContent = "S";
   if (name) name.textContent = "Guest researcher";
   if (role) role.textContent = "Not signed in";
   if (manageItem) manageItem.hidden = true;
+  if (performanceItem) performanceItem.hidden = true;
   if (signOutItem) signOutItem.hidden = true;
   if (signInItem) signInItem.hidden = false;
 }
@@ -94,10 +97,24 @@ function wireMenuToggle() {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !menu.hidden) {
+    if (menu.hidden) return;
+    if (e.key === "Escape") {
       closeMenu();
       trigger.focus();
+      return;
     }
+    // Items are tabindex="-1" (roving focus), so arrow keys are the way
+    // to reach every visible item after the first one.
+    const items = [...menu.querySelectorAll('[role="menuitem"]:not([hidden])')];
+    if (!items.length || !["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement);
+    const next =
+      e.key === "Home" ? 0
+      : e.key === "End" ? items.length - 1
+      : e.key === "ArrowDown" ? (i + 1) % items.length
+      : (i - 1 + items.length) % items.length;
+    items[next].focus();
   });
 
   window.__scholaraCloseProfileMenu = closeMenu;
