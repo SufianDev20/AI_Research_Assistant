@@ -81,8 +81,7 @@ DOMManager.prototype.renderReferences = function(papers) {
 
   if (!papers || papers.length === 0) {
     const emptyState = document.createElement("div");
-    emptyState.style.cssText =
-      "padding: 2rem 1rem; text-align: center; color: #94a3b8; font-size: 0.9rem;";
+    emptyState.className = "references-empty";
     emptyState.textContent =
       "No papers retrieved yet. Research results will appear here.";
     this.elements.referencesList.appendChild(emptyState);
@@ -96,35 +95,63 @@ DOMManager.prototype.renderReferences = function(papers) {
     function (paper, i) {
       var card = document.createElement("div");
       card.className = "source-card";
+      // Focusable so keyboard users can open the paper in Paper Analysis
+      // (Enter/Space), the same as clicking the card.
+      card.tabIndex = 0;
+      card.title = "Open in Paper Analysis";
 
-      var linkHtml =
+      // OpenAlex returns doi as a full https://doi.org/... URL; only bare
+      // DOIs need the resolver prefix.
+      var doiUrl =
         paper && paper.doi
-          ? '<a class="source-link" href="https://doi.org/' +
-            paper.doi +
-            '" target="_blank" rel="noopener noreferrer">' +
-            (paper.title || "Untitled") +
-            "</a>"
-          : paper && paper.title
-            ? paper.title
-            : "Untitled";
+          ? /^https?:\/\//i.test(paper.doi)
+            ? paper.doi
+            : "https://doi.org/" + paper.doi
+          : "";
+
+      var linkHtml = doiUrl
+        ? '<a class="source-link" href="' +
+          doiUrl +
+          '" target="_blank" rel="noopener noreferrer">' +
+          (paper.title || "Untitled") +
+          "</a>"
+        : paper && paper.title
+          ? paper.title
+          : "Untitled";
 
       var citationCount = paper.cited_by_count || 0;
+      var meta = [paper.publication_year, paper.source]
+        .filter(Boolean)
+        .map((v) => this.escapeHtml(String(v)))
+        .join(" · ");
 
       card.innerHTML =
         '<div class="source-number">' +
         (i + 1) +
         "</div>" +
+        '<div class="source-body">' +
         '<div class="source-title">' +
         linkHtml +
         "</div>" +
+        (meta ? '<div class="source-meta">' + meta + "</div>" : "") +
         '<div class="source-citation-count">' +
-        citationCount +
-        " citations</div>";
+        citationCount.toLocaleString() +
+        (citationCount === 1 ? " citation" : " citations") +
+        "</div>" +
+        "</div>";
 
       card.addEventListener("click", (e) => {
         if (e.target.closest("a.source-link")) return;
         e.preventDefault();
         this.openAnalysisPage(sortedPapers, i);
+      });
+
+      card.addEventListener("keydown", (e) => {
+        if (e.target !== card) return; // the title link handles its own keys
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.openAnalysisPage(sortedPapers, i);
+        }
       });
 
       this.elements.referencesList.appendChild(card);
@@ -188,11 +215,14 @@ DOMManager.prototype.generateResearchResponse = async function() {
 
   const assistantDiv = this.addMessage("", false, container);
 
-  // Shows brain and generating response till LLM provides the response
+  // Loading state shown until the search + summary complete
   assistantDiv.innerHTML = `
-        <div class="research-loading">
-            <i class="fa-solid fa-brain"></i>
-            <span>Generating response...</span>
+        <div class="research-loading" role="status">
+            <span class="research-loading__label">
+                <span class="research-loading__pulse" aria-hidden="true"></span>
+                Finding papers and drafting a summary&hellip;
+            </span>
+            <span class="research-loading__lines" aria-hidden="true"><span></span><span></span><span></span></span>
         </div>
     `;
 
@@ -310,7 +340,8 @@ DOMManager.prototype.generateResearchResponse = async function() {
     console.error("Error in generateResearchResponse:", err);
     // Replace the "Generating response..." placeholder with the error
     if (assistantDiv) {
-      assistantDiv.innerHTML =
+      assistantDiv.classList.add("message--error");
+      assistantDiv.textContent =
         "Error: " + (err && err.message ? err.message : "Unknown error");
       assistantDiv.style.opacity = "1";
     }
@@ -462,21 +493,13 @@ DOMManager.prototype.loadMorePapers = async function() {
       // Show user-friendly error message but continue the flow
       const errorDiv = document.createElement("div");
       errorDiv.className = "summary-error-message";
-      errorDiv.style.cssText = `
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-        margin: 1rem 0;
-        color: #fca5a5;
-        font-size: 0.875rem;
-        text-align: center;
-      `;
+      errorDiv.setAttribute("role", "alert");
       errorDiv.innerHTML = `
-        <div style="margin-bottom: 0.5rem; font-weight: 600;">⚠️ Could not summarize additional papers</div>
-        <div style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">${err.message}</div>
-        <button style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;">Try Again</button>
+        <p class="summary-error-message__title">Could not summarize additional papers</p>
+        <p class="summary-error-message__detail"></p>
+        <button type="button" class="summary-error-message__retry">Try Again</button>
       `;
+      errorDiv.querySelector(".summary-error-message__detail").textContent = err.message;
       this.elements.researchChatContainer.appendChild(errorDiv);
 
       // Add retry functionality
@@ -544,10 +567,6 @@ DOMManager.prototype.loadMorePapers = async function() {
       const messageDiv = document.createElement("div");
       messageDiv.textContent = data.message;
       messageDiv.className = "load-more-message";
-      messageDiv.style.textAlign = "center";
-      messageDiv.style.color = "#9ca3af";
-      messageDiv.style.marginTop = "1rem";
-      messageDiv.style.fontSize = "0.875rem";
       this.elements.researchChatContainer.appendChild(messageDiv);
     }
   } catch (err) {

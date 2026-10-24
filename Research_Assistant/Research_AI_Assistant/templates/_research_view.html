@@ -1,55 +1,98 @@
-    <!-- FULL-SCREEN RESEARCH VIEW -->
-    <div id="researchView" class="research-view">
-      <!-- Top Bar -->
-      <div class="research-top-bar">
-        <div class="research-top-left">
-          <button id="researchBackBtn" class="research-back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-          <div id="researchQuery" class="research-query"></div>
-        </div>
-        <div class="research-top-right">
-          <button id="saveToBinderBtn" class="save-to-binder-btn" style="display: none">
-            <i class="fa-solid fa-bookmark"></i>
-            <span>Save to Binder</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Chat/Response Area -->
-      <div class="research-chat-area">
-        <div class="research-main-content">
-          <div id="researchChatContainer" class="research-chat-container"></div>
-
-          <!-- Load More Button Container -->
-          <div id="loadMoreContainer" class="load-more-container" style="display: none">
-            <button id="loadMoreBtn" class="load-more-btn">
-              <i class="fa-solid fa-plus-circle"></i>
-              <span>Load More Papers</span>
+    <!-- FULL-SCREEN RESEARCH VIEW
+         Shown in place of the hero and binders (core.js showResearchView /
+         binders.js openBinder toggle .show). Styled by css/research/research-view.css;
+         presentation-only behaviour (references toggle/count, focus on open)
+         lives in js/research-view.js. Element IDs are JS hooks -- keep them. -->
+    <section id="researchView" class="research-view" aria-label="Research conversation">
+      <div class="research-shell">
+        <!-- Research header -->
+        <header class="research-top-bar">
+          <div class="research-top-left">
+            <button id="researchBackBtn" class="research-back-btn" type="button" aria-label="Back to workspace" title="Back to workspace">
+              <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
             </button>
-            <div id="loadMoreStatus" class="load-more-status"></div>
-          </div>
-        </div>
-
-        <!-- Right Side References Panel -->
-        <div id="referencesPanel" class="references-panel">
-          <div class="references-header">
-            <h3 class="references-title">References</h3>
-            <div class="references-filters">
-              <button class="filter-btn active" data-filter="relevance">Relevance</button>
-              <button class="filter-btn" data-filter="cited_by_count">Most Cited</button>
+            <div class="research-heading">
+              <p class="research-kicker">
+                <i class="fa-solid fa-feather-pointed" aria-hidden="true"></i>
+                <span>Research conversation</span>
+              </p>
+              <h2 id="researchQuery" class="research-query" tabindex="-1"></h2>
             </div>
           </div>
-          <div id="referencesList" class="references-list"></div>
-        </div>
-      </div>
+          <div class="research-top-right">
+            <button id="saveToBinderBtn" class="save-to-binder-btn" type="button" style="display: none">
+              <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+              <span>Save to Binder</span>
+            </button>
+          </div>
+        </header>
 
-      <!-- Bottom Input Bar -->
-      <div class="research-input-bar">
-        <div class="research-input-section">
-          <input id="research-input" type="text" placeholder="Ask follow-up questions... (Enter to send)" class="research-input" />
-          <button id="research-send-btn" class="research-send-button">
-            <i class="fa-solid fa-paper-plane"></i>
-            <span>Send</span>
-          </button>
+        <div class="research-chat-area">
+          <!-- Reading column: conversation, load more, follow-up composer -->
+          <div class="research-main-content">
+            <div id="researchChatContainer" class="research-chat-container" aria-live="polite"></div>
+
+            <div id="loadMoreContainer" class="load-more-container" style="display: none">
+              <button id="loadMoreBtn" class="load-more-btn" type="button">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <span>Load More Papers</span>
+              </button>
+              <div id="loadMoreStatus" class="load-more-status" aria-live="polite"></div>
+            </div>
+
+            <div class="research-input-bar">
+              <div class="research-input-section">
+                <label for="research-input" class="sr-only">Follow-up question</label>
+                <input
+                  id="research-input"
+                  type="text"
+                  placeholder="Ask a follow-up question… (Enter to send)"
+                  class="research-input"
+                  autocomplete="off"
+                  aria-describedby="researchComposerHint"
+                />
+                <button id="research-send-btn" class="research-send-button" type="button" aria-label="Send follow-up question">
+                  <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                  <span class="research-send-button__label">Send</span>
+                </button>
+              </div>
+              <p id="researchComposerHint" class="research-composer-hint">
+                Follow-up questions open in Paper Analysis with these papers.
+              </p>
+            </div>
+            <!-- Marks the composer's resting place at the end of the column;
+                 js/research-view.js uses it to tell when the sticky composer
+                 is pinned to the viewport. -->
+            <div class="research-input-sentinel" aria-hidden="true"></div>
+          </div>
+
+          <!-- References -->
+          <aside id="referencesPanel" class="references-panel" aria-labelledby="referencesTitle">
+            <div class="references-header">
+              <h3 id="referencesTitle" class="references-title">
+                References
+                <span id="referencesCount" class="references-count"></span>
+              </h3>
+              <button
+                id="referencesToggle"
+                class="references-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="referencesBody"
+                aria-label="Show references"
+              >
+                <span class="references-toggle__label">Show</span>
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div id="referencesBody" class="references-body">
+              <div class="references-filters" role="group" aria-label="Sort references">
+                <button class="filter-btn active" type="button" data-filter="relevance">Relevance</button>
+                <button class="filter-btn" type="button" data-filter="cited_by_count">Most Cited</button>
+              </div>
+              <div id="referencesList" class="references-list"></div>
+            </div>
+          </aside>
         </div>
       </div>
-    </div>
+    </section>

@@ -1,0 +1,1136 @@
+/* ============================================================================
+   Scholara — research conversation view (_research_view.html)
+   Loaded after styles.css. The view sits in normal page flow below the
+   shared navbar (no fixed overlay), so the page scrolls naturally and the
+   workspace background, theme toggle and account menu stay in place.
+   Built on the .app-body tokens (--paper-raised, --ink, --forest, --rule,
+   ...); the dark overrides at the bottom reuse the literals styles.css uses
+   for the workspace's dark search card and buttons.
+   ========================================================================== */
+
+.research-view {
+  display: none;
+}
+
+.research-view.show {
+  display: block;
+}
+
+.research-shell {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0.25rem 2rem 2.5rem;
+}
+
+/* ===== HEADER ===== */
+.research-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.25rem 0 1.4rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.research-top-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.research-heading {
+  min-width: 0;
+}
+
+.research-back-btn {
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background-color: var(--paper-raised);
+  color: var(--ink-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.research-back-btn:hover {
+  background-color: var(--panel);
+  border-color: var(--emerald);
+  color: var(--forest);
+}
+
+/* Same treatment as the workspace's .hero-label ("Ask Scholara") */
+.research-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.3rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #104d43;
+}
+
+.research-query {
+  margin: 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Receives focus programmatically when the view opens (tabindex="-1") */
+.research-query:focus {
+  outline: none;
+}
+
+.research-top-right {
+  flex-shrink: 0;
+}
+
+/* Pill shape and colors match .new-binder-button. JS toggles display
+   between none and block, so spacing uses margins rather than gap. */
+.save-to-binder-btn {
+  padding: 0.62rem 1.15rem;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--forest);
+  color: #f6f7f0;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.save-to-binder-btn i {
+  margin-right: 0.5rem;
+  font-size: 0.85em;
+}
+
+.save-to-binder-btn:hover {
+  background-color: var(--forest-deep);
+}
+
+.save-to-binder-btn:active {
+  transform: scale(0.97);
+}
+
+/* ===== LAYOUT ===== */
+.research-chat-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: 2rem;
+  align-items: start;
+}
+
+.research-main-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.research-chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ===== CONVERSATION TURNS ===== */
+/* The opening question is already the page title in the header. */
+.research-chat-container > .message.user:first-child {
+  display: none;
+}
+
+.research-chat-container .message.user {
+  padding: 0.15rem 0 0.15rem 1rem;
+  border-left: 2px solid var(--emerald);
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.research-chat-container .message.user::before {
+  content: "Question";
+  display: block;
+  margin-bottom: 0.2rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+}
+
+.research-chat-container .message.assistant {
+  padding: 1.9rem 2.25rem;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.04), 0 8px 24px rgba(18, 33, 25, 0.05);
+  color: var(--ink-body);
+  font-size: 1rem;
+  line-height: 1.72;
+  overflow-wrap: break-word;
+}
+
+/* Comfortable reading measure inside a card (paper cards themselves span
+   the full reading column; their text is capped below) */
+.research-chat-container .message.assistant > :not(pre):not(img):not(.summary-card) {
+  max-width: 46rem;
+}
+
+.message.assistant p {
+  margin: 0 0 1em;
+}
+
+.message.assistant > :last-child {
+  margin-bottom: 0;
+}
+
+.message.assistant h2,
+.message.assistant h3,
+.message.assistant h4 {
+  margin: 1.5em 0 0.5em;
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.message.assistant h2 { font-size: 1.45rem; }
+.message.assistant h3 { font-size: 1.22rem; }
+.message.assistant h4 { font-size: 1.05rem; }
+
+.message.assistant > :first-child {
+  margin-top: 0;
+}
+
+.message.assistant strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.message.assistant ul,
+.message.assistant ol {
+  margin: 0 0 1em;
+  padding-left: 1.3rem;
+}
+
+.message.assistant li {
+  margin: 0.3em 0;
+  padding-left: 0.2rem;
+}
+
+.message.assistant li::marker {
+  color: var(--emerald);
+}
+
+.message.assistant blockquote {
+  margin: 1.1em 0;
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  border-left: 3px solid var(--mint);
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.08rem;
+  font-style: italic;
+  color: var(--ink-body);
+}
+
+.message.assistant code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background-color: var(--panel);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85em;
+}
+
+.message.assistant pre.code-block code {
+  padding: 0;
+  background: none;
+}
+
+/* Inline citation markers, e.g. [3] or [1, 4] (paper.js markdownToHtml) */
+.message.assistant .cite {
+  display: inline-block;
+  padding: 0 0.38em;
+  border-radius: 5px;
+  background-color: var(--mint-wash);
+  color: var(--forest);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.74em;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: 0.08em;
+}
+
+/* ===== PAPER CARDS =====
+   paper.js linesToBlocks splits each summary into one <article
+   class="summary-card"> per paper, plus a references card and note cards
+   for any other text. The message holding them drops its own card chrome
+   and becomes a plain stack, so every paper is its own card. The second
+   selector out-ranks the dark-mode message rule below. */
+.app-body .research-chat-container .message.assistant:has(> .summary-card),
+.app-body[data-theme] .research-chat-container .message.assistant:has(> .summary-card) {
+  display: flex;
+  flex-direction: column;
+  gap: 1.375rem;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.research-chat-container .summary-card {
+  min-width: 0;
+  padding: 1.75rem 1.9rem 1.8rem;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.04), 0 6px 18px rgba(18, 33, 25, 0.05);
+  color: var(--ink-body);
+  font-size: 1rem;
+  line-height: 1.72;
+  overflow-wrap: break-word;
+}
+
+/* Reading measure for the text inside a card */
+.research-chat-container .summary-card > :not(pre):not(img),
+.research-chat-container .summary-card__summary > * {
+  max-width: 48rem;
+}
+
+.message.assistant .summary-card > :first-child {
+  margin-top: 0;
+}
+
+.message.assistant .summary-card > :last-child,
+.message.assistant .summary-card__summary > :last-child {
+  margin-bottom: 0;
+}
+
+.message.assistant .summary-card__number {
+  margin: 0 0 0.4rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--emerald);
+}
+
+.message.assistant .summary-card__title {
+  margin: 0 0 0.9rem;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.34rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Label | value rows; long author lists and sources wrap in their column */
+.message.assistant .summary-card__meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.3rem 1rem;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.message.assistant .summary-card__meta div {
+  display: contents;
+}
+
+.message.assistant .summary-card__meta dt {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.message.assistant .summary-card__meta dd {
+  margin: 0;
+  color: var(--ink-body);
+  overflow-wrap: anywhere;
+}
+
+.message.assistant .summary-card__meta a {
+  color: var(--forest);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 2px;
+}
+
+.message.assistant .summary-card__meta a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Divider + SUMMARY label + the generated summary */
+.message.assistant .summary-card__summary {
+  margin-top: 1.15rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--rule);
+}
+
+.message.assistant .summary-card__label {
+  margin: 0 0 0.5rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--emerald);
+}
+
+.message.assistant .summary-card__summary p {
+  margin: 0 0 0.95em;
+}
+
+.message.assistant .summary-references {
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.message.assistant .summary-references li {
+  padding-left: 0;
+}
+
+/* Divider label before a load-more summary */
+.research-chat-container .summary-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-meta);
+}
+
+.research-chat-container .summary-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--rule);
+}
+
+.research-chat-container .pagination-info {
+  font-size: 0.8rem;
+  color: var(--ink-meta);
+}
+
+.research-chat-container .pagination-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.research-chat-container .load-more-message {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-meta);
+}
+
+/* ===== LOADING / ERROR STATES ===== */
+.research-chat-container .thinking-indicator,
+.research-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ink-meta);
+}
+
+.research-chat-container .thinking-icon {
+  color: var(--emerald);
+}
+
+.research-loading {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.1rem;
+  padding: 0;
+}
+
+.research-loading__label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 500;
+  color: var(--forest);
+}
+
+.research-loading__pulse {
+  flex-shrink: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background-color: var(--emerald);
+  animation: rv-pulse 1.4s ease-in-out infinite;
+}
+
+.research-loading__lines {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.research-loading__lines span {
+  display: block;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rule-soft) 0%, var(--rule) 50%, var(--rule-soft) 100%);
+  background-size: 200% 100%;
+  animation: rv-shimmer 1.6s linear infinite;
+}
+
+.research-loading__lines span:nth-child(1) { width: 92%; }
+.research-loading__lines span:nth-child(2) { width: 78%; }
+.research-loading__lines span:nth-child(3) { width: 60%; }
+
+@keyframes rv-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+@keyframes rv-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+.research-chat-container .message.assistant.message--error {
+  background-color: rgba(178, 68, 40, 0.05);
+  border-color: rgba(178, 68, 40, 0.28);
+  color: #7a2e1f;
+}
+
+.research-chat-container .summary-error-message {
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(178, 68, 40, 0.28);
+  border-radius: 12px;
+  background-color: rgba(178, 68, 40, 0.05);
+  color: #7a2e1f;
+  font-size: 0.88rem;
+}
+
+.summary-error-message__title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.summary-error-message__detail {
+  margin: 0 0 0.75rem;
+  color: var(--ink-body);
+}
+
+.summary-error-message__retry {
+  padding: 0.45rem 0.95rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.summary-error-message__retry:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ===== LOAD MORE ===== */
+.research-view .load-more-container {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0;
+}
+
+.research-view .load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background-color: var(--paper-raised);
+  color: var(--forest);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.research-view .load-more-btn i {
+  font-size: 0.8em;
+}
+
+.research-view .load-more-btn:hover:not(:disabled) {
+  border-color: var(--emerald);
+  background-color: var(--mint-wash);
+}
+
+.research-view .load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.research-view .load-more-status {
+  min-height: 1.2rem;
+  font-size: 0.8rem;
+  color: var(--ink-meta);
+}
+
+/* ===== FOLLOW-UP COMPOSER =====
+   Sticky to the bottom of the viewport, inside the reading column
+   (.research-main-content):
+   - it is always reachable while the papers scroll past behind it;
+   - its width and left edge come from the column, so it never crosses
+     the references panel;
+   - a sticky element keeps its place in the flow, so once the reader
+     reaches the end it settles after Load More and the pagination line --
+     the last card, Load More, pagination and errors are never covered,
+     and no bottom padding has to be measured or reserved.
+   The scrolling ancestor is the page itself (no overflow container in
+   between: body's overflow-x propagates to the viewport), so sticky is
+   relative to the viewport. js/research-view.js adds .is-stuck while it
+   is pinned. */
+.research-input-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: 1.5rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* While pinned over the papers: a slightly deeper shadow, and the hint
+   line fades. The hint hangs below the composer out of flow, so the
+   pinned bar is only the composer plus its bottom margin, and fading it
+   never changes the column's height (which could otherwise make the bar
+   flip between pinned and resting at the boundary). It stays available
+   to screen readers through aria-describedby. */
+.research-input-bar.is-stuck .research-input-section {
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.06), 0 14px 34px rgba(18, 33, 25, 0.14);
+}
+
+.research-input-bar .research-composer-hint {
+  position: absolute;
+  top: calc(100% - max(1rem, env(safe-area-inset-bottom)));
+  left: 0;
+  right: 0;
+  transition: opacity 0.2s var(--ease);
+}
+
+.research-input-bar.is-stuck .research-composer-hint {
+  opacity: 0;
+}
+
+.research-input-sentinel {
+  height: 0;
+}
+
+.research-input-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 1.15rem;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.05), 0 10px 28px rgba(18, 33, 25, 0.08);
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.research-input-section:focus-within {
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px rgba(47, 125, 93, 0.14), 0 10px 28px rgba(18, 33, 25, 0.08);
+}
+
+.research-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.72rem 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+/* Focus is shown on the whole composer (:focus-within above) */
+.app-body .research-input:focus-visible {
+  outline: none;
+}
+
+.research-input::placeholder {
+  color: var(--ink-meta);
+}
+
+.research-send-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.1rem;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--emerald);
+  color: #f6f7f0;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.research-send-button:hover:not(:disabled) {
+  background-color: var(--forest);
+}
+
+.research-send-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.research-send-button:disabled {
+  background-color: var(--rule);
+  color: var(--ink-meta);
+  cursor: not-allowed;
+}
+
+.research-composer-hint {
+  margin: 0.5rem 0.25rem 0;
+  font-size: 0.75rem;
+  color: var(--ink-meta);
+}
+
+/* ===== REFERENCES PANEL ===== */
+.references-panel {
+  position: sticky;
+  top: 6rem;
+  max-height: calc(100vh - 7.5rem);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background-color: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.04), 0 8px 24px rgba(18, 33, 25, 0.05);
+}
+
+.references-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem 0.85rem;
+}
+
+.references-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Same as .binder-count */
+.references-count {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background-color: var(--panel);
+  color: var(--forest);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.references-count:empty {
+  display: none;
+}
+
+/* Only shown on narrow screens, where the list collapses */
+.references-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--forest);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.references-toggle i {
+  font-size: 0.75em;
+  transition: transform 0.15s var(--ease);
+}
+
+.references-toggle[aria-expanded="true"] i {
+  transform: rotate(180deg);
+}
+
+.references-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Segmented control; JS toggles its display during generation */
+.references-filters {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 1.25rem 0.85rem;
+  padding: 0.25rem;
+  border-radius: 10px;
+  background-color: var(--panel);
+}
+
+.filter-btn {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-body);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.filter-btn:hover {
+  color: var(--forest);
+}
+
+.filter-btn.active {
+  background-color: var(--paper-raised);
+  color: var(--forest);
+  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.12);
+}
+
+.references-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--rule-soft);
+}
+
+/* Overrides the legacy .source-card / .source-number rules in styles.css */
+.references-list .source-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.references-list .source-card:hover {
+  transform: none;
+  box-shadow: none;
+  background-color: var(--panel);
+  border-color: var(--rule-soft);
+}
+
+.app-body .references-list .source-card:focus-visible {
+  outline-offset: 1px;
+  border-radius: 10px;
+  background-color: var(--panel);
+}
+
+.references-list .source-number {
+  width: 1.65rem;
+  height: 1.65rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background-color: var(--mint-wash);
+  color: var(--forest);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.references-list .source-body {
+  min-width: 0;
+}
+
+.references-list .source-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.87rem;
+  font-weight: 500;
+  line-height: 1.42;
+  color: var(--ink);
+}
+
+.references-list .source-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.references-list .source-link:hover {
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.references-list .source-meta,
+.references-list .source-citation-count {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ink-meta);
+  overflow-wrap: anywhere;
+}
+
+.references-list .source-meta + .source-citation-count {
+  margin-top: 0.1rem;
+}
+
+.references-empty {
+  padding: 1.75rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-meta);
+  border: 1px dashed var(--rule);
+  border-radius: 10px;
+}
+
+/* ===== DARK MODE ===== */
+.app-body[data-theme="dark"] .research-kicker {
+  color: #a9d4be;
+}
+
+.app-body[data-theme="dark"] .research-chat-container .message.assistant,
+.app-body[data-theme="dark"] .research-chat-container .summary-card,
+.app-body[data-theme="dark"] .references-panel,
+.app-body[data-theme="dark"] .research-input-section {
+  background-color: rgba(26, 51, 38, 0.96);
+  border-color: rgba(63, 155, 115, 0.22);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.app-body[data-theme="dark"] .research-back-btn,
+.app-body[data-theme="dark"] .research-view .load-more-btn {
+  background-color: rgba(26, 51, 38, 0.96);
+}
+
+.app-body[data-theme="dark"] .research-back-btn:hover,
+.app-body[data-theme="dark"] .research-view .load-more-btn:hover:not(:disabled) {
+  color: #a9d4be;
+}
+
+.app-body[data-theme="dark"] .save-to-binder-btn,
+.app-body[data-theme="dark"] .research-send-button {
+  background-color: #2f7d5d;
+}
+
+.app-body[data-theme="dark"] .save-to-binder-btn:hover,
+.app-body[data-theme="dark"] .research-send-button:hover:not(:disabled) {
+  background-color: #3f9b73;
+}
+
+.app-body[data-theme="dark"] .research-send-button:disabled {
+  background-color: rgba(169, 212, 190, 0.12);
+}
+
+/* The composer passes over the papers while pinned, so its surface must
+   be opaque (the shared dark card colour above is 96% alpha). */
+.app-body[data-theme="dark"] .research-input-section {
+  background-color: #1a3326;
+}
+
+.app-body[data-theme="dark"] .research-input-bar.is-stuck .research-input-section {
+  border-color: rgba(92, 184, 145, 0.38);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.app-body[data-theme="dark"] .message.assistant .summary-card__meta a,
+.app-body[data-theme="dark"] .message.assistant .cite,
+.app-body[data-theme="dark"] .references-list .source-number,
+.app-body[data-theme="dark"] .research-view .load-more-btn,
+.app-body[data-theme="dark"] .references-toggle {
+  color: #a9d4be;
+}
+
+.app-body[data-theme="dark"] .filter-btn.active {
+  background-color: rgba(169, 212, 190, 0.14);
+  color: #a9d4be;
+  box-shadow: none;
+}
+
+.app-body[data-theme="dark"] .research-chat-container .message.assistant.message--error,
+.app-body[data-theme="dark"] .research-chat-container .summary-error-message {
+  background-color: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: #fca5a5;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1180px) {
+  .research-chat-area {
+    grid-template-columns: minmax(0, 1fr) 18.5rem;
+    gap: 1.5rem;
+  }
+
+  .research-chat-container .message.assistant,
+  .research-chat-container .summary-card {
+    padding: 1.6rem 1.75rem;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The fixed navbar grows taller than .nav-spacer (5rem) at narrower
+     widths (~103px at 768px, ~119px at 375px); the extra top padding
+     keeps the research header clear of it. */
+  .research-shell {
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .research-top-bar {
+    flex-wrap: wrap;
+    padding: 1rem 0 1.1rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .research-query {
+    font-size: 1.35rem;
+  }
+
+  .research-chat-area {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  /* References become a collapsible section above the conversation */
+  .references-panel {
+    position: static;
+    order: -1;
+    max-height: none;
+  }
+
+  .references-header {
+    padding: 0.8rem 1rem;
+  }
+
+  .references-toggle {
+    display: inline-flex;
+  }
+
+  .references-panel:not(.is-expanded) .references-body {
+    display: none;
+  }
+
+  .references-filters {
+    margin: 0 1rem 0.75rem;
+  }
+
+  .references-list {
+    overflow: visible;
+  }
+
+  .research-chat-container .message.assistant,
+  .research-chat-container .summary-card {
+    padding: 1.25rem 1.15rem;
+    font-size: 0.97rem;
+  }
+
+  .research-chat-container .summary-card {
+    border-radius: 16px;
+  }
+
+  .message.assistant .summary-card__title {
+    font-size: 1.18rem;
+  }
+
+  .app-body .research-chat-container .message.assistant:has(> .summary-card),
+  .app-body[data-theme] .research-chat-container .message.assistant:has(> .summary-card) {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .research-shell {
+    padding-top: 2.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .research-top-right,
+  .save-to-binder-btn {
+    width: 100%;
+  }
+
+  .research-send-button {
+    padding: 0.7rem 0.85rem;
+  }
+
+  .research-send-button__label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .research-loading__pulse,
+  .research-loading__lines span {
+    animation: none;
+  }
+
+  .research-back-btn,
+  .save-to-binder-btn,
+  .research-input-bar .research-composer-hint,
+  .research-send-button,
+  .filter-btn,
+  .references-list .source-card,
+  .references-toggle i {
+    transition: none;
+  }
+}

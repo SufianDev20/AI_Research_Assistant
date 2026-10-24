@@ -374,7 +374,7 @@ export class DOMManager {
       this.elements.referencesPanel.style.display = "flex";
       if (this.elements.referencesList) {
         this.elements.referencesList.innerHTML =
-          '<div style="padding: 2rem 1rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">No papers retrieved yet. Research results will appear here.</div>';
+          '<div class="references-empty">No papers retrieved yet. Research results will appear here.</div>';
       }
     } else {
       console.warn("References panel element not found");
