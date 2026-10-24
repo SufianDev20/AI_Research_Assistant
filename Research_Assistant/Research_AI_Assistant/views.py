@@ -31,6 +31,7 @@ from .services.prompt_builder import (
     extract_final_summary,
     InvalidSummaryFormat,
 )
+
 # Multi-Paper Q&A backend: multi-paper, page-level citations, deterministic
 # citation validation.
 from .services.qa_pipeline import (
@@ -233,6 +234,7 @@ def search(request):
             cursor=cursor,
             open_access_only=open_access_only,
             oa_status=oa_status,
+            min_year=min_year,
             max_year=max_year,
             random_seed=random_seed,
         )
@@ -679,9 +681,7 @@ def multi_paper_qa(request):
         )
 
     # The LLM sees short aliases + author labels, never OpenAlex URLs.
-    _, legend = build_paper_legend(
-        validated.get("paper_meta"), papers_chunks.keys()
-    )
+    _, legend = build_paper_legend(validated.get("paper_meta"), papers_chunks.keys())
 
     try:
         openrouter_service = OpenRouterService()
