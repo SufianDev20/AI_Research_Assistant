@@ -1,14 +1,16 @@
 
 # AI Research Assistant
 
-A comprehensive Django-based web application that serves as an AI-powered research assistant for academic papers. The application integrates with the OpenAlex API to search, retrieve, and process academic paper metadata, and uses OpenRouter's free LLM models to generate individual paper summaries with proper academic citations.
+A comprehensive Django-based web application that serves as an AI-powered research assistant for academic papers. The application integrates with the OpenAlex API to search, retrieve, and process academic paper metadata, and uses an LLM to generate individual paper summaries with proper academic citations. The LLM is chosen by configuration: OpenRouter's free models, a self-hosted Ollama server on a university research server, or Ollama with OpenRouter as a fallback. Searches can also try a local corpus on that research server before OpenAlex.
 
 ## Features
 
 ### Core Functionality
 
 - **OpenAlex API Integration**: Full integration with OpenAlex API using pyalex library
+- **Selectable LLM Backend**: `LLM_BACKEND` chooses `openrouter` (default), `ollama`, or `ollama_then_openrouter`. The last tries Ollama first and falls back to OpenRouter on any failure. Summaries, titles and Q&A all go through the same backend
 - **OpenRouter LLM Integration**: Uses free models from OpenRouter to generate individual paper summaries with intelligent fallback
+- **Local Corpus Search**: When `RESEARCH_API_URL` and `RESEARCH_API_KEY` are set, first-page searches ask the university research server for papers before OpenAlex. A weak or failed result falls back to OpenAlex. Responses report their origin in a `source` field (`local` or `openalex`). The local corpus is skipped (OpenAlex only) for Load More, open-access-only searches, and any real year filter; the default 1900-2026 range does not count as a filter
 - **Live Free-Model Discovery**: The free-model list is fetched from OpenRouter's `/models` API and cached (6 hours by default), so there is no hardcoded model list to keep up to date. Non-chat models (classifiers, embedders, guardrails) are excluded using OpenRouter's own `supported_parameters` / `output_modalities` fields
 - **Performance Tracking System**: Comprehensive monitoring of model performance with reliability scoring
 - **Intelligent Model Selection**: Automatic fallback to best-performing models based on success rates and response times
@@ -19,13 +21,82 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **PDF-to-Markdown Extraction**: Converts open-access PDFs to page-tagged Markdown (PyMuPDF4LLM), cached per paper so repeat questions skip re-downloading and re-OCRing
 - **Multi-Paper Q&A with Verified Citations**: Ask questions across up to 10 selected papers at once; every citation is checked deterministically against the source page text (page existence + fuzzy snippet match) before being shown as verified
 - **Clerk Authentication**: Google sign-in via Clerk gates the workspace and analysis pages; the API validates the Clerk JWT server-side. Only `/api/` and `/api/search/` are open to signed-out visitors; the LLM and PDF endpoints require a valid token (`/api/summarise/`, `/api/generate_title/`, `/api/multi-paper-qa/`, `/api/openalex/authors/` and `/api/performance/*`)
-- **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API
+- **Cursor-based Pagination**: Efficient pagination for large result sets using OpenAlex cursor API. Load More needs `OPENALEX_API_KEY`; without it OpenAlex rejects cursor paging with a 401 (a startup warning is logged)
 - **Circuit Breaker Pattern**: Models are automatically disabled after consecutive failures, tried last while disabled, and re-enabled 30 minutes after their last failure (or on their next success)
 - **Real-time Analytics**: Admin dashboard with dedicated performance monitoring interface
 
+## Architecture
+
+The diagram shows how a request moves through the app. Solid arrows are normal calls; labelled arrows are fallbacks or conditions.
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser"]
+        WS["Workspace /workspace/"]
+        AN["Analysis /analysis/"]
+    end
+
+    subgraph Django["Django app (Research_AI_Assistant)"]
+        AUTH["ClerkAuthentication (JWT)"]
+        SEARCH["views.search"]
+        SUM["views.summarise / generate_title"]
+        QA["views.multi_paper_qa"]
+        CORPUS["LocalCorpusService"]
+        OA["OpenAlexService"]
+        GETLLM["get_llm() via LLM_BACKEND"]
+        FALL["FallbackLLM"]
+        OL["OllamaService"]
+        OR["OpenRouterService"]
+        PT["PerformanceTracker"]
+        QAPIPE["qa_pipeline + qa_llm"]
+        CACHE["QAChunkCache"]
+        DB[("SQLite / ResponseLog, PaperPDF")]
+    end
+
+    subgraph External["External services"]
+        RS["University research server"]
+        OALEX["OpenAlex API"]
+        ORAPI["OpenRouter API"]
+        PDF["Open-access PDF hosts"]
+        CLERK["Clerk"]
+    end
+
+    WS -->|search| SEARCH
+    WS -->|summary| SUM
+    AN -->|Q&A| QA
+
+    SEARCH --> AUTH
+    SUM --> AUTH
+    QA --> AUTH
+    AUTH -.->|verify token| CLERK
+
+    SEARCH -->|1. first page, no OA-only or year filter| CORPUS
+    CORPUS -->|POST /retrieve| RS
+    CORPUS -->|2. weak or failed| OA
+    SEARCH -->|no local corpus| OA
+    OA -->|works API, retry 429/5xx| OALEX
+
+    SUM --> GETLLM
+    QA --> GETLLM
+    GETLLM -->|openrouter| OR
+    GETLLM -->|ollama| OL
+    GETLLM -->|ollama_then_openrouter| FALL
+    FALL -->|primary| OL
+    FALL -->|on LLMError| OR
+    OL -->|/llm/jobs| RS
+    OR -->|free model chain| ORAPI
+    OR --> PT
+    PT --> DB
+
+    QA --> QAPIPE
+    QAPIPE --> CACHE
+    CACHE -->|SSRF-guarded fetch| PDF
+    CACHE --> DB
+```
+
 ## Performance Tracking System
 
-The application includes a comprehensive performance tracking system for OpenRouter models:
+The application includes a performance tracking system for OpenRouter models. Calls served by the Ollama backend are not recorded in it, so they do not appear on the dashboard:
 
 ### Key Features
 
@@ -77,7 +148,7 @@ Free models come and go, so no ranking is hardcoded here. The live ranking (reli
 - **Landing Page**: Dedicated marketing/entry page at `/`, separate from the workspace
 - **Modern UI**: Clean, responsive web interface with dark theme
 - **Interactive Research View**: Dynamic chat-like interface for research conversations
-- **Paper Analysis Page**: Select papers from a search, view them side-by-side, and run multi-paper Q&A with page-level, verified citations shown per answer
+- **Paper Analysis Page**: Select papers from a search, view them side-by-side, and run multi-paper Q&A with page-level, verified citations shown per answer. Papers with no PDF or open-access link (including every paper from the local research-server corpus) are shown but excluded from Q&A
 - **Binder System**: Save and organize research conversations with custom colors and titles
 - **Paper Cards**: Visual display of research papers with metadata and links
 - **Load More Functionality**: Seamless pagination for browsing large result sets
@@ -131,9 +202,9 @@ Free models come and go, so no ranking is hardcoded here. The live ranking (reli
 
 ### Backend
 
-- **Framework**: Django 6.0+, Django REST Framework
+- **Framework**: Django 6.1+ (below 7), Django REST Framework 3.18+ (below 4)
 - **API Client**: pyalex (OpenAlex Python client)
-- **LLM Provider**: OpenRouter (free models with intelligent fallback)
+- **LLM Provider**: Selectable via `LLM_BACKEND`: OpenRouter (free models with intelligent fallback), a self-hosted Ollama server, or Ollama with OpenRouter fallback
 - **Database**: SQLite (development), PostgreSQL (production ready)
 - **Environment Management**: django-environ
 - **Performance Monitoring**: Custom performance tracking system with reliability scoring
@@ -150,7 +221,9 @@ Free models come and go, so no ranking is hardcoded here. The live ranking (reli
 ### External APIs
 
 - **OpenAlex**: Academic paper metadata and citation data
-- **OpenRouter**: LLM models for paper summarization
+- **OpenRouter**: LLM models for paper summarization, titles and Q&A (when the backend uses OpenRouter)
+- **University research server**: Optional local paper corpus (`POST /retrieve`) and Ollama LLM endpoints (`/llm/jobs`, `/llm`), both authenticated with `RESEARCH_API_KEY`
+- **Clerk**: Sign-in and JWT verification for the workspace, analysis page and authenticated API
 
 ## Project Structure
 
@@ -161,7 +234,11 @@ AIResearchAssistant/
 └── Research_Assistant/                 # Main Django project
     ├── manage.py                       # Django management script
     ├── summarise.py                    # LLM summarization test script
-    ├── Test/                           # Standalone scripts (not run by `manage.py test`)
+    ├── Test/                           # Test modules (see Testing; not all run by `manage.py test`)
+    │   ├── test_llm_service.py         # Offline: Ollama client, FallbackLLM, get_llm()
+    │   ├── test_local_corpus.py        # Offline: research-server search client
+    │   ├── test_openalex_service.py    # Offline: OpenAlex retry behaviour
+    │   ├── test_integration_flow.py    # Offline: search and summarise fallback chains
     │   ├── test_qa_services.py         # Offline unittest for the Q&A / PDF services
     │   ├── test_openrouter.py, test_performance.py, test_consistency.py,
     │   │   test_format_validation.py, quick_consistency_test.py, test_api.py
@@ -189,7 +266,10 @@ AIResearchAssistant/
         │       ├── styles.css           # Workspace stylesheet
         │       └── js/                  # ES-module JS (globals.js entry point, analysis/*)
         └── services/                    # Business logic services
-            ├── openalex_service.py      # OpenAlex API client
+            ├── llm_service.py           # get_llm(): picks the backend from LLM_BACKEND; FallbackLLM; LLMError
+            ├── ollama_service.py        # Research-server Ollama client (async jobs, blocking fallback)
+            ├── local_corpus_service.py  # Research-server paper search (first step of /api/search/)
+            ├── openalex_service.py      # OpenAlex API client (retries 429/5xx)
             ├── openrouter_service.py    # OpenRouter LLM client with performance tracking
             ├── extract_service.py       # Metadata extraction from OpenAlex
             ├── prompt_builder.py        # Summary LLM prompt construction
@@ -204,7 +284,7 @@ AIResearchAssistant/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+ (required by Django 6)
 - pip package manager
 - Git (for cloning)
 
@@ -246,11 +326,33 @@ AIResearchAssistant/
    ALLOWED_HOSTS=localhost,127.0.0.1
    CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxx
    CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxx
+   # Optional: research server and LLM backend (see the table below)
+   # LLM_BACKEND=openrouter
+   # RESEARCH_API_URL=https://your-research-server.example
+   # RESEARCH_API_KEY=your_permanent_research_key
    ```
+
+   `OPENALEX_API_KEY` is optional but needed for Load More. `.env.example` lists every variable; copy it to `.env` and fill in the keys.
 
    `CLERK_SECRET_KEY` has no default and is required for Django to start. Get both keys from your [Clerk dashboard](https://dashboard.clerk.com/).
 
    Optional OpenRouter settings: `OPENROUTER_MODELS` (comma-separated model ids; pins the model list and skips live discovery), `OPENROUTER_MODELS_CACHE_SECONDS` (how long the discovered list is cached, default 21600), `OPENROUTER_MODEL` (preferred default model), `OPENROUTER_PIN_DEFAULT_MODEL` (force that model first, overriding the reliability ranking and circuit breaker), `OPENROUTER_TIMEOUT_SECONDS`.
+
+   Choosing the LLM backend and the research server:
+
+   | Variable | Default | Purpose |
+   |---|---|---|
+   | `LLM_BACKEND` | `openrouter` | `openrouter`, `ollama`, or `ollama_then_openrouter` |
+   | `RESEARCH_API_URL` | empty | Research server base URL. Empty disables the local corpus and Ollama |
+   | `RESEARCH_API_KEY` | empty | Permanent research-server key, not a session token. Both URL and key must be set |
+   | `RESEARCH_READ_TIMEOUT_SECONDS` | `30` | Read timeout for local corpus searches |
+   | `LLM_READ_TIMEOUT_SECONDS` | `240` | Read timeout for the blocking Ollama fallback call |
+   | `LLM_JOB_DEADLINE_SECONDS` | `240` | Total time to wait for one Ollama job |
+   | `LLM_NUM_CTX` | `8192` | Context window requested from Ollama (the server may cap it) |
+
+   `OPENROUTER_API_KEY` may be left empty only when `LLM_BACKEND=ollama`. The research-server timeout variable is `RESEARCH_READ_TIMEOUT_SECONDS`; an older `RESEARCH_TIMEOUT` line in `.env` is ignored.
+
+   **Important:** in `.env`, leave optional numeric settings commented out (or set to a real value). An empty `VAR=` line for an integer setting, such as `LLM_NUM_CTX=`, makes Django fail at startup. `.env.example` shows each setting this way.
 
 5. **Run database migrations**:
 
@@ -310,6 +412,11 @@ python manage.py test Research_AI_Assistant.tests
 # Offline Q&A / PDF service tests (run from Research_Assistant/)
 python -m unittest Test.test_qa_services
 
+# Offline tests for the LLM backends, research-server search, OpenAlex retry
+# and the fallback chains (run from Research_Assistant/; these are not picked up
+# by the command above, so name them explicitly)
+python manage.py test Test.test_llm_service Test.test_local_corpus Test.test_openalex_service Test.test_integration_flow
+
 # Test API endpoints
 curl "http://127.0.0.1:{your_chosen_port_number}/api/"
 curl "http://127.0.0.1:{your_chosen_port_number}/api/search/?q=machine+learning&per_page=5"
@@ -351,6 +458,7 @@ python Test/test_performance.py
 - **No Hardcoded Secrets**: Zero hardcoded API keys in codebase
 - **Rate Limiting**: Proper rate limiting for OpenAlex (100 req/s) and OpenRouter (20 req/min), plus per-endpoint throttles on the API
 - **Authenticated API**: Endpoints that spend LLM credit, fetch PDFs or expose internals (`/api/summarise/`, `/api/generate_title/`, `/api/multi-paper-qa/`, `/api/openalex/authors/`, `/api/performance/*`) require a valid Clerk token; only search and the API root are open
+- **Research Server Auth**: Requests to the research server send `RESEARCH_API_KEY` as a Bearer token. A 401 is treated as a hard failure and never retried
 - **SSRF Guard**: Server-side PDF fetches reject non-http(s) URLs and hosts that resolve to private, loopback or link-local addresses
 - **Bounded PDF Downloads**: PDFs are streamed and abandoned as soon as they pass 50 MB, even if the server omits or misreports `Content-Length`
 - **Cache Integrity**: Cached Q&A chunks are only reused when they were built from one of the PDF URLs in the current request
@@ -367,7 +475,12 @@ python Test/test_performance.py
 4. **OpenRouter Model Errors**: System automatically falls back to other free models
    - If the model list itself cannot be fetched from OpenRouter (bad `OPENROUTER_API_KEY`, no network), summarising returns a 503 and `initialize_models` stops with an error. There is no built-in fallback list; fix the key/connection, or set `OPENROUTER_MODELS` to pin a list
 5. **Admin Interface Errors**: Run `python manage.py initialize_models` to set up model tracking
-6. **Performance Data Not Showing**: Check that requests are being made to generate tracking data
+6. **Performance Data Not Showing**: Check that requests are being made to generate tracking data. Calls served by the Ollama backend are never recorded here
+7. **Startup fails with `invalid literal for int()`**: a numeric variable in `.env` is set to an empty value (for example `LLM_NUM_CTX=`). Delete the line or comment it out
+8. **Search results all say `source: openalex` when a research server is set**: the server is unset, unreachable, returned a 401 (key expired or wrong), or gave a weak result. Check the logs for `Local corpus`
+9. **Every signed-in request returns 401**: `CLERK_AUTHORIZED_PARTIES` is set to an empty value. Remove the line to use the default (`http://localhost:8080`)
+10. **Logs show `SWITCHING TO OPENROUTER`**: the Ollama backend failed and the request fell back to OpenRouter. Check the research server, or set `LLM_BACKEND=openrouter` to stop trying Ollama
+11. **Multi-paper Q&A returns 503**: `get_llm()` could not build a backend, usually an invalid `LLM_BACKEND` or `LLM_BACKEND=ollama` without `RESEARCH_API_URL` / `RESEARCH_API_KEY`
 
 ### Performance Monitoring
 

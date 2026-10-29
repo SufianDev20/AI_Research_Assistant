@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import ModelPerformance, ModelReliability, PaperPDF, User
+from .services.llm_service import LLMError
 from .services.qa_chunk_cache import CHUNK_SCHEMA_VERSION, QAChunkCache
 from .services.performance_tracker import (
     CIRCUIT_BREAKER_RESET_MIN,
@@ -856,7 +857,7 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
         super().setUp()
         self.client = Client()
 
-    @patch("Research_AI_Assistant.views.OpenRouterService")
+    @patch("Research_AI_Assistant.views.get_llm")
     def test_summarise_success(self, mock_service_class):
         """
         Returns 200 with the summary on valid input. The response body is
@@ -876,7 +877,7 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["summary"], MOCK_SUMMARY)
 
-    @patch("Research_AI_Assistant.views.OpenRouterService")
+    @patch("Research_AI_Assistant.views.get_llm")
     def test_summarise_calls_complete_with_correct_args(self, mock_service_class):
         """View must pass SYSTEM_PROMPT and a user message built from the papers."""
         mock_instance = MagicMock()
@@ -937,7 +938,7 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("JSON", resp.json()["error"])
 
-    @patch("Research_AI_Assistant.views.OpenRouterService")
+    @patch("Research_AI_Assistant.views.get_llm")
     def test_summarise_openrouter_api_error_returns_503(self, mock_service_class):
         """
         OpenRouterAPIError from complete() must return 503 (upstream
@@ -956,9 +957,9 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 503)
-        self.assertEqual(resp.json()["error_code"], "OPENROUTER_API_ERROR")
+        self.assertEqual(resp.json()["error_code"], "LLM_API_ERROR")
 
-    @patch("Research_AI_Assistant.views.OpenRouterService")
+    @patch("Research_AI_Assistant.views.get_llm")
     def test_summarise_missing_api_key_returns_503(self, mock_service_class):
         """OpenRouterAPIError raised at service init (no key) must return 503."""
         mock_service_class.side_effect = OpenRouterAPIError(
@@ -973,7 +974,7 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
         )
         self.assertEqual(resp.status_code, 503)
 
-    @patch("Research_AI_Assistant.views.OpenRouterService")
+    @patch("Research_AI_Assistant.views.get_llm")
     def test_summarise_passes_all_papers_uncapped(self, mock_service_class):
         """
         The view currently passes every paper straight to build_user_message
@@ -1382,3 +1383,32 @@ class TestMultiPaperQAAuth(TestCase):
         ) as mock_chunk:
             self._post()
         mock_chunk.assert_called_once()
+
+
+class TestMultiPaperQALLMError(ClerkAuthTestMixin, TestCase):
+    """An LLMError from get_llm() (bad LLM_BACKEND, missing Ollama config,
+    etc.) must return 503 like summarise/generate_title do, not the generic
+    500 from the catch-all Exception handler."""
+
+    def _post(self):
+        return self.client.post(
+            reverse("research_ai_assistant:multi_paper_qa"),
+            data=json.dumps(
+                {
+                    "paper_ids": ["W1"],
+                    "question": "q",
+                    "pdf_urls": {"W1": "https://example.test/a.pdf"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+    @patch("Research_AI_Assistant.views.get_llm")
+    @patch("Research_AI_Assistant.views.QAChunkCache.get_or_chunk")
+    def test_llm_error_returns_503_not_500(self, mock_chunk, mock_get_llm):
+        mock_chunk.return_value = {
+            "chunks": [{"paper_id": "W1", "page": 1, "text": "hello", "token_estimate": 5}]
+        }
+        mock_get_llm.side_effect = LLMError("Invalid LLM_BACKEND 'bogus'.")
+        resp = self._post()
+        self.assertEqual(resp.status_code, 503)

@@ -372,9 +372,19 @@ DOMManager.prototype.generateResearchResponse = async function() {
 DOMManager.prototype.loadMorePapers = async function() {
   if (!window.appState.nextCursor || window.appState.isLoadingMore) return;
 
-  window.appState.isLoadingMore = true;
   const btn = this.elements.loadMoreBtn;
   const status = this.elements.loadMoreStatus;
+
+  // searchParams is only set by a fresh search; without it the request below
+  // would throw before any feedback reached the user.
+  if (!window.appState.searchParams?.query) {
+    if (status) status.textContent = "Error: search context lost. Run the search again.";
+    return;
+  }
+
+  window.appState.isLoadingMore = true;
+  let loadFailed = false;
+  let firstNewNode = null;
 
   if (btn) btn.disabled = true;
   if (status) status.textContent = "Loading more papers...";
@@ -399,7 +409,16 @@ DOMManager.prototype.loadMorePapers = async function() {
     );
 
     if (!response.ok) {
-      throw new Error(`Load more error ${response.status}`);
+      // Surface the server's own message (e.g. OpenAlex being unreachable)
+      // rather than just the status code.
+      let detail = "";
+      try {
+        const errBody = await response.json();
+        detail = errBody.error || errBody.detail || "";
+      } catch (_parseErr) {
+        // Non-JSON body; the status code below is all we have.
+      }
+      throw new Error(detail || `Load more error ${response.status}`);
     }
 
     const data = await response.json();
@@ -457,6 +476,7 @@ DOMManager.prototype.loadMorePapers = async function() {
       labelDiv.textContent = "Summary of Additional Papers";
       labelDiv.className = "summary-label";
       this.elements.researchChatContainer.appendChild(labelDiv);
+      firstNewNode = labelDiv;
 
       // Add summary as assistant message
       const summaryDiv = this.addMessage(
@@ -501,6 +521,7 @@ DOMManager.prototype.loadMorePapers = async function() {
       `;
       errorDiv.querySelector(".summary-error-message__detail").textContent = err.message;
       this.elements.researchChatContainer.appendChild(errorDiv);
+      firstNewNode = errorDiv;
 
       // Add retry functionality
       const retryBtn = errorDiv.querySelector("button");
@@ -570,13 +591,17 @@ DOMManager.prototype.loadMorePapers = async function() {
       this.elements.researchChatContainer.appendChild(messageDiv);
     }
   } catch (err) {
+    console.error("Load more failed:", err);
+    loadFailed = true;
     if (status) status.textContent = `Error: ${err.message}`;
     // Still update pagination info even on error to show correct state
     this.updatePaginationInfo();
   } finally {
     window.appState.isLoadingMore = false;
     if (btn) btn.disabled = false;
-    if (status) status.textContent = "";
+    // Keep an error visible; only clear the "Loading..." text on success.
+    if (status && !loadFailed) status.textContent = "";
+    if (firstNewNode) firstNewNode.scrollIntoView({ behavior: "smooth", block: "start" });
 
     // Final pagination update to ensure button visibility is correct
     this.updatePaginationInfo();

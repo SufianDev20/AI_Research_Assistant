@@ -28,7 +28,8 @@ CLERK_AUTHORIZED_PARTIES = env.list(
 
 OPENALEX_EMAIL = env("OPENALEX_EMAIL")
 OPENALEX_API_KEY = env("OPENALEX_API_KEY", default=None)
-OPENROUTER_API_KEY = env("OPENROUTER_API_KEY")
+# Empty is allowed so OpenRouter can be removed (LLM_BACKEND=ollama).
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
 OPENROUTER_TIMEOUT_SECONDS = env.int("OPENROUTER_TIMEOUT_SECONDS", default=60)
 OPENROUTER_SITE_URL = env("OPENROUTER_SITE_URL", default="https://127.0.0.1:8080")
 OPENROUTER_SITE_NAME = "Research_AI_Assistant"
@@ -42,6 +43,23 @@ OPENROUTER_PIN_DEFAULT_MODEL = env.bool("OPENROUTER_PIN_DEFAULT_MODEL", default=
 OPENROUTER_MODELS_CACHE_SECONDS = env.int(
     "OPENROUTER_MODELS_CACHE_SECONDS", default=6 * 60 * 60
 )
+
+# University research server (PostgreSQL corpus + Ollama), reached through the
+# Cloudflare tunnel. An empty URL or key disables the local corpus and Ollama.
+# Use the permanent RESEARCH_API_KEY, not a 12-hour login session token.
+RESEARCH_API_URL = env("RESEARCH_API_URL", default="").rstrip("/")
+RESEARCH_API_KEY = env("RESEARCH_API_KEY", default="")
+RESEARCH_READ_TIMEOUT_SECONDS = (
+    6,
+    env.int("RESEARCH_READ_TIMEOUT_SECONDS", default=30),
+)
+
+# Which LLM answers summaries, titles and Q&A:
+#   openrouter | ollama | ollama_then_openrouter
+LLM_BACKEND = env("LLM_BACKEND", default="openrouter")
+LLM_TIMEOUT = (6, env.int("LLM_READ_TIMEOUT_SECONDS", default=240))
+LLM_JOB_DEADLINE_SECONDS = env.int("LLM_JOB_DEADLINE_SECONDS", default=240)
+LLM_NUM_CTX = env.int("LLM_NUM_CTX", default=8192)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -179,5 +197,10 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "loggers": {"Research_AI_Assistant": {"handlers": ["console"], "level": "DEBUG" if DEBUG else "INFO"}},
+    "loggers": {
+        "Research_AI_Assistant": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+        }
+    },
 }

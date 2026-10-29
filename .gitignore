@@ -21,7 +21,6 @@ db.sqlite3
 *.log
 skills-lock.json
 # Editor folders
-.vscode/
 .idea/
 
 # OS files
@@ -33,6 +32,7 @@ Thumbs.db
 .vscode/
 .agents/
 .claude/
+docs/
 # Python testing and profiling
 .pytest_cache/
 .mypy_cache/

@@ -6,7 +6,10 @@ Handles all interactions with OpenAlex API using pyalex library.
 from pyalex import Works, Authors
 from django.conf import settings
 from typing import List, Optional, Dict
-import logging, pyalex
+import logging, pyalex, time
+import requests
+
+logger = logging.getLogger(__name__)
 
 # Configure PyAlex API key if available
 try:
@@ -15,18 +18,59 @@ try:
     ):
         pyalex.config.email = settings.OPENALEX_EMAIL
         pyalex.config.api_key = settings.OPENALEX_API_KEY
-        logger = logging.getLogger(__name__)
-        logger.info("PyAlex API key configured")
+        if settings.OPENALEX_API_KEY:
+            logger.info("PyAlex API key configured")
+        else:
+            logger.warning(
+                "OPENALEX_API_KEY is empty: Load More (cursor paging) will fail with 401."
+            )
 except Exception as e:
-    logging.getLogger(__name__).warning(f"Failed to configure PyAlex API key: {e}")
-
-logger = logging.getLogger(__name__)
+    logger.warning(f"Failed to configure PyAlex API key: {e}")
 
 
 class OpenAlexAPIError(Exception):
     """Custom exception for OpenAlex API failures."""
 
     pass
+
+
+# OpenAlex sometimes answers with 429/5xx under load; those clear on their
+# own, so retry a few times before giving up. 401 is not retried: a wrong or
+# expired key returns it on every attempt, so retrying it only wastes time.
+RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 1.0
+
+
+def _response_detail(exc) -> str:
+    """OpenAlex's own explanation (e.g. "API key required for cursor paging")."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    try:
+        body = response.json()
+        message = body.get("message") or body.get("error") or ""
+    except ValueError:
+        message = (response.text or "")[:200]
+    return f" — OpenAlex says: {message}" if message else ""
+
+
+def _get_with_retry(works_query, **kwargs):
+    """Run works_query.get(**kwargs), retrying transient OpenAlex errors."""
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            return works_query.get(**kwargs)
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response is not None else None
+            if status_code not in RETRYABLE_STATUSES or attempt == MAX_ATTEMPTS:
+                raise
+            logger.warning(
+                "OpenAlex returned %s (attempt %d/%d); retrying.",
+                status_code,
+                attempt,
+                MAX_ATTEMPTS,
+            )
+            time.sleep(RETRY_DELAY_SECONDS * attempt)
 
 
 class OpenAlexService:
@@ -147,7 +191,8 @@ class OpenAlexService:
                 if sample_page < 4:
                     meta["next_cursor"] = f"sample:{base_seed}:{sample_page + 1}"
             else:
-                results_list, meta = works_query.get(
+                results_list, meta = _get_with_retry(
+                    works_query,
                     return_meta=True,
                     per_page=per_page,
                     cursor=cursor or "*",
@@ -167,6 +212,7 @@ class OpenAlexService:
             )
             raise OpenAlexAPIError(
                 f"Failed to retrieve papers from OpenAlex: {str(e)}"
+                f"{_response_detail(e)}"
             ) from e
 
     def search_authors(

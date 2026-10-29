@@ -22,9 +22,10 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import QueryLog
+from .services.local_corpus_service import LocalCorpusError, LocalCorpusService
 from .services.openalex_service import OpenAlexAPIError, OpenAlexService
 from .services.extract_service import ExtractionService
-from .services.openrouter_service import OpenRouterAPIError, OpenRouterService
+from .services.llm_service import LLMError, get_llm
 from .services.prompt_builder import (
     system_prompt,
     build_user_message,
@@ -226,6 +227,50 @@ def search(request):
         load_more,
     )
 
+    # Local corpus first. Only for a first page with no filters the local
+    # server cannot honour. Any failure or weak result falls through to OpenAlex.
+    # The frontend always sends the full default range (1900-2026). That is not
+    # a real filter, so it must not switch the local corpus off.
+    year_filter_active = (min_year not in (None, 1900)) or (
+        max_year not in (None, 2026)
+    )
+
+    local_corpus_service = LocalCorpusService()  # reads settings per request
+    if (
+        local_corpus_service.enabled
+        and not cursor
+        and not load_more
+        and not open_access_only
+        and not year_filter_active
+    ):
+        try:
+            local = local_corpus_service.search(query, per_page)
+            if LocalCorpusService.is_sufficient(local):
+                papers = local["papers"]
+                try:
+                    QueryLog.objects.create(
+                        query_text=query, ranking_mode=mode, result_count=len(papers)
+                    )
+                except Exception:
+                    logger.warning("Failed to write QueryLog entry.", exc_info=True)
+                return JsonResponse(
+                    {
+                        "papers": papers,
+                        "count": len(papers),
+                        "total_count": len(papers),
+                        "per_page": per_page,
+                        "next_cursor": None,
+                        "has_more": False,
+                        "mode": mode,
+                        "query": query,
+                        "message": None,
+                        "source": "local",
+                    }
+                )
+            logger.info("Local corpus insufficient for '%s'; using OpenAlex.", query)
+        except LocalCorpusError as exc:
+            logger.warning("Local corpus unavailable (%s); using OpenAlex.", exc)
+
     try:
         # Fetch raw works from OpenAlex with pagination
         api_response = openalex_service.search_papers(
@@ -278,6 +323,7 @@ def search(request):
             "mode": mode,
             "query": query,
             "message": message,
+            "source": "openalex",
         }
     )
 
@@ -314,8 +360,8 @@ def generate_title(request):
         )
 
     try:
-        # Initialize OpenRouter service
-        openrouter_service = OpenRouterService()
+        # Select the configured LLM backend (see services/llm_service.py)
+        llm = get_llm()
 
         # Convert conversation history to a single user message for title generation
         conversation_text = "\n".join(
@@ -326,7 +372,7 @@ def generate_title(request):
         )
 
         # Get title from LLM
-        title = openrouter_service.complete(
+        title = llm.complete(
             system_prompt="You are a helpful assistant that generates concise, professional titles for research conversations.",
             user_message=f"Based on this conversation, suggest a short, catchy, professional title (maximum 40 characters). Respond with ONLY the title text - no quotes, explanations, or extra words.\n\nConversation:\n{conversation_text}",
             request_type="title",
@@ -340,8 +386,8 @@ def generate_title(request):
 
         return JsonResponse({"title": title})
 
-    except OpenRouterAPIError as exc:
-        logger.error("OpenRouter title generation error: %s", exc)
+    except LLMError as exc:
+        logger.error("LLM title generation error: %s", exc)
         return JsonResponse(
             {"error": "Service temporarily unavailable"},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -437,14 +483,14 @@ def summarise(request):
         return JsonResponse({"error": "Missing or invalid 'papers' field"}, status=400)
 
     try:
-        # Initialize OpenRouter service
-        openrouter_service = OpenRouterService()
+        # Select the configured LLM backend (see services/llm_service.py)
+        llm = get_llm()
 
         # Build user message with papers context
         user_message = build_user_message(papers, query)
 
         # Get summary from LLM
-        summary = openrouter_service.complete(
+        summary = llm.complete(
             system_prompt=system_prompt,
             user_message=user_message,
             request_type="summary",
@@ -459,7 +505,7 @@ def summarise(request):
                 "OpenRouter returned an invalid summary format; retrying with "
                 "a stricter format instruction."
             )
-            summary = openrouter_service.complete(
+            summary = llm.complete(
                 system_prompt=(
                     f"{system_prompt}\n\n"
                     "This is a format repair attempt. Start your response "
@@ -482,12 +528,12 @@ def summarise(request):
             },
             status=502,
         )
-    except OpenRouterAPIError as exc:
-        logger.error("OpenRouter summarise error: %s", exc)
+    except LLMError as exc:
+        logger.error("LLM summarise error: %s", exc)
         return JsonResponse(
             {
                 "error": "Service temporarily unavailable",
-                "error_code": "OPENROUTER_API_ERROR",
+                "error_code": "LLM_API_ERROR",
                 "message": "Summary service temporarily unavailable - please try again later",
             },
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -684,15 +730,19 @@ def multi_paper_qa(request):
     _, legend = build_paper_legend(validated.get("paper_meta"), papers_chunks.keys())
 
     try:
-        openrouter_service = OpenRouterService()
-        llm_result = QACompletionService.ask(
-            openrouter_service, context_chunks, question, legend
-        )
+        llm = get_llm()
+        llm_result = QACompletionService.ask(llm, context_chunks, question, legend)
     except QACompletionError as exc:
         logger.error("Multi-paper Q&A completion failed: %s", exc)
         return Response(
             {"error": f"LLM request failed: {exc}", "paper_errors": paper_errors},
             status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except LLMError as exc:
+        logger.error("Multi-paper Q&A: LLM backend unavailable: %s", exc)
+        return Response(
+            {"error": "Service temporarily unavailable", "paper_errors": paper_errors},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except Exception as exc:
         logger.exception("Unexpected error during multi-paper Q&A completion")

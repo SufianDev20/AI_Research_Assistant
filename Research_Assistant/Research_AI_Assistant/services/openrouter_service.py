@@ -15,6 +15,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
+from .llm_service import LLMError
 from .performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,7 @@ def fetch_free_models() -> List[str]:
         ) from exc
 
 
-class OpenRouterAPIError(Exception):
+class OpenRouterAPIError(LLMError):
     """Raised when the OpenRouter API returns an error or an unexpected response."""
 
     pass
