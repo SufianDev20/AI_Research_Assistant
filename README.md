@@ -31,12 +31,12 @@ The diagram shows how a request moves through the app. Solid arrows are normal c
 
 ```mermaid
 flowchart LR
-    subgraph Browser["Browser"]
+    subgraph Browser [Browser]
         WS["Workspace /workspace/"]
         AN["Analysis /analysis/"]
     end
 
-    subgraph Django["Django app (Research_AI_Assistant)"]
+    subgraph Django [Django app - Research_AI_Assistant]
         AUTH["ClerkAuthentication (JWT)"]
         SEARCH["views.search"]
         SUM["views.summarise / generate_title"]
@@ -50,10 +50,10 @@ flowchart LR
         PT["PerformanceTracker"]
         QAPIPE["qa_pipeline + qa_llm"]
         CACHE["QAChunkCache"]
-        DB[("SQLite / ResponseLog, PaperPDF")]
+        DB[("SQLite - ResponseLog, PaperPDF")]
     end
 
-    subgraph External["External services"]
+    subgraph External [External services]
         RS["University research server"]
         OALEX["OpenAlex API"]
         ORAPI["OpenRouter API"]
