@@ -147,6 +147,30 @@ class OllamaServiceTests(SimpleTestCase):
             OllamaService().complete(**KW)
         self.assertIn("timed out", str(ctx.exception))
 
+    @override_settings(LLM_JOB_DEADLINE_SECONDS=240, LLM_QA_JOB_DEADLINE_SECONDS=60)
+    @patch("Research_AI_Assistant.services.ollama_service.time.monotonic")
+    @patch(GET)
+    @patch(POST)
+    def test_qa_uses_short_deadline(self, post, get, mono):
+        post.return_value = _submitted()
+        get.return_value = _job("processing")
+        mono.side_effect = [0, 100]  # 100 > 60 qa deadline, so one poll then stop
+        with self.assertRaises(OllamaAPIError) as ctx:
+            OllamaService().complete(**KW, request_type="qa")
+        self.assertIn("timed out after 60s", str(ctx.exception))
+
+    @override_settings(LLM_JOB_DEADLINE_SECONDS=240, LLM_QA_JOB_DEADLINE_SECONDS=60)
+    @patch("Research_AI_Assistant.services.ollama_service.time.monotonic")
+    @patch(GET)
+    @patch(POST)
+    def test_summary_uses_full_deadline(self, post, get, mono):
+        post.return_value = _submitted()
+        get.return_value = _job("processing")
+        mono.side_effect = [0, 100, 300]  # 100 < 240 polls once, 300 > 240 stops
+        with self.assertRaises(OllamaAPIError) as ctx:
+            OllamaService().complete(**KW, request_type="summary")
+        self.assertIn("timed out after 240s", str(ctx.exception))
+
     @patch(GET)
     @patch(POST)
     def test_validator_retries_once_then_succeeds(self, post, get):

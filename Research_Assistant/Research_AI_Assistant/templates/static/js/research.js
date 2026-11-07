@@ -395,7 +395,12 @@ DOMManager.prototype.loadMorePapers = async function() {
   }
 
   try {
-    const perPage = window.appState.searchParams?.perPage || 25;
+    // Quota filter = number of NEW papers each Load More must add. Load More is
+    // keyword search (semantic search can't paginate), so its order can repeat
+    // papers already shown from the semantic first page; over-fetch (API max 50),
+    // then drop shown ids and trim back to the quota below.
+    const quota = window.appState.searchParams?.perPage || 25;
+    const perPage = Math.min(quota * 2, 50);
     let yearParams = "";
     if (window.appState.searchParams && window.appState.searchParams.minYear) {
       yearParams += `&min_year=${encodeURIComponent(window.appState.searchParams.minYear)}`;
@@ -425,6 +430,14 @@ DOMManager.prototype.loadMorePapers = async function() {
 
     // Update cursor for next load
     window.appState.nextCursor = data.next_cursor;
+
+    // Drop papers already shown, then trim to the quota filter
+    const shownIds = new Set(
+      window.appState.currentResearchBinder.papers.map((p) => p.openalex_id),
+    );
+    data.papers = (data.papers || [])
+      .filter((p) => !shownIds.has(p.openalex_id))
+      .slice(0, quota);
 
     // Append new papers to the main papers array
     window.appState.currentResearchBinder.papers.push(...data.papers);

@@ -59,6 +59,9 @@ RESEARCH_READ_TIMEOUT_SECONDS = (
 LLM_BACKEND = env("LLM_BACKEND", default="openrouter")
 LLM_TIMEOUT = (6, env.int("LLM_READ_TIMEOUT_SECONDS", default=240))
 LLM_JOB_DEADLINE_SECONDS = env.int("LLM_JOB_DEADLINE_SECONDS", default=240)
+# Q&A context is large; this server fails on it (~241s). Give up fast so the
+# OpenRouter fallback is reached in seconds. Summary keeps the full deadline.
+LLM_QA_JOB_DEADLINE_SECONDS = env.int("LLM_QA_JOB_DEADLINE_SECONDS", default=60)
 LLM_NUM_CTX = env.int("LLM_NUM_CTX", default=8192)
 
 # Quick-start development settings - unsuitable for production
@@ -169,6 +172,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     BASE_DIR / "Research_AI_Assistant" / "templates" / "static",
 ]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [

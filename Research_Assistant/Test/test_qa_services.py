@@ -515,5 +515,114 @@ class TestQARequestSerializerCandidates(unittest.TestCase):
         self.assertFalse(ok)
 
 
+class TestOcrAndGarbleRetry(unittest.TestCase):
+    """OCR logging and the one-shot garbled-text retry in _fetch_and_chunk_one."""
+
+    @staticmethod
+    def _dl():
+        from io import StringIO
+
+        return SimpleNamespace(
+            INFO_MESSAGES=StringIO(),
+            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop"),
+        )
+
+    def _run(self, to_markdown, dl):
+        pm4 = SimpleNamespace(to_markdown=to_markdown)
+        modules = {
+            "pymupdf4llm": pm4,
+            "pymupdf4llm.helpers": SimpleNamespace(document_layout=dl),
+            "pymupdf4llm.helpers.document_layout": dl,
+            "pymupdf": SimpleNamespace(open=lambda **kw: MagicMock()),
+        }
+        with patch(
+            "Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes",
+            return_value=b"pdf bytes",
+        ), patch.dict(sys.modules, modules):
+            return QAChunkService.fetch_and_chunk("https://example.test/a.pdf", "W1")
+
+    def test_garble_check_thresholds(self):
+        from Research_AI_Assistant.services import qa_pipeline as qp
+
+        self.assertFalse(qp._looks_garbled("Clean prose. " * 40))
+        self.assertTrue(qp._looks_garbled("�" * 300))
+        self.assertFalse(qp._looks_garbled("�" * 50))  # too short to judge
+        # Table/number-heavy but readable: letters ~0.3-0.4, must NOT be garbled.
+        self.assertFalse(qp._looks_garbled("| col value | 12 | 3.4 | 567 |\n" * 30))
+        # True gibberish: letters well under 0.3.
+        self.assertTrue(qp._looks_garbled("|@#1| 2| 3|@#|45|@#|6|\n" * 30))
+
+    def test_buffer_window_holds_the_lock(self):
+        # The clear->extract->count window must run under _OCR_LOG_LOCK so a
+        # concurrent request cannot clear the shared buffer mid-extraction.
+        from io import StringIO
+
+        from Research_AI_Assistant.services import qa_pipeline as qp
+
+        dl = SimpleNamespace(
+            INFO_MESSAGES=StringIO(),
+            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop"),
+        )
+        held = {}
+
+        def to_markdown(doc, **kwargs):
+            # If the lock is already held by us, a non-blocking acquire fails.
+            held["locked"] = not qp._OCR_LOG_LOCK.acquire(blocking=False)
+            if not held["locked"]:
+                qp._OCR_LOG_LOCK.release()
+            return [{"metadata": {"page_number": 1}, "text": "x" * 10}]
+
+        pm4 = SimpleNamespace(to_markdown=to_markdown)
+        with patch.dict(
+            sys.modules, {"pymupdf": SimpleNamespace(open=lambda **k: MagicMock())}
+        ):
+            qp.QAChunkService._to_markdown_pages(b"bytes", "W1", pm4, dl)
+        self.assertTrue(held["locked"])
+
+    def test_clean_text_is_extracted_without_retry(self):
+        clean = [{"metadata": {"page_number": 1}, "text": "Clean prose. " * 40}]
+        to_md = MagicMock(return_value=clean)
+
+        result = self._run(to_md, self._dl())
+
+        self.assertEqual(to_md.call_count, 1)
+        self.assertNotIn("use_ocr", to_md.call_args.kwargs)
+        self.assertEqual(result["chunks"][0]["page"], 1)
+
+    def test_garbled_text_retries_with_ocr_forced(self):
+        junk = [{"metadata": {"page_number": 1}, "text": "�" * 300}]
+        clean = [{"metadata": {"page_number": 1}, "text": "Clean prose. " * 40}]
+        to_md = MagicMock(side_effect=[junk, clean])
+
+        result = self._run(to_md, self._dl())
+
+        self.assertEqual(to_md.call_count, 2)
+        self.assertEqual(to_md.call_args.kwargs["use_ocr"], "force-drop")
+        self.assertIn("Clean prose", result["chunks"][0]["text"])
+
+    def test_ocr_already_ran_skips_retry(self):
+        dl = self._dl()
+
+        def run_with_ocr(*args, **kwargs):
+            dl.INFO_MESSAGES.write("OCR on page.number=1/2.\n")
+            return [{"metadata": {"page_number": 1}, "text": "�" * 300}]
+
+        to_md = MagicMock(side_effect=run_with_ocr)
+
+        self._run(to_md, dl)
+
+        self.assertEqual(to_md.call_count, 1)
+
+    def test_worse_retry_is_ignored(self):
+        first = [{"metadata": {"page_number": 1}, "text": "�" * 300}]
+        worse = [{"metadata": {"page_number": 1}, "text": "�" * 301}]
+        to_md = MagicMock(side_effect=[first, worse])
+
+        result = self._run(to_md, self._dl())
+
+        self.assertEqual(to_md.call_count, 2)
+        self.assertEqual(result["chunks"][0]["text"], "�" * 300)
+
+
 if __name__ == "__main__":
     unittest.main()

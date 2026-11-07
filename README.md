@@ -14,7 +14,7 @@ A comprehensive Django-based web application that serves as an AI-powered resear
 - **Live Free-Model Discovery**: The free-model list is fetched from OpenRouter's `/models` API and cached (6 hours by default), so there is no hardcoded model list to keep up to date. Non-chat models (classifiers, embedders, guardrails) are excluded using OpenRouter's own `supported_parameters` / `output_modalities` fields
 - **Performance Tracking System**: Comprehensive monitoring of model performance with reliability scoring
 - **Intelligent Model Selection**: Automatic fallback to best-performing models based on success rates and response times
-- **Paper Search Service**: Search academic papers with advanced filtering options (year range, open access status, random sampling)
+- **Paper Search Service**: Search academic papers with advanced filtering options (year range, open access status, random sampling). The first page uses OpenAlex semantic search (ranks by meaning). Year ranges and open-access status are applied to those results; a thin result set is topped up from keyword search. The response's `search_type` is `semantic`, `hybrid` or `keyword`
 - **Author Search Service**: Search for academic authors via OpenAlex API
 - **Metadata Extraction**: Comprehensive extraction of paper metadata including title, authors, abstract, publication year, DOI, research concepts, and open access information
 - **LLM Summarization**: Generate individual summaries for each paper with Harvard-style citations and 90%+ format compliance
@@ -151,52 +151,25 @@ Free models come and go, so no ranking is hardcoded here. The live ranking (reli
 - **Paper Analysis Page**: Select papers from a search, view them side-by-side, and run multi-paper Q&A with page-level, verified citations shown per answer. Papers with no PDF or open-access link (including every paper from the local research-server corpus) are shown but excluded from Q&A
 - **Binder System**: Save and organize research conversations with custom colors and titles
 - **Paper Cards**: Visual display of research papers with metadata and links
-- **Load More Functionality**: Seamless pagination for browsing large result sets
+- **Load More Functionality**: Seamless pagination for browsing large result sets. Load More appends new papers, skips any already shown, and continues with keyword ranking
 - **Real-time Search**: Instant search with loading indicators and error handling
-- **Year Filter**: Single slider to filter papers by publication year (1900-2026)
+- **Year Filter**: From/To inputs to filter papers by publication year (1900-2026). The default range is not a filter
 - **Dynamic Tooltip**: Interactive year display when adjusting the filter
 
 ## Interface Screenshots
 
 ### Main Interface
 
-![Main Interface](Research_Assistant/Research_AI_Assistant/templates/images/Interface.png)
+![Main Interface](Research_Assistant\Research_AI_Assistant\templates\images\frontend.png)
 
-### Year Filter Selection
+### Search Page
+![Search Page](Research_Assistant\Research_AI_Assistant\templates\images\search_page.png)
 
-![Year Filter 1](Research_Assistant/Research_AI_Assistant/templates/images/Filter1.png)
+### Summary Results
+![Summary Result](Research_Assistant\Research_AI_Assistant\templates\images\SummaryResponse.png)
 
-### Filter Options
-
-![Year Filter 2](Research_Assistant/Research_AI_Assistant/templates/images/Filter2.png)
-
-### Filter Number of Papers Selection
-
-![Number of Papers](Research_Assistant/Research_AI_Assistant/templates/images/Filter3.png)
-
-### Research Response View
-
-![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/ResponsePage.png)
-
-### Response Page Filter By Relevance for References
-
-![Filter By Relevance](Research_Assistant/Research_AI_Assistant/templates/images/FilterByRelevance.png)
-
-### Response Page Filter by Most Cited
-
-![Response Page](Research_Assistant/Research_AI_Assistant/templates/images/FilterMostCited.png)
-
-### Binder saving of the response page
-
-![Binder Saving](Research_Assistant/Research_AI_Assistant/templates/images/BinderSaved.png)
-
-### Binder delete of the response page
-
-![Binder Delete](Research_Assistant/Research_AI_Assistant/templates/images/BinderDelete.png)
-
-### Performance Dashboard
-
-![Performance Dashboard](Research_Assistant/Research_AI_Assistant/templates/images/Performance_Dashboard.png)
+### Multi Q&A 
+![Multi Q&A](Research_Assistant\Research_AI_Assistant\templates\images\MultiQ&A.png)
 
 ## Technology Stack
 
@@ -269,12 +242,12 @@ AIResearchAssistant/
             ├── llm_service.py           # get_llm(): picks the backend from LLM_BACKEND; FallbackLLM; LLMError
             ├── ollama_service.py        # Research-server Ollama client (async jobs, blocking fallback)
             ├── local_corpus_service.py  # Research-server paper search (first step of /api/search/)
-            ├── openalex_service.py      # OpenAlex API client (retries 429/5xx)
+            ├── openalex_service.py      # OpenAlex client: semantic-first search, filter handling, keyword top-up, retries 429/5xx
             ├── openrouter_service.py    # OpenRouter LLM client with performance tracking
             ├── extract_service.py       # Metadata extraction from OpenAlex
             ├── prompt_builder.py        # Summary LLM prompt construction
             ├── pdf_service.py           # PDF fetching + PyMuPDF4LLM extraction (SSRF-guarded)
-            ├── qa_pipeline.py           # Q&A chunking, context assembly, citation validation
+            ├── qa_pipeline.py           # Q&A chunking (per-paper PDF extraction, OCR retry for garbled text), context assembly, citation validation
             ├── qa_llm.py                # Q&A LLM prompt + JSON response parsing
             ├── qa_chunk_cache.py        # Caches Q&A chunks per paper to avoid re-OCR
             └── performance_tracker.py   # Model performance monitoring and intelligent fallback
@@ -349,6 +322,7 @@ AIResearchAssistant/
    | `LLM_READ_TIMEOUT_SECONDS` | `240` | Read timeout for the blocking Ollama fallback call |
    | `LLM_JOB_DEADLINE_SECONDS` | `240` | Total time to wait for one Ollama job |
    | `LLM_NUM_CTX` | `8192` | Context window requested from Ollama (the server may cap it) |
+   | `LLM_QA_JOB_DEADLINE_SECONDS` | `60` | Time to wait for one Ollama Q&A job before falling back to OpenRouter. Summaries keep `LLM_JOB_DEADLINE_SECONDS` |
 
    `OPENROUTER_API_KEY` may be left empty only when `LLM_BACKEND=ollama`. The research-server timeout variable is `RESEARCH_READ_TIMEOUT_SECONDS`; an older `RESEARCH_TIMEOUT` line in `.env` is ignored.
 
@@ -481,6 +455,8 @@ python Test/test_performance.py
 9. **Every signed-in request returns 401**: `CLERK_AUTHORIZED_PARTIES` is set to an empty value. Remove the line to use the default (`http://localhost:8080`)
 10. **Logs show `SWITCHING TO OPENROUTER`**: the Ollama backend failed and the request fell back to OpenRouter. Check the research server, or set `LLM_BACKEND=openrouter` to stop trying Ollama
 11. **Multi-paper Q&A returns 503**: `get_llm()` could not build a backend, usually an invalid `LLM_BACKEND` or `LLM_BACKEND=ollama` without `RESEARCH_API_URL` / `RESEARCH_API_KEY`
+12. **Q&A answer takes about a minute, then comes from OpenRouter**: the research server gave up on the large Q&A context after `LLM_QA_JOB_DEADLINE_SECONDS` (default 60). Expected behaviour. Check `SWITCHING TO OPENROUTER` in the logs
+13. **First Q&A on a scanned PDF is slow**: pages that need OCR are read once and the chunks are cached. Logs show `PDF extraction for <id>: <seconds>s, <pages> pages, <n> OCR pages`
 
 ### Performance Monitoring
 

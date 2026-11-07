@@ -288,6 +288,7 @@ def search(request):
         meta = api_response.get("meta", {})
         total_count = meta.get("count", len(raw_results))
         next_cursor = meta.get("next_cursor")
+        search_type = api_response.get("search_type", "keyword")
 
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -324,6 +325,7 @@ def search(request):
             "query": query,
             "message": message,
             "source": "openalex",
+            "search_type": search_type,
         }
     )
 

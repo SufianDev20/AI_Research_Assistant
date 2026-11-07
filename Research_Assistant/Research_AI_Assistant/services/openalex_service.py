@@ -73,6 +73,23 @@ def _get_with_retry(works_query, **kwargs):
             time.sleep(RETRY_DELAY_SECONDS * attempt)
 
 
+def _matches_unsupported_filters(work, oa_status, min_year, max_year) -> bool:
+    """Apply oa_status and year-range filters that OpenAlex semantic search rejects."""
+    if oa_status:
+        open_access = work.get("open_access") or {}
+        if open_access.get("oa_status") != oa_status:
+            return False
+    if min_year is not None or max_year is not None:
+        year = work.get("publication_year")
+        if year is None:
+            return False
+        if min_year is not None and year < min_year:
+            return False
+        if max_year is not None and year > max_year:
+            return False
+    return True
+
+
 class OpenAlexService:
     """Fetch and process data from OpenAlex API."""
 
@@ -134,28 +151,53 @@ class OpenAlexService:
         if min_year is not None and max_year is not None and min_year > max_year:
             raise ValueError("min_year cannot be greater than max_year")
 
-        try:
-            works_query = Works().search(query)
+        # The frontend always sends the default range 1900-2026. That is not a filter.
+        if min_year == 1900:
+            min_year = None
+        if max_year == 2026:
+            max_year = None
+
+        year_is_exact = min_year is not None and min_year == max_year
+        year_is_range = (
+            min_year is not None or max_year is not None
+        ) and not year_is_exact
+        # OpenAlex semantic rejects oa_status and date-range filters. Those are
+        # applied to the semantic pool in Python, topped up from keyword if thin.
+        needs_post_filter = bool(oa_status) or year_is_range
+
+        def build_query(semantic: bool):
+            # Semantic search (search.semantic) ranks by meaning. It is used only for
+            # the first page: it does not support cursor paging, so any cursor/sampling
+            # request stays on keyword search.
+            q = Works().similar(query) if semantic else Works().search(query)
 
             if exclude_retracted:
-                works_query = works_query.filter(is_retracted=False)
+                q = q.filter(is_retracted=False)
 
             if open_access_only:
-                works_query = works_query.filter(is_oa=True)
+                q = q.filter(is_oa=True)
+
+            if semantic:
+                # publication_year is the only year filter semantic accepts.
+                if year_is_exact:
+                    q = q.filter(publication_year=min_year)
+                return q
 
             if oa_status:
-                works_query = works_query.filter(oa_status=oa_status)
+                q = q.filter(oa_status=oa_status)
 
             # Add year filters
             if min_year is not None:
-                works_query = works_query.filter(
-                    from_publication_date=f"{min_year}-01-01"
-                )
+                q = q.filter(from_publication_date=f"{min_year}-01-01")
 
             if max_year is not None:
-                works_query = works_query.filter(
-                    to_publication_date=f"{max_year}-12-31"
-                )
+                q = q.filter(to_publication_date=f"{max_year}-12-31")
+            return q
+
+        use_semantic = cursor is None and random_seed is None
+        search_type = "keyword"
+
+        try:
 
             # Cursor paging (OpenAlex documented) OR sampling mode (OpenAlex documented)
             #
@@ -180,6 +222,7 @@ class OpenAlexService:
                 effective_seed = base_seed + int(sample_page)
 
                 # Use documented sampling API
+                works_query = build_query(semantic=False)
                 results_list = works_query.sample(per_page, seed=effective_seed).get()
                 meta = {
                     "count": 0,
@@ -191,12 +234,90 @@ class OpenAlexService:
                 if sample_page < 4:
                     meta["next_cursor"] = f"sample:{base_seed}:{sample_page + 1}"
             else:
-                results_list, meta = _get_with_retry(
-                    works_query,
-                    return_meta=True,
-                    per_page=per_page,
-                    cursor=cursor or "*",
-                )
+                results_list = None
+                meta = {}
+                if use_semantic:
+                    try:
+                        raw_semantic, sem_meta = _get_with_retry(
+                            build_query(semantic=True),
+                            return_meta=True,
+                            per_page=50 if needs_post_filter else min(per_page, 50),
+                        )
+                        raw_semantic = list(raw_semantic)
+                        if needs_post_filter:
+                            raw_semantic = [
+                                w
+                                for w in raw_semantic
+                                if _matches_unsupported_filters(
+                                    w, oa_status, min_year, max_year
+                                )
+                            ]
+                        semantic_page = raw_semantic[:per_page]
+                        if semantic_page:
+                            results_list = semantic_page
+                            search_type = "semantic"
+                            # Semantic has no cursor; Load More continues with
+                            # keyword search from the start of its cursor chain.
+                            count = (
+                                len(semantic_page)
+                                if needs_post_filter
+                                else sem_meta.get("count", 0)
+                            )
+                            meta = {"count": count, "next_cursor": "*"}
+                        else:
+                            logger.warning(
+                                "Semantic search returned no results; using keyword search"
+                            )
+                            results_list = None
+                    except Exception as sem_err:
+                        logger.warning(
+                            "Semantic search failed (%s); using keyword search",
+                            sem_err,
+                        )
+                        results_list = None
+
+                # Semantic pool too thin after post-filtering: top up from keyword
+                # (all filters applied server-side), de-duplicated.
+                if (
+                    results_list is not None
+                    and needs_post_filter
+                    and len(results_list) < per_page
+                ):
+                    try:
+                        kw_list, kw_meta = _get_with_retry(
+                            build_query(semantic=False),
+                            return_meta=True,
+                            per_page=per_page,
+                            cursor="*",
+                        )
+                        seen = {w.get("id") for w in results_list}
+                        for w in list(kw_list):
+                            if len(results_list) >= per_page:
+                                break
+                            if w.get("id") not in seen:
+                                results_list.append(w)
+                                seen.add(w.get("id"))
+                        search_type = "hybrid"
+                        # "*" (not the keyword page-2 cursor): Load More then
+                        # re-runs keyword from the start and the frontend
+                        # de-dupes, so keyword page-1 papers are not skipped.
+                        meta = {
+                            "count": kw_meta.get("count", 0),
+                            "next_cursor": "*",
+                        }
+                    except Exception as topup_err:
+                        logger.warning(
+                            "Keyword top-up failed (%s); returning semantic results only",
+                            topup_err,
+                        )
+
+                if results_list is None:
+                    results_list, meta = _get_with_retry(
+                        build_query(semantic=False),
+                        return_meta=True,
+                        per_page=per_page,
+                        cursor=cursor or "*",
+                    )
 
             return {
                 "results": list(results_list),
@@ -204,6 +325,7 @@ class OpenAlexService:
                     "count": meta.get("count", 0),
                     "next_cursor": meta.get("next_cursor"),
                 },
+                "search_type": search_type,
             }
 
         except Exception as e:

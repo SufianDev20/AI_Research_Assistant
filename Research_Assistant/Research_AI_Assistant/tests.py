@@ -72,29 +72,208 @@ class TestOpenAlexService(TestCase):
         mock_works_class.return_value = mock_works_instance
 
         mock_search_result = Mock()
-        mock_works_instance.search.return_value = mock_search_result
+        mock_works_instance.similar.return_value = mock_search_result
 
         mock_search_result.filter.return_value = mock_search_result
 
         mock_results = [{"id": "1", "title": "Test Paper"}]
         mock_search_result.get.return_value = (
             mock_results,
-            {"count": 1, "next_cursor": "abc"},
+            {"count": 1, "next_cursor": None},
         )
 
         service = OpenAlexService()
         result = service.search_papers("machine learning")
 
+        # First page uses semantic search; Load More continues with keyword
+        # from the start of its cursor chain ("*").
         self.assertEqual(
             result,
-            {"results": mock_results, "meta": {"count": 1, "next_cursor": "abc"}},
+            {
+                "results": mock_results,
+                "meta": {"count": 1, "next_cursor": "*"},
+                "search_type": "semantic",
+            },
         )
         mock_works_class.assert_called_once()
-        mock_works_instance.search.assert_called_once_with("machine learning")
+        mock_works_instance.similar.assert_called_once_with("machine learning")
+        mock_works_instance.search.assert_not_called()
         mock_search_result.filter.assert_called_once_with(is_retracted=False)
-        mock_search_result.get.assert_called_once_with(
-            return_meta=True, per_page=25, cursor="*"
+        mock_search_result.get.assert_called_once_with(return_meta=True, per_page=25)
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_semantic_empty_falls_back_to_keyword(self, mock_works_class):
+        """Zero semantic hits fall back to keyword search."""
+        mock_works_instance = Mock()
+        mock_works_class.return_value = mock_works_instance
+
+        semantic = Mock()
+        semantic.filter.return_value = semantic
+        semantic.get.return_value = ([], {"count": 0, "next_cursor": None})
+        keyword = Mock()
+        keyword.filter.return_value = keyword
+        keyword_results = [{"id": "9"}]
+        keyword.get.return_value = (keyword_results, {"count": 1, "next_cursor": "k2"})
+        mock_works_instance.similar.return_value = semantic
+        mock_works_instance.search.return_value = keyword
+
+        result = OpenAlexService().search_papers("odd query", per_page=10)
+
+        self.assertEqual(result["search_type"], "keyword")
+        self.assertEqual(result["results"], keyword_results)
+        self.assertEqual(result["meta"]["next_cursor"], "k2")
+        keyword.get.assert_called_once_with(return_meta=True, per_page=10, cursor="*")
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_semantic_error_falls_back_to_keyword(self, mock_works_class):
+        """A semantic API failure falls back to keyword search."""
+        mock_works_instance = Mock()
+        mock_works_class.return_value = mock_works_instance
+
+        semantic = Mock()
+        semantic.filter.return_value = semantic
+        semantic.get.side_effect = Exception("semantic down")
+        keyword = Mock()
+        keyword.filter.return_value = keyword
+        keyword.get.return_value = ([{"id": "5"}], {"count": 1, "next_cursor": None})
+        mock_works_instance.similar.return_value = semantic
+        mock_works_instance.search.return_value = keyword
+
+        result = OpenAlexService().search_papers("query")
+
+        self.assertEqual(result["search_type"], "keyword")
+        self.assertEqual(result["results"], [{"id": "5"}])
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_cursor_request_uses_keyword(self, mock_works_class):
+        """Load More (cursor set) never uses semantic search."""
+        mock_works_instance = Mock()
+        mock_works_class.return_value = mock_works_instance
+        keyword = Mock()
+        keyword.filter.return_value = keyword
+        keyword.get.return_value = ([{"id": "7"}], {"count": 1, "next_cursor": "n"})
+        mock_works_instance.search.return_value = keyword
+
+        result = OpenAlexService().search_papers("query", cursor="*")
+
+        mock_works_instance.similar.assert_not_called()
+        self.assertEqual(result["search_type"], "keyword")
+
+    def _semantic_keyword_mocks(self, mock_works_class, sem_results, kw_results=None):
+        works = Mock()
+        mock_works_class.return_value = works
+        semantic = Mock()
+        semantic.filter.return_value = semantic
+        semantic.get.return_value = (sem_results, {"count": 999, "next_cursor": None})
+        keyword = Mock()
+        keyword.filter.return_value = keyword
+        keyword.get.return_value = (
+            kw_results or [],
+            {"count": 42, "next_cursor": "kw2"},
         )
+        works.similar.return_value = semantic
+        works.search.return_value = keyword
+        return semantic, keyword
+
+    @staticmethod
+    def _filter_kwargs(mock_query):
+        return [c.kwargs for c in mock_query.filter.call_args_list]
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_default_year_range_is_not_a_filter(self, mock_works_class):
+        """Frontend default 1900-2026 must stay on plain semantic search."""
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, [{"id": "1"}])
+
+        result = OpenAlexService().search_papers("q", min_year=1900, max_year=2026)
+
+        self.assertEqual(result["search_type"], "semantic")
+        self.assertEqual(self._filter_kwargs(semantic), [{"is_retracted": False}])
+        keyword.get.assert_not_called()
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_exact_year_uses_publication_year_on_semantic(self, mock_works_class):
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, [{"id": "1"}])
+
+        result = OpenAlexService().search_papers("q", min_year=2023, max_year=2023)
+
+        self.assertEqual(result["search_type"], "semantic")
+        kwargs = self._filter_kwargs(semantic)
+        self.assertIn({"publication_year": 2023}, kwargs)
+        for k in kwargs:
+            self.assertNotIn("from_publication_date", k)
+            self.assertNotIn("to_publication_date", k)
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_year_range_post_filters_semantic_pool(self, mock_works_class):
+        pool = [{"id": str(y), "publication_year": y} for y in (2010, 2021, 2022, 2030)]
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, pool)
+
+        result = OpenAlexService().search_papers(
+            "q", per_page=2, min_year=2020, max_year=2024
+        )
+
+        self.assertEqual(result["search_type"], "semantic")
+        self.assertEqual([w["id"] for w in result["results"]], ["2021", "2022"])
+        self.assertEqual(result["meta"]["count"], 2)
+        for k in self._filter_kwargs(semantic):
+            self.assertNotIn("from_publication_date", k)
+            self.assertNotIn("to_publication_date", k)
+        keyword.get.assert_not_called()
+        semantic.get.assert_called_once_with(return_meta=True, per_page=50)
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_thin_semantic_pool_is_topped_up_from_keyword(self, mock_works_class):
+        pool = [{"id": "a", "publication_year": 2021}]
+        kw = [
+            {"id": "a", "publication_year": 2021},
+            {"id": "b", "publication_year": 2022},
+            {"id": "c", "publication_year": 2023},
+        ]
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, pool, kw)
+
+        result = OpenAlexService().search_papers(
+            "q", per_page=3, min_year=2020, max_year=2024
+        )
+
+        self.assertEqual(result["search_type"], "hybrid")
+        self.assertEqual([w["id"] for w in result["results"]], ["a", "b", "c"])
+        # next_cursor is "*", not the keyword page-2 cursor: Load More re-runs
+        # keyword from the start and the frontend de-dupes, so keyword page-1
+        # papers not used as top-up are not lost.
+        self.assertEqual(result["meta"], {"count": 42, "next_cursor": "*"})
+        kw_kwargs = self._filter_kwargs(keyword)
+        self.assertIn({"from_publication_date": "2020-01-01"}, kw_kwargs)
+        self.assertIn({"to_publication_date": "2024-12-31"}, kw_kwargs)
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_oa_status_filtered_client_side_on_semantic(self, mock_works_class):
+        pool = [
+            {"id": "g", "open_access": {"oa_status": "gold"}},
+            {"id": "b", "open_access": {"oa_status": "bronze"}},
+            {"id": "n", "open_access": None},
+        ]
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, pool)
+
+        result = OpenAlexService().search_papers("q", per_page=1, oa_status="gold")
+
+        self.assertEqual(result["search_type"], "semantic")
+        self.assertEqual([w["id"] for w in result["results"]], ["g"])
+        for k in self._filter_kwargs(semantic):
+            self.assertNotIn("oa_status", k)
+
+    @patch("Research_AI_Assistant.services.openalex_service.Works")
+    def test_post_filter_empty_falls_back_to_keyword(self, mock_works_class):
+        pool = [{"id": "x", "publication_year": 1990}]
+        kw = [{"id": "k", "publication_year": 2021}]
+        semantic, keyword = self._semantic_keyword_mocks(mock_works_class, pool, kw)
+
+        result = OpenAlexService().search_papers(
+            "q", per_page=5, min_year=2020, max_year=2024
+        )
+
+        self.assertEqual(result["search_type"], "keyword")
+        self.assertEqual(result["results"], kw)
+        keyword.get.assert_called_once_with(return_meta=True, per_page=5, cursor="*")
 
     @patch("Research_AI_Assistant.services.openalex_service.Works")
     def test_search_papers_with_filters(self, mock_works_class):

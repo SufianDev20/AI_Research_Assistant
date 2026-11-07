@@ -44,6 +44,11 @@ class OllamaService:
         self.api_key: str = getattr(settings, "RESEARCH_API_KEY", "") or ""
         self.timeout = getattr(settings, "LLM_TIMEOUT", (6, 240))
         self.job_deadline: int = int(getattr(settings, "LLM_JOB_DEADLINE_SECONDS", 240))
+        # Q&A sends a large context this server fails on (~241s). Give up fast
+        # so FallbackLLM reaches OpenRouter in seconds, not minutes.
+        self.qa_job_deadline: int = int(
+            getattr(settings, "LLM_QA_JOB_DEADLINE_SECONDS", 60)
+        )
         self.num_ctx: int = int(getattr(settings, "LLM_NUM_CTX", 8192))
         if not (self.base_url and self.api_key):
             raise OllamaAPIError("RESEARCH_API_URL and RESEARCH_API_KEY must be set.")
@@ -86,7 +91,7 @@ class OllamaService:
             logger.warning("Ollama request to %s failed: %s", path, exc)
             raise OllamaAPIError("Ollama server unreachable.") from exc
 
-    def _post(self, payload: dict) -> str:
+    def _post(self, payload: dict, job_deadline: Optional[int] = None) -> str:
         """Submit an async job and poll it, so no single request outlives the
         tunnel's ~100 s limit. Falls back to blocking POST /llm on servers
         that do not have /llm/jobs yet (404)."""
@@ -101,10 +106,10 @@ class OllamaService:
             job_id = response.json()["job_id"]
         except (ValueError, KeyError, TypeError) as exc:
             raise OllamaAPIError("Ollama server returned an invalid payload.") from exc
-        return self._poll_job(job_id)
+        return self._poll_job(job_id, job_deadline)
 
-    def _poll_job(self, job_id: str) -> str:
-        deadline = time.monotonic() + self.job_deadline
+    def _poll_job(self, job_id: str, job_deadline: Optional[int] = None) -> str:
+        deadline = time.monotonic() + (job_deadline or self.job_deadline)
         poll_errors = 0
         while time.monotonic() < deadline:
             time.sleep(POLL_INTERVAL_SECONDS)
@@ -137,7 +142,9 @@ class OllamaService:
                 return self._content_of(job.get("result"))
             if job_status == "failed":
                 raise OllamaAPIError(f"Ollama job failed: {job.get('error') or 'unknown'}.")
-        raise OllamaAPIError(f"Ollama job timed out after {self.job_deadline}s.")
+        raise OllamaAPIError(
+            f"Ollama job timed out after {job_deadline or self.job_deadline}s."
+        )
 
     def _post_blocking(self, payload: dict) -> str:
         response = self._request("/llm", payload, self.timeout)
@@ -165,12 +172,15 @@ class OllamaService:
             "num_ctx": self.num_ctx,
             "json_mode": request_type in JSON_REQUEST_TYPES,
         }
+        job_deadline = (
+            self.qa_job_deadline if request_type == "qa" else self.job_deadline
+        )
 
         last_error: Optional[Exception] = None
         # One retry, only when the reply fails the caller's format check.
         # Network and HTTP errors are not retried so a fallback starts fast.
         for attempt in (1, 2):
-            content = self._post(payload)
+            content = self._post(payload, job_deadline)
             if response_validator is None:
                 return content
             try:

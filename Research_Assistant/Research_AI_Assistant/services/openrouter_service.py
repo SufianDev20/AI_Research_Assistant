@@ -25,7 +25,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Default free model.
 # Browse free models at https://openrouter.ai/models?max_price=0
 DEFAULT_MODEL = "google/gemma-4-31b-it:free"
-DEFAULT_MAX_MODELS_PER_REQUEST = 5
+DEFAULT_MAX_MODELS_PER_REQUEST = 10
 
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 FREE_MODELS_CACHE_KEY = "openrouter:free_models"
