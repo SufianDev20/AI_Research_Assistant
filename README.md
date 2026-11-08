@@ -160,16 +160,16 @@ Free models come and go, so no ranking is hardcoded here. The live ranking (reli
 
 ### Main Interface
 
-![Main Interface](Research_Assistant\Research_AI_Assistant\templates\images\frontend.png)
+![Main Interface](Research_Assistant/Research_AI_Assistant/templates/images/frontend.png)
 
 ### Search Page
-![Search Page](Research_Assistant\Research_AI_Assistant\templates\images\search_page.png)
+![Search Page](Research_Assistant/Research_AI_Assistant/templates/images/search_page.png)
 
 ### Summary Results
-![Summary Result](Research_Assistant\Research_AI_Assistant\templates\images\SummaryResponse.png)
+![Summary Result](Research_Assistant/Research_AI_Assistant/templates/images/SummaryResponse.png)
 
 ### Multi Q&A 
-![Multi Q&A](Research_Assistant\Research_AI_Assistant\templates\images\MultiQ&A.png)
+![Multi Q&A](Research_Assistant/Research_AI_Assistant/templates/images/MultiQ&A.png)
 
 ## Technology Stack
 
