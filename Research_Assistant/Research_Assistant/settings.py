@@ -214,6 +214,8 @@ LOGGING = {
         "Research_AI_Assistant": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
-        }
+        },
+        "django.security": {"handlers": ["console"], "level": "WARNING"},
+        "django.request": {"handlers": ["console"], "level": "WARNING"},
     },
 }
