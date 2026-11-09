@@ -40,7 +40,7 @@ htmlcov/
 coverage_html_report/
 *.prof
 pip-log.txt
-
+data.json
 # Django
 db.sqlite3
 *.log

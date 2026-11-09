@@ -89,8 +89,6 @@ def api_root(request):
 
 
 @api_view(["GET"])
-@authentication_classes([])
-@permission_classes([AllowAny])
 @throttle_classes([SearchRateThrottle])
 def search(request):
     """
@@ -249,7 +247,10 @@ def search(request):
                 papers = local["papers"]
                 try:
                     QueryLog.objects.create(
-                        query_text=query, ranking_mode=mode, result_count=len(papers)
+                        query_text=query,
+                        ranking_mode=mode,
+                        result_count=len(papers),
+                        owner=request.user,
                     )
                 except Exception:
                     logger.warning("Failed to write QueryLog entry.", exc_info=True)
@@ -305,6 +306,7 @@ def search(request):
             query_text=query,
             ranking_mode=mode,
             result_count=len(papers),
+            owner=request.user,
         )
     except Exception:
         logger.warning("Failed to write QueryLog entry.", exc_info=True)

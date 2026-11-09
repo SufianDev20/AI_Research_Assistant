@@ -8,7 +8,8 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.http import JsonResponse
-from rest_framework.decorators import api_view, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import IsAdminUser
 from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
@@ -24,6 +25,7 @@ class modelPerformanceRateThrottle(AnonRateThrottle):
 
 
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 @throttle_classes([modelPerformanceRateThrottle])
 def model_performance_stats(request):
     """
@@ -88,6 +90,7 @@ def model_performance_stats(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 @throttle_classes([modelPerformanceRateThrottle])
 def model_details(request):
     """
@@ -202,6 +205,7 @@ def model_details(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 @throttle_classes([modelPerformanceRateThrottle])
 def model_comparison(request):
     """

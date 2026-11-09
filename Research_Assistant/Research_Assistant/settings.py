@@ -95,6 +95,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "Research_AI_Assistant.middleware.ClearPostgresRLSContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -124,12 +125,7 @@ WSGI_APPLICATION = "Research_Assistant.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+DATABASES = {"default": env.db_url("DATABASE_URL")}
 
 
 # Password validation
@@ -153,6 +149,18 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+# The host's proxy terminates HTTPS and sets X-Forwarded-Proto; without this,
+# SECURE_SSL_REDIRECT below would redirect forever.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 3600
+    # Left unset on purpose: include-subdomains and preload are hard to undo,
+    # and the site runs on a host-provided subdomain we don't own.
+    SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W021"]
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/

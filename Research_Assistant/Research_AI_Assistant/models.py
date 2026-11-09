@@ -22,6 +22,13 @@ class QueryLog(models.Model):
     ]
 
     query_text = models.CharField(max_length=500)
+    owner = models.ForeignKey(
+        "Research_AI_Assistant.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="query_logs",
+    )
     ranking_mode = models.CharField(
         max_length=20,
         choices=RANKING_CHOICES,
@@ -285,7 +292,9 @@ class UserManager(BaseUserManager):
             raise ValueError("Superuser must have is_staff=True")
         if not extra_fields.get("is_superuser"):
             raise ValueError("Superuser must have is_superuser=True")
-        return self.create_user(clerk_id, email=email, password=password, **extra_fields)
+        return self.create_user(
+            clerk_id, email=email, password=password, **extra_fields
+        )
 
 
 class User(AbstractBaseUser, PermissionsMixin):

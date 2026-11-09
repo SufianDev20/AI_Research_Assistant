@@ -4,6 +4,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from clerk_backend_api import authenticate_request, AuthenticateRequestOptions
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import connection
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -41,6 +42,17 @@ class ClerkAuthentication(BaseAuthentication):
             clerk_id=clerk_user_id,
             defaults={"is_active": True},
         )
+
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('app.user_id', %s, false)",
+                    [str(user.pk)],
+                )
+                cursor.execute(
+                    "SELECT set_config('app.is_staff', %s, false)",
+                    ["true" if user.is_staff else "false"],
+                )
 
         return (user, None)
 
