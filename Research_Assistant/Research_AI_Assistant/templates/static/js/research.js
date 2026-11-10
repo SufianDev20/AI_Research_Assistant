@@ -100,26 +100,19 @@ DOMManager.prototype.renderReferences = function(papers) {
       card.tabIndex = 0;
       card.title = "Open in Paper Analysis";
 
-      // OpenAlex returns doi as a full https://doi.org/... URL; only bare
-      // DOIs need the resolver prefix.
-      var doiUrl =
-        paper && paper.doi
-          ? /^https?:\/\//i.test(paper.doi)
-            ? paper.doi
-            : "https://doi.org/" + paper.doi
-          : "";
+      // Paper metadata is untrusted text: escape every value before innerHTML.
+      var doiUrl = this.paperDoiUrl(paper && paper.doi);
+      var title = this.escapeHtml((paper && paper.title) || "Untitled");
 
       var linkHtml = doiUrl
         ? '<a class="source-link" href="' +
-          doiUrl +
+          this.escapeHtml(doiUrl) +
           '" target="_blank" rel="noopener noreferrer">' +
-          (paper.title || "Untitled") +
+          title +
           "</a>"
-        : paper && paper.title
-          ? paper.title
-          : "Untitled";
+        : title;
 
-      var citationCount = paper.cited_by_count || 0;
+      var citationCount = Number(paper.cited_by_count) || 0;
       var meta = [paper.publication_year, paper.source]
         .filter(Boolean)
         .map((v) => this.escapeHtml(String(v)))

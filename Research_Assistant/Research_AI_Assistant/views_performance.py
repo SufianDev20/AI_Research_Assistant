@@ -11,22 +11,18 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework import status
-from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 
 from .models import ModelPerformance, ResponseLog, ModelReliability
 from .services.performance_tracker import PerformanceTracker
+from .throttles import PerformanceRateThrottle
 
 logger = logging.getLogger(__name__)
 
 
-class modelPerformanceRateThrottle(AnonRateThrottle):
-    rate = "60/m"
-
-
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
-@throttle_classes([modelPerformanceRateThrottle])
+@throttle_classes([PerformanceRateThrottle])
 def model_performance_stats(request):
     """
     Get comprehensive model performance statistics.
@@ -91,7 +87,7 @@ def model_performance_stats(request):
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
-@throttle_classes([modelPerformanceRateThrottle])
+@throttle_classes([PerformanceRateThrottle])
 def model_details(request):
     """
     Get detailed information for a specific model.
@@ -206,7 +202,7 @@ def model_details(request):
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
-@throttle_classes([modelPerformanceRateThrottle])
+@throttle_classes([PerformanceRateThrottle])
 def model_comparison(request):
     """
     Compare performance between multiple models.

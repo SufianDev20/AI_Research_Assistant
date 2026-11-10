@@ -61,7 +61,7 @@ DOMManager.prototype.generateAssistantResponse = function(binder, container) {
         domManager.generateTitle(binder);
       }
     } catch (err) {
-      assistantDiv.innerHTML = `Error: ${err.message}`;
+      assistantDiv.textContent = `Error: ${err.message}`;
     } finally {
       window.appState.isThinking = false;
       if (sendBtn) sendBtn.disabled = false;

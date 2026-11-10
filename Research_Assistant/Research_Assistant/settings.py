@@ -183,16 +183,33 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+# "throttle" holds the per-view rate-limit counters in a database table so all
+# gunicorn workers share one count (a per-process cache would multiply every
+# limit by the worker count). The table is created by migration
+# 0012_throttle_cache_table. "default" stays per-process.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "throttle": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "throttle_cache",
+    },
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
         # Remove BrowsableAPIRenderer in production — it adds overhead
     ],
+    # Defaults for views without their own @throttle_classes. Signed-in
+    # requests are only counted by UserRateThrottle; AnonRateThrottle skips
+    # them. The per-view limits live in Research_AI_Assistant/throttles.py.
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/min",
+        "user": "100/min",
     },
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "Research_AI_Assistant.authentication.ClerkAuthentication",

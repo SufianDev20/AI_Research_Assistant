@@ -1154,14 +1154,11 @@ class TestSummariseView(ClerkAuthTestMixin, TestCase):
         self.assertEqual(resp.status_code, 503)
 
     @patch("Research_AI_Assistant.views.get_llm")
-    def test_summarise_passes_all_papers_uncapped(self, mock_service_class):
+    def test_summarise_passes_all_papers_under_the_cap(self, mock_service_class):
         """
-        The view currently passes every paper straight to build_user_message
-        with no cap (unlike multi_paper_qa's QARequestSerializer, which caps
-        paper_ids at 10). Flagged to the user as an input-size gap worth a
-        cap, separate from the ponytail-audit scope this test suite was
-        otherwise fixed under; this test documents the current behavior
-        rather than a requirement.
+        Every paper under the cap (views.MAX_SUMMARY_PAPERS) is passed to
+        build_user_message; none are silently dropped. The cap itself is
+        covered by TestLLMInputCaps.
         """
         mock_instance = MagicMock()
         mock_instance.complete.return_value = MOCK_SUMMARY
@@ -1591,3 +1588,149 @@ class TestMultiPaperQALLMError(ClerkAuthTestMixin, TestCase):
         mock_get_llm.side_effect = LLMError("Invalid LLM_BACKEND 'bogus'.")
         resp = self._post()
         self.assertEqual(resp.status_code, 503)
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting for signed-in users
+# ---------------------------------------------------------------------------
+
+
+@override_settings(RESEARCH_API_URL="", RESEARCH_API_KEY="")
+class TestSignedInUserThrottling(ClerkAuthTestMixin, TestCase):
+    """Every API view except api_root requires sign-in, so the per-view rate
+    limits must count signed-in users. (They used to subclass
+    AnonRateThrottle, which DRF skips for any authenticated request.)"""
+
+    def _title(self):
+        return self.client.post(
+            reverse("research_ai_assistant:generate_title"),
+            data=json.dumps({"messages": [{"role": "user", "content": "hi"}]}),
+            content_type="application/json",
+        )
+
+    def _mock_llm(self):
+        patcher = patch("Research_AI_Assistant.views.get_llm")
+        mock_get_llm = patcher.start()
+        self.addCleanup(patcher.stop)
+        mock_get_llm.return_value.complete.return_value = "A Research Title"
+        return mock_get_llm.return_value
+
+    def test_generate_title_is_limited_to_20_per_minute(self):
+        self._mock_llm()
+        statuses = [self._title().status_code for _ in range(21)]
+        self.assertEqual(statuses, [200] * 20 + [429])
+
+    def test_summarise_shares_the_llm_limit_with_generate_title(self):
+        self._mock_llm()
+        for _ in range(20):
+            self._title()
+        resp = self.client.post(
+            reverse("research_ai_assistant:summarise"),
+            data=json.dumps({"query": "q", "papers": MOCK_PAPERS}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 429)
+
+    def test_limit_is_counted_per_user(self):
+        self._mock_llm()
+        for _ in range(21):
+            self._title()
+        other_user = User.objects.create(clerk_id="other-clerk-id")
+        with patch(
+            "Research_AI_Assistant.authentication.ClerkAuthentication.authenticate",
+            return_value=(other_user, None),
+        ):
+            self.assertEqual(self._title().status_code, 200)
+
+    def test_multi_paper_qa_is_limited_to_10_per_minute(self):
+        from .services.qa_pipeline import QAChunkError
+
+        body = json.dumps(
+            {
+                "paper_ids": ["W1"],
+                "question": "q",
+                "pdf_urls": {"W1": "https://example.test/a.pdf"},
+            }
+        )
+        with patch(
+            "Research_AI_Assistant.views.QAChunkCache.get_or_chunk",
+            side_effect=QAChunkError("blocked"),
+        ):
+            statuses = [
+                self.client.post(
+                    reverse("research_ai_assistant:multi_paper_qa"),
+                    data=body,
+                    content_type="application/json",
+                ).status_code
+                for _ in range(11)
+            ]
+        self.assertEqual(statuses, [422] * 10 + [429])
+
+    @patch("Research_AI_Assistant.views.openalex_service.search_papers")
+    def test_search_is_limited_to_60_per_minute(self, mock_search):
+        mock_search.return_value = {"results": [], "meta": {}}
+        url = reverse("research_ai_assistant:search")
+        statuses = [self.client.get(url, {"q": "x"}).status_code for _ in range(61)]
+        self.assertEqual(statuses, [200] * 60 + [429])
+
+    def test_performance_api_is_limited_to_60_per_minute(self):
+        self._test_user.is_staff = True
+        self._test_user.save()
+        url = reverse("research_ai_assistant:performance_stats")
+        statuses = [self.client.get(url).status_code for _ in range(61)]
+        self.assertEqual(statuses, [200] * 60 + [429])
+
+    def test_per_view_counters_are_shared_between_worker_processes(self):
+        """A per-process cache would multiply every limit by the number of
+        gunicorn workers, so the counters live in the database."""
+        from django.core.cache.backends.db import DatabaseCache
+
+        from . import views
+
+        for throttle in (
+            views.SearchRateThrottle,
+            views.GenerateTitle,
+            views.MultiPaperQAThrottle,
+        ):
+            self.assertIsInstance(throttle.cache, DatabaseCache, throttle.__name__)
+
+
+class TestLLMInputCaps(ClerkAuthTestMixin, TestCase):
+    """summarise and generate_title forward client text to the LLM, so the
+    amount they forward is bounded."""
+
+    @patch("Research_AI_Assistant.views.get_llm")
+    def test_summarise_rejects_more_than_50_papers(self, mock_get_llm):
+        resp = self.client.post(
+            reverse("research_ai_assistant:summarise"),
+            data=json.dumps({"query": "q", "papers": [MOCK_PAPERS[0]] * 51}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("50", resp.json()["error"])
+        mock_get_llm.return_value.complete.assert_not_called()
+
+    @patch("Research_AI_Assistant.views.get_llm")
+    def test_summarise_accepts_50_papers(self, mock_get_llm):
+        mock_get_llm.return_value.complete.return_value = MOCK_SUMMARY
+        resp = self.client.post(
+            reverse("research_ai_assistant:summarise"),
+            data=json.dumps({"query": "q", "papers": [MOCK_PAPERS[0]] * 50}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    @patch("Research_AI_Assistant.views.get_llm")
+    def test_generate_title_truncates_long_messages(self, mock_get_llm):
+        """Binder messages hold whole summaries; a title only needs the gist,
+        so each message is cut to 2000 characters rather than rejected."""
+        mock_get_llm.return_value.complete.return_value = "A Research Title"
+        messages = [{"role": "user", "content": "§" * 10_000}] * 5
+        resp = self.client.post(
+            reverse("research_ai_assistant:generate_title"),
+            data=json.dumps({"messages": messages}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        sent = mock_get_llm.return_value.complete.call_args[1]["user_message"]
+        self.assertEqual(sent.count("§"), 5 * 2000)

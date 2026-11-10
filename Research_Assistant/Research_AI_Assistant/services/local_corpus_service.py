@@ -10,6 +10,7 @@ these papers are excluded from multi-paper Q&A (see analysis.js's
 Settings (all optional; an empty URL or key disables the local corpus):
     RESEARCH_API_URL, RESEARCH_API_KEY, RESEARCH_TIMEOUT = (connect, read)
 """
+
 import logging
 from typing import Dict, List, Optional
 
@@ -34,9 +35,7 @@ def _split_authors(raw: str) -> List[Dict]:
         return []
     parts = raw.split(";") if ";" in raw else raw.split(",")
     return [
-        {"name": p.strip(), "orcid": "", "institutions": []}
-        for p in parts
-        if p.strip()
+        {"name": p.strip(), "orcid": "", "institutions": []} for p in parts if p.strip()
     ]
 
 
@@ -64,7 +63,7 @@ def to_paper(source: Dict, index: int) -> Dict:
         "oa_status": None,
         "has_pdf_link": False,
         "full_text_url": None,
-        "pdf_url": None,
+        "pdf_url": source.get("pdf_url"),
         "pdf_candidates": [],
         "oa_url": None,
         "referenced_works": [],
@@ -76,7 +75,9 @@ def to_paper(source: Dict, index: int) -> Dict:
 
 class LocalCorpusService:
     def __init__(self) -> None:
-        self.base_url: str = (getattr(settings, "RESEARCH_API_URL", "") or "").rstrip("/")
+        self.base_url: str = (getattr(settings, "RESEARCH_API_URL", "") or "").rstrip(
+            "/"
+        )
         self.api_key: str = getattr(settings, "RESEARCH_API_KEY", "") or ""
         self.timeout = getattr(settings, "RESEARCH_TIMEOUT", (6, 30))
 

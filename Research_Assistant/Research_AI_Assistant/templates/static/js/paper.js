@@ -8,9 +8,12 @@ DOMManager.prototype.markdownToHtml = function(text) {
   const held = [];
   const hold = (html) => `@@HOLD${held.push(html) - 1}@@`;
 
-  let processedText = text
+  // The summary is LLM output built from paper metadata, so it is untrusted.
+  // Escape all of it first; every tag in the result is one the rules below
+  // add. Rules that match on ">" or quotes must match the escaped form.
+  let processedText = this.escapeHtml(text)
     .replace(/```(?:\s*\w+)?\s*\n([\s\S]*?)\n```/g, (match, p1) => {
-      const code = this.escapeHtml(p1.trim());
+      const code = p1.trim();
       return "\n\n" + hold(`<pre class="code-block"><code>${code}</code></pre>`) + "\n\n";
     })
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
@@ -60,9 +63,9 @@ const PAPER_HEADING = /^(?:<h[2-4]>)?(?:<strong>)?Paper\s*<span class="cite">\[(
 const REFERENCES_HEADING = /^(?:<h[2-4]>)?(?:<strong>)?References:?(?:<\/strong>)?(?:<\/h[2-4]>)?$/i;
 const SUMMARY_FIELD = /^(?:<strong>)?(Authors?|Year|Source|DOI|Summary)(?::<\/strong>|<\/strong>:|:)\s*(.*)$/i;
 const EMPTY_FIELD_VALUE = /^(?:|n\/?a|none|unknown|not available|-)\.?$/i;
-// Only values that are unambiguously a DOI become links (the character
-// classes also keep quotes and angle brackets out of the href); anything
-// else stays plain text.
+// Only values that are unambiguously a DOI become links; anything else
+// stays plain text. Values reach these patterns already HTML-escaped (see
+// markdownToHtml), so a quote or angle bracket can only appear as an entity.
 const BARE_DOI = /^10\.\d{4,9}\/[^\s"'<>]+$/;
 const DOI_URL = /^https?:\/\/(?:dx\.)?doi\.org\/10\.\d{4,9}\/[^\s"'<>]+$/i;
 const BLOCK_TAGS = {
@@ -178,7 +181,7 @@ DOMManager.prototype.linesToBlocks = function(text) {
     } else if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
       start("ol");
       out.push(`<li>${m[1]}</li>`);
-    } else if ((m = line.match(/^>\s?(.*)$/))) {
+    } else if ((m = line.match(/^&gt;\s?(.*)$/))) {
       if (!start("quote")) out.push("<br>");
       out.push(m[1]);
     } else {
@@ -192,12 +195,22 @@ DOMManager.prototype.linesToBlocks = function(text) {
 };
 
 DOMManager.prototype.escapeHtml = function(unsafe) {
-  return unsafe
+  return String(unsafe ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+};
+
+// A paper's DOI as a doi.org URL. OpenAlex returns doi as a full
+// https://doi.org/... URL; only bare DOIs need the resolver prefix. The
+// result always starts with http(s)://, so it is safe as a link target once
+// escaped with escapeHtml.
+DOMManager.prototype.paperDoiUrl = function(doi) {
+  if (!doi) return "";
+  const value = String(doi);
+  return /^https?:\/\//i.test(value) ? value : "https://doi.org/" + value;
 };
 
 DOMManager.prototype.renderPaperCards = function(papers, container) {
@@ -274,6 +287,11 @@ DOMManager.prototype.createPaperCard = function(paper, index) {
       (paper.abstract.length > 150 ? "..." : "")
     : "No abstract available";
 
+  // Paper metadata is untrusted text: escape every value before innerHTML.
+  const esc = (value) => this.escapeHtml(value);
+  const doiUrl = this.paperDoiUrl(paper.doi);
+  const title = esc(paper.title || "Untitled");
+
   const card = document.createElement("div");
   card.className =
     "paper-card hover:bg-zinc-800/70 transition-colors cursor-pointer";
@@ -282,17 +300,17 @@ DOMManager.prototype.createPaperCard = function(paper, index) {
             <div class="paper-number">${index + 1}.</div>
             <div class="paper-details">
                 <div class="paper-title">
-                    ${paper.doi ? `<a href="https://doi.org/${paper.doi}" target="_blank" class="paper-link">${paper.title}</a>` : paper.title}
+                    ${doiUrl ? `<a href="${esc(doiUrl)}" target="_blank" rel="noopener noreferrer" class="paper-link">${title}</a>` : title}
                 </div>
-                <div class="paper-meta">${authors} • ${paper.publication_year || "N/A"}</div>
-                <div class="paper-abstract">${abstract}</div>
+                <div class="paper-meta">${esc(authors)} • ${esc(paper.publication_year || "N/A")}</div>
+                <div class="paper-abstract">${esc(abstract)}</div>
             </div>
         </div>
     `;
 
   card.onclick = (e) => {
-    if (!e.target.closest("a") && paper.doi) {
-      window.open(`https://doi.org/${paper.doi}`, "_blank");
+    if (!e.target.closest("a") && doiUrl) {
+      window.open(doiUrl, "_blank", "noopener");
     }
   };
 

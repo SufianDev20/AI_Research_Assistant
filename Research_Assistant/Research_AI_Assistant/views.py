@@ -17,7 +17,6 @@ from rest_framework.decorators import (
     throttle_classes,
 )
 from rest_framework.permissions import AllowAny
-from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -48,22 +47,18 @@ from .services.qa_llm import (
     build_paper_legend,
 )
 from .serializers import QARequestSerializer
+from .throttles import GenerateTitle, MultiPaperQAThrottle, SearchRateThrottle
 
 logger = logging.getLogger(__name__)
 
 openalex_service = OpenAlexService()
 
 
-class SearchRateThrottle(AnonRateThrottle):
-    """Rate throttle for search requests for Annonymous users"""
-
-    rate = "60/m"
-
-
-class GenerateTitle(AnonRateThrottle):
-    """Rate throttle for title generation requests for Annonymous users"""
-
-    rate = "20/m"
+# Bounds on client text forwarded to the LLM.
+# Search returns at most 50 papers per page, so a summary never needs more.
+MAX_SUMMARY_PAPERS = 50
+# Binder messages hold whole summaries; a title only needs the gist.
+TITLE_MESSAGE_MAX_CHARS = 2000
 
 
 @api_view(["GET"])
@@ -370,7 +365,8 @@ def generate_title(request):
         # Convert conversation history to a single user message for title generation
         conversation_text = "\n".join(
             [
-                f"{msg.get('role', '').title()}: {msg.get('content', '')}"
+                f"{msg.get('role', '').title()}: "
+                f"{str(msg.get('content', ''))[:TITLE_MESSAGE_MAX_CHARS]}"
                 for msg in messages[-5:]  # Use last 5 messages to avoid token limits
             ]
         )
@@ -485,6 +481,12 @@ def summarise(request):
 
     if not papers or not isinstance(papers, list):
         return JsonResponse({"error": "Missing or invalid 'papers' field"}, status=400)
+
+    if len(papers) > MAX_SUMMARY_PAPERS:
+        return JsonResponse(
+            {"error": f"At most {MAX_SUMMARY_PAPERS} papers can be summarised at once."},
+            status=400,
+        )
 
     try:
         # Select the configured LLM backend (see services/llm_service.py)
@@ -629,10 +631,6 @@ def search_authors(request):
     except OpenAlexAPIError as exc:
         logger.error("OpenAlex author search error: %s", exc)
         return JsonResponse({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-
-class MultiPaperQAThrottle(AnonRateThrottle):
-    rate = "10/m"  # PDF fetch + LLM call makes this an expensive endpoint
 
 
 @api_view(["POST"])

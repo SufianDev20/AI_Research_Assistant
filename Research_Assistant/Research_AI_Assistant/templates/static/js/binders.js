@@ -40,6 +40,12 @@ DOMManager.prototype.createBinderElement = function(binder) {
       ? binder.papers[0].title
       : null;
 
+  // Names, paper titles and messages are untrusted text (LLM output and
+  // paper metadata): escape every value before innerHTML.
+  var esc = this.escapeHtml;
+  var color = esc(binder.color);
+  var binderId = esc(binder.id);
+
   var card = document.createElement("div");
   card.className = "binder-card";
   var self = this;
@@ -50,25 +56,25 @@ DOMManager.prototype.createBinderElement = function(binder) {
   // Build HTML string with compatible syntax
   var html =
     '<div style="background: ' +
-    binder.color +
+    color +
     '" class="binder-color-bar"></div>' +
     '<div class="binder-content">' +
     '<div class="binder-header">' +
     '<div onclick="event.stopImmediatePropagation(); editBinderColor(\'' +
-    binder.id +
+    binderId +
     '\');" ' +
     'style="background: ' +
-    binder.color +
+    color +
     '" class="binder-color-dot"></div>' +
     '<div contenteditable="true" spellcheck="false" ' +
     'onblur="saveBinderName(\'' +
-    binder.id +
+    binderId +
     '\', this.innerText)" ' +
     'class="binder-title">' +
-    binder.name +
+    esc(binder.name) +
     "</div>" +
     '<button onclick="event.stopImmediatePropagation(); deleteBinder(\'' +
-    binder.id +
+    binderId +
     '\');" ' +
     'class="binder-delete-btn" title="Delete binder">' +
     '<i class="fa-solid fa-trash"></i>' +
@@ -81,8 +87,9 @@ DOMManager.prototype.createBinderElement = function(binder) {
       '<div class="binder-paper-preview">' +
       '<div class="binder-paper-label">Latest Paper</div>' +
       '<div class="binder-paper-title">' +
-      (firstPaper.substring(0, 80) +
-        (firstPaper.length > 80 ? "..." : "")) +
+      esc(
+        firstPaper.substring(0, 80) + (firstPaper.length > 80 ? "..." : ""),
+      ) +
       "</div>" +
       "</div>";
   }
@@ -116,8 +123,9 @@ DOMManager.prototype.createBinderElement = function(binder) {
       '<div class="binder-last-message">' +
       '<div class="binder-last-message-text">' +
       '"' +
-      (lastMessage.substring(0, 60) +
-        (lastMessage.length > 60 ? "..." : "")) +
+      esc(
+        lastMessage.substring(0, 60) + (lastMessage.length > 60 ? "..." : ""),
+      ) +
       '"' +
       "</div>" +
       "</div>";
