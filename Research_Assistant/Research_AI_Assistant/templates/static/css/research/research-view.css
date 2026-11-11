@@ -144,6 +144,19 @@
   flex-direction: column;
 }
 
+/* References card with the follow-up composer beneath it, at the same
+   width. The column is sticky as a whole; the references panel shrinks
+   to fit so its list scrolls internally and the composer stays visible. */
+.research-side {
+  position: sticky;
+  top: 6rem;
+  max-height: calc(100vh - 7.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
 .research-chat-container {
   display: flex;
   flex-direction: column;
@@ -602,51 +615,10 @@
 }
 
 /* ===== FOLLOW-UP COMPOSER =====
-   Sticky to the bottom of the viewport, inside the reading column
-   (.research-main-content):
-   - it is always reachable while the papers scroll past behind it;
-   - its width and left edge come from the column, so it never crosses
-     the references panel;
-   - a sticky element keeps its place in the flow, so once the reader
-     reaches the end it settles after Load More and the pagination line --
-     the last card, Load More, pagination and errors are never covered,
-     and no bottom padding has to be measured or reserved.
-   The scrolling ancestor is the page itself (no overflow container in
-   between: body's overflow-x propagates to the viewport), so sticky is
-   relative to the viewport. js/research-view.js adds .is-stuck while it
-   is pinned. */
+   Sits under the references card in .research-side; never shrinks, so
+   the references list gives up height first. */
 .research-input-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  margin-top: 1.5rem;
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
-}
-
-/* While pinned over the papers: a slightly deeper shadow, and the hint
-   line fades. The hint hangs below the composer out of flow, so the
-   pinned bar is only the composer plus its bottom margin, and fading it
-   never changes the column's height (which could otherwise make the bar
-   flip between pinned and resting at the boundary). It stays available
-   to screen readers through aria-describedby. */
-.research-input-bar.is-stuck .research-input-section {
-  box-shadow: 0 1px 2px rgba(18, 33, 25, 0.06), 0 14px 34px rgba(18, 33, 25, 0.14);
-}
-
-.research-input-bar .research-composer-hint {
-  position: absolute;
-  top: calc(100% - max(1rem, env(safe-area-inset-bottom)));
-  left: 0;
-  right: 0;
-  transition: opacity 0.2s var(--ease);
-}
-
-.research-input-bar.is-stuck .research-composer-hint {
-  opacity: 0;
-}
-
-.research-input-sentinel {
-  height: 0;
+  flex-shrink: 0;
 }
 
 .research-input-section {
@@ -725,12 +697,10 @@
 
 /* ===== REFERENCES PANEL ===== */
 .references-panel {
-  position: sticky;
-  top: 6rem;
-  max-height: calc(100vh - 7.5rem);
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background-color: var(--paper-raised);
   border: 1px solid var(--rule);
@@ -982,17 +952,6 @@
   background-color: rgba(169, 212, 190, 0.12);
 }
 
-/* The composer passes over the papers while pinned, so its surface must
-   be opaque (the shared dark card colour above is 96% alpha). */
-.app-body[data-theme="dark"] .research-input-section {
-  background-color: #1a3326;
-}
-
-.app-body[data-theme="dark"] .research-input-bar.is-stuck .research-input-section {
-  border-color: rgba(92, 184, 145, 0.38);
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.45);
-}
-
 .app-body[data-theme="dark"] .message.assistant .summary-card__meta a,
 .app-body[data-theme="dark"] .message.assistant .cite,
 .app-body[data-theme="dark"] .references-list .source-number,
@@ -1050,8 +1009,9 @@
     gap: 1rem;
   }
 
-  /* References become a collapsible section above the conversation */
-  .references-panel {
+  /* References become a collapsible section above the conversation,
+     with the composer following them in the normal flow */
+  .research-side {
     position: static;
     order: -1;
     max-height: none;
@@ -1126,7 +1086,6 @@
 
   .research-back-btn,
   .save-to-binder-btn,
-  .research-input-bar .research-composer-hint,
   .research-send-button,
   .filter-btn,
   .references-list .source-card,

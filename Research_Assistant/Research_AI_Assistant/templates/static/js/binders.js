@@ -244,6 +244,7 @@ DOMManager.prototype.openBinder = function(id) {
         );
         if (msg.role === "assistant") {
           div.innerHTML = this.markdownToHtml(msg.content);
+          this.addPaperDetails(div, binder.papers);
           div.style.opacity = "1";
         }
       }.bind(this),

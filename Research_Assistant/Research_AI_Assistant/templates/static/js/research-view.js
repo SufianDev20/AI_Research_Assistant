@@ -7,8 +7,6 @@
 //   - when it closes: return focus to the workspace search input
 //   - keep the references count and the sort buttons' aria-pressed in sync
 //   - expand/collapse the references section on narrow screens
-//   - mark the sticky follow-up composer .is-stuck while it is pinned to
-//     the bottom of the viewport (CSS fades its hint line then)
 (function () {
   "use strict";
   var view = document.getElementById("researchView");
@@ -44,7 +42,6 @@
       window.scrollTo(0, 0);
       setExpanded(false);
       if (title) title.focus({ preventScroll: true });
-      requestAnimationFrame(refreshStuck);
     } else {
       var active = document.activeElement;
       if (!active || active === document.body || view.contains(active)) {
@@ -59,28 +56,6 @@
       var n = list.querySelectorAll(".source-card").length;
       count.textContent = n ? String(n) : "";
     }).observe(list, { childList: true });
-  }
-
-  // The composer is pinned exactly when its resting place (the sentinel
-  // right after it) is still below the bottom of the viewport.
-  var composer = view.querySelector(".research-input-bar");
-  var sentinel = view.querySelector(".research-input-sentinel");
-  var stuckObserver = null;
-  if (composer && sentinel && "IntersectionObserver" in window) {
-    stuckObserver = new IntersectionObserver(function (entries) {
-      var entry = entries[entries.length - 1];
-      var below = entry.rootBounds && entry.boundingClientRect.top > entry.rootBounds.bottom;
-      composer.classList.toggle("is-stuck", Boolean(below) && !entry.isIntersecting);
-    });
-    stuckObserver.observe(sentinel);
-  }
-  // Opening the view moves the sentinel from display:none straight to
-  // below the fold without crossing the viewport, which an
-  // IntersectionObserver doesn't report; re-observing forces a fresh entry.
-  function refreshStuck() {
-    if (!stuckObserver) return;
-    stuckObserver.unobserve(sentinel);
-    stuckObserver.observe(sentinel);
   }
 
   if (panel) {

@@ -308,6 +308,7 @@ DOMManager.prototype.generateResearchResponse = async function() {
 
     // Replace the "Generating response..." placeholder with the actual response
     assistantDiv.innerHTML = this.markdownToHtml(summary);
+    this.addPaperDetails(assistantDiv, papersToUse);
     assistantDiv.style.opacity = "1";
 
     // Update UI with pagination info after response + papers are rendered
@@ -491,6 +492,7 @@ DOMManager.prototype.loadMorePapers = async function() {
         this.elements.researchChatContainer,
       );
       summaryDiv.innerHTML = this.markdownToHtml(summary);
+      this.addPaperDetails(summaryDiv, data.papers);
       summaryDiv.style.opacity = "1";
 
       // Also add summary to messages array for persistence
@@ -570,6 +572,7 @@ DOMManager.prototype.loadMorePapers = async function() {
                 this.elements.researchChatContainer,
               );
               summaryDiv.innerHTML = this.markdownToHtml(summary);
+              this.addPaperDetails(summaryDiv, data.papers);
               summaryDiv.style.opacity = "1";
             } else {
               throw new Error("Retry failed");

@@ -28,7 +28,7 @@
         </header>
 
         <div class="research-chat-area">
-          <!-- Reading column: conversation, load more, follow-up composer -->
+          <!-- Reading column: conversation, load more -->
           <div class="research-main-content">
             <div id="researchChatContainer" class="research-chat-container" aria-live="polite"></div>
 
@@ -39,6 +39,37 @@
               </button>
               <div id="loadMoreStatus" class="load-more-status" aria-live="polite"></div>
             </div>
+          </div>
+
+          <!-- Side column: references, then the follow-up composer -->
+          <div class="research-side">
+            <!-- References -->
+            <aside id="referencesPanel" class="references-panel" aria-labelledby="referencesTitle">
+              <div class="references-header">
+                <h3 id="referencesTitle" class="references-title">
+                  References
+                  <span id="referencesCount" class="references-count"></span>
+                </h3>
+                <button
+                  id="referencesToggle"
+                  class="references-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="referencesBody"
+                  aria-label="Show references"
+                >
+                  <span class="references-toggle__label">Show</span>
+                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div id="referencesBody" class="references-body">
+                <div class="references-filters" role="group" aria-label="Sort references">
+                  <button class="filter-btn active" type="button" data-filter="relevance">Relevance</button>
+                  <button class="filter-btn" type="button" data-filter="cited_by_count">Most Cited</button>
+                </div>
+                <div id="referencesList" class="references-list"></div>
+              </div>
+            </aside>
 
             <div class="research-input-bar">
               <div class="research-input-section">
@@ -60,39 +91,7 @@
                 Follow-up questions open in Paper Analysis with these papers.
               </p>
             </div>
-            <!-- Marks the composer's resting place at the end of the column;
-                 js/research-view.js uses it to tell when the sticky composer
-                 is pinned to the viewport. -->
-            <div class="research-input-sentinel" aria-hidden="true"></div>
           </div>
-
-          <!-- References -->
-          <aside id="referencesPanel" class="references-panel" aria-labelledby="referencesTitle">
-            <div class="references-header">
-              <h3 id="referencesTitle" class="references-title">
-                References
-                <span id="referencesCount" class="references-count"></span>
-              </h3>
-              <button
-                id="referencesToggle"
-                class="references-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-controls="referencesBody"
-                aria-label="Show references"
-              >
-                <span class="references-toggle__label">Show</span>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-              </button>
-            </div>
-            <div id="referencesBody" class="references-body">
-              <div class="references-filters" role="group" aria-label="Sort references">
-                <button class="filter-btn active" type="button" data-filter="relevance">Relevance</button>
-                <button class="filter-btn" type="button" data-filter="cited_by_count">Most Cited</button>
-              </div>
-              <div id="referencesList" class="references-list"></div>
-            </div>
-          </aside>
         </div>
       </div>
     </section>

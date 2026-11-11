@@ -90,6 +90,77 @@ DOMManager.prototype.doiLinkHtml = function(value) {
     : value;
 };
 
+// Adds what the backend returned for each paper to its summary card: the
+// citation count, plus any of authors, year, source and DOI the summary
+// left out (or a link to the open-access copy when there is no DOI). Cards
+// are matched to papers by DOI, then by title -- never by card number,
+// since a restored binder holds several summaries' papers in one list. A
+// card that matches no paper is left exactly as the summary wrote it.
+const normDoi = (value) =>
+  String(value || "").trim().toLowerCase().replace(/^https?:\/\/(?:dx\.)?doi\.org\//, "");
+const normTitle = (value) =>
+  String(value || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+DOMManager.prototype.addPaperDetails = function(root, papers) {
+  if (!root || !Array.isArray(papers) || !papers.length) return;
+
+  root.querySelectorAll("article.summary-card").forEach((card) => {
+    const shown = {};
+    card.querySelectorAll(".summary-card__meta dt").forEach((dt) => {
+      shown[dt.textContent.trim().toLowerCase().replace(/^author$/, "authors")] = dt.nextElementSibling;
+    });
+    const doi = normDoi(shown.doi?.textContent);
+    const title = normTitle(card.querySelector(".summary-card__title")?.textContent);
+    const paper =
+      (doi && papers.find((p) => p && normDoi(p.doi) === doi)) ||
+      (title && papers.find((p) => p && normTitle(p.title) === title));
+    if (!paper) return;
+
+    let meta = card.querySelector(".summary-card__meta");
+    if (!meta) {
+      meta = document.createElement("dl");
+      meta.className = "summary-card__meta";
+      card.querySelector(".summary-card__title").after(meta);
+    }
+
+    // Paper metadata is untrusted text: rows are built with textContent,
+    // and links only ever point at http(s) URLs.
+    const addRow = (label, value, href) => {
+      if (value === null || value === undefined || value === "") return;
+      const row = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = label;
+      if (href) {
+        const a = document.createElement("a");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = value;
+        dd.appendChild(a);
+      } else {
+        dd.textContent = value;
+      }
+      row.append(dt, dd);
+      meta.appendChild(row);
+    };
+
+    // Same author format as the summary prompt (prompt_builder.py)
+    const names = (paper.authors || []).map((a) => a && a.name).filter(Boolean);
+    if (!shown.authors) {
+      addRow("Authors", names.length > 3 ? names.slice(0, 3).join("; ") + " et al." : names.join("; "));
+    }
+    if (!shown.year) addRow("Year", paper.publication_year);
+    if (!shown.source) addRow("Source", paper.source);
+    if (!shown.doi) {
+      if (paper.doi) addRow("DOI", paper.doi, this.paperDoiUrl(paper.doi));
+      else if (/^https?:\/\//i.test(paper.oa_url || "")) addRow("Link", "Open access version", paper.oa_url);
+    }
+    const citations = Number(paper.cited_by_count) || 0;
+    addRow("Citations", citations.toLocaleString());
+  });
+};
+
 DOMManager.prototype.linesToBlocks = function(text) {
   const out = [];
   let open = null; // block currently open inside a card (BLOCK_TAGS key)
