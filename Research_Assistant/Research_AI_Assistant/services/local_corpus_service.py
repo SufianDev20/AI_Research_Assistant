@@ -56,7 +56,7 @@ def to_paper(source: Dict, index: int) -> Dict:
         "abstract": " ".join(source.get("snippets") or []),
         "publication_year": _to_year(source.get("year")),
         "doi": "",
-        "cited_by_count": 0,
+        "cited_by_count": source.get("citation_count") or 0,
         "concepts": [],
         "source": source.get("source") or "",
         "is_open_access": False,
