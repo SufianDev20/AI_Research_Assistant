@@ -363,7 +363,14 @@ class OpenRouterService:
                 content = choice.get("message", {}).get("content")
                 if content is None:
                     error_msg = "OpenRouter response missing message.content."
-                    logger.warning(f"Model {model_name}: {error_msg}")
+                    # finish_reason "length" with high completion_tokens means
+                    # the model spent max_tokens before producing content.
+                    logger.warning(
+                        f"Model {model_name}: {error_msg} "
+                        f"finish_reason={choice.get('finish_reason')!r} "
+                        f"max_tokens={max_tokens} usage={data.get('usage')} "
+                        f"message_keys={sorted((choice.get('message') or {}).keys())}"
+                    )
                     last_error = OpenRouterAPIError(error_msg)
                     attempt.failure(error_msg)
                     continue
