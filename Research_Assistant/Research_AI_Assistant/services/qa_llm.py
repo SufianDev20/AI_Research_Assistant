@@ -189,7 +189,7 @@ class QACompletionService:
 
     @staticmethod
     def ask(
-        openrouter_service,
+        llm,
         context_chunks: List[Dict],
         question: str,
         papers: Optional[Dict[str, Dict]] = None,
@@ -202,7 +202,11 @@ class QACompletionService:
         the real paper id before returning.
 
         Args:
-            openrouter_service: An instance of OpenRouterService. Passed in rather than instantiated here so the view controls the request lifecycle and so tests can inject a fake.
+            llm: The backend from services.llm_service.get_llm() (any
+                OpenRouterService/OllamaService/FallbackLLM instance — all
+                share the same complete() signature). Passed in rather than
+                instantiated here so the view controls the request lifecycle
+                and so tests can inject a fake.
             context_chunks: Ordered chunk list from
             qa_context_service.build_context().question: The user's question.
 
@@ -224,7 +228,7 @@ class QACompletionService:
         )
 
         try:
-            raw_content = openrouter_service.complete(
+            raw_content = llm.complete(
                 system_prompt=QA_SYSTEM_PROMPT,
                 user_message=user_message,
                 temperature=QA_TEMPERATURE,

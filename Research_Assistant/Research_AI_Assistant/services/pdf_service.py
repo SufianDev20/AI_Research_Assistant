@@ -24,6 +24,7 @@ MAX_PDF_BYTES = 50 * 1024 * 1024
 FETCH_TIMEOUT = 30
 MAX_PDF_URL_LENGTH = 2000
 ALLOWED_PDF_URL_SCHEMES = {"http", "https"}
+OPENALEX_CONTENT_HOST = "content.openalex.org"
 
 
 class PDFExtractionError(Exception):
@@ -88,10 +89,18 @@ def _reject_unsafe_pdf_url(pdf_url: str, context_id: str) -> None:
 def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
     """Download PDF bytes with a response-size guard."""
     _reject_unsafe_pdf_url(pdf_url, context_id)
+    parsed_url = urlparse(pdf_url)
+    openalex_api_key = getattr(settings, "OPENALEX_API_KEY", None)
+    request_params = (
+        {"api_key": openalex_api_key}
+        if parsed_url.hostname == OPENALEX_CONTENT_HOST and openalex_api_key
+        else None
+    )
     try:
         response = requests.get(
             pdf_url,
             timeout=FETCH_TIMEOUT,
+            params=request_params,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
                 "Accept": "application/pdf,*/*",

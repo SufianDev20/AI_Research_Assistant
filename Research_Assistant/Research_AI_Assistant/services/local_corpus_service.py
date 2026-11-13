@@ -2,10 +2,8 @@
 Client for the university research server (POST /retrieve).
 
 Returns papers in the same shape as ExtractionService.extract_metadata(),
-so the summary code can consume them unchanged. Q&A cannot: pdf_url and
-oa_url are always None (the server has no full-text URL to give), so
-these papers are excluded from multi-paper Q&A (see analysis.js's
-`eligible` filter) rather than sent to it.
+so the summary and Q&A code can consume them unchanged when the corpus
+provides a fetchable pdf_url.
 
 Settings (all optional; an empty URL or key disables the local corpus):
     RESEARCH_API_URL, RESEARCH_API_KEY, RESEARCH_TIMEOUT = (connect, read)
@@ -13,14 +11,14 @@ Settings (all optional; an empty URL or key disables the local corpus):
 
 import logging
 from typing import Dict, List, Optional
+from urllib.parse import urljoin
 
 import requests
 from django.conf import settings
 
+from .research_server_config import research_server_config
+
 logger = logging.getLogger(__name__)
-
-SERVER_MAX_PAPERS = 10  # server.py clamps max_papers to 10
-
 
 class LocalCorpusError(Exception):
     """Raised for any failure that should trigger the OpenAlex fallback."""
@@ -46,25 +44,41 @@ def _to_year(value) -> Optional[int]:
         return None
 
 
-def to_paper(source: Dict, index: int) -> Dict:
-    """Map one server source to the OpenAlex-style paper dict."""
+def _absolute_pdf_url(base_url: str, pdf_url: Optional[str]) -> Optional[str]:
+    """The server returns pdf_url as a path relative to its own host (e.g.
+    "/papers/foo.pdf"), not an absolute URL. Fetching it server-side (Q&A's
+    PDF chunking) requires a real http(s) URL with a host, so resolve it
+    against the research server's own base_url before it leaves this
+    module. An already-absolute URL is returned unchanged."""
+    if not pdf_url:
+        return None
+    return urljoin(base_url + "/", pdf_url)
+
+
+def to_paper(source: Dict, index: int, base_url: str = "") -> Dict:
+    """Map one server source to the OpenAlex-style paper dict.
+
+    Source keys use the server's `papers` table column names.
+    """
     filename = source.get("filename") or ""
+    abstract = source.get("abstract") or " ".join(source.get("snippets") or [])
+    pdf_url = _absolute_pdf_url(base_url, source.get("pdf_url"))
     return {
-        "openalex_id": f"local:{filename or index}",
+        "openalex_id": source.get("openalex_id") or f"local:{filename or index}",
         "title": source.get("title") or "Untitled paper",
         "authors": _split_authors(source.get("authors")),
-        "abstract": " ".join(source.get("snippets") or []),
+        "abstract": abstract,
         "publication_year": _to_year(source.get("year")),
-        "doi": "",
+        "doi": source.get("doi") or "",
         "cited_by_count": source.get("citation_count") or 0,
         "concepts": [],
         "source": source.get("source") or "",
-        "is_open_access": False,
+        "is_open_access": bool(pdf_url),
         "oa_status": None,
-        "has_pdf_link": False,
-        "full_text_url": None,
-        "pdf_url": source.get("pdf_url"),
-        "pdf_candidates": [],
+        "has_pdf_link": bool(pdf_url),
+        "full_text_url": pdf_url,
+        "pdf_url": pdf_url,
+        "pdf_candidates": [pdf_url] if pdf_url else [],
         "oa_url": None,
         "referenced_works": [],
         "referenced_works_count": 0,
@@ -75,17 +89,14 @@ def to_paper(source: Dict, index: int) -> Dict:
 
 class LocalCorpusService:
     def __init__(self) -> None:
-        self.base_url: str = (getattr(settings, "RESEARCH_API_URL", "") or "").rstrip(
-            "/"
-        )
-        self.api_key: str = getattr(settings, "RESEARCH_API_KEY", "") or ""
+        self.base_url, self.api_key = research_server_config()
         self.timeout = getattr(settings, "RESEARCH_TIMEOUT", (6, 30))
 
     @property
     def enabled(self) -> bool:
         return bool(self.base_url and self.api_key)
 
-    def search(self, query: str, max_papers: int = 10) -> Dict:
+    def search(self, query: str, max_papers: int = 25) -> Dict:
         """
         Returns {"papers": [...], "confidence": {...}}.
         Raises LocalCorpusError on any network, auth or payload problem.
@@ -94,11 +105,18 @@ class LocalCorpusService:
             raise LocalCorpusError("Local corpus is not configured.")
 
         try:
+            requested_papers = int(max_papers)
+        except (TypeError, ValueError) as exc:
+            raise LocalCorpusError("Local corpus paper count must be an integer.") from exc
+        if requested_papers < 1:
+            raise LocalCorpusError("Local corpus paper count must be positive.")
+
+        try:
             response = requests.post(
                 f"{self.base_url}/retrieve",
                 json={
                     "question": query,
-                    "max_papers": max(1, min(int(max_papers), SERVER_MAX_PAPERS)),
+                    "max_papers": requested_papers,
                 },
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 timeout=self.timeout,
@@ -120,7 +138,9 @@ class LocalCorpusService:
             confidence = data.get("confidence") or {}
             if not isinstance(confidence, dict):
                 confidence = {}
-            papers = [to_paper(s, i) for i, s in enumerate(sources, 1)]
+            papers = [
+                to_paper(s, i, base_url=self.base_url) for i, s in enumerate(sources, 1)
+            ]
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
             raise LocalCorpusError("Local corpus returned an invalid payload.") from exc
 

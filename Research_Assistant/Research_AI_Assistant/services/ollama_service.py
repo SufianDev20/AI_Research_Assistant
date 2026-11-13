@@ -23,11 +23,10 @@ import requests
 from django.conf import settings
 
 from .llm_service import LLMError
+from .research_server_config import research_server_config
+from ..request_types import JSON_REQUEST_TYPES
 
 logger = logging.getLogger(__name__)
-
-# Task types whose prompts demand a JSON reply (qa_llm.QA_SYSTEM_PROMPT).
-JSON_REQUEST_TYPES = {"qa"}
 
 # Submit and poll requests return immediately; only the job itself is slow.
 SHORT_TIMEOUT = (6, 30)
@@ -40,8 +39,7 @@ class OllamaAPIError(LLMError):
 
 class OllamaService:
     def __init__(self) -> None:
-        self.base_url: str = (getattr(settings, "RESEARCH_API_URL", "") or "").rstrip("/")
-        self.api_key: str = getattr(settings, "RESEARCH_API_KEY", "") or ""
+        self.base_url, self.api_key = research_server_config()
         self.timeout = getattr(settings, "LLM_TIMEOUT", (6, 240))
         self.job_deadline: int = int(getattr(settings, "LLM_JOB_DEADLINE_SECONDS", 240))
         # Q&A sends a large context this server fails on (~241s). Give up fast

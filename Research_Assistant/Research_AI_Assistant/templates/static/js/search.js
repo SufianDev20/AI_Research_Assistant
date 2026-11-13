@@ -1,4 +1,5 @@
 import { DOMManager } from './core.js';
+import { YEAR_MIN, YEAR_MAX } from './constants.js';
 
 // Extend DOMManager prototype with search-related methods
 DOMManager.prototype.updateYearLabel = function() {
@@ -14,9 +15,6 @@ DOMManager.prototype.updateYearLabel = function() {
 
   this.updateTooltipPosition();
 };
-
-const YEAR_MIN = 1900;
-const YEAR_MAX = 2026;
 
 // Validates and clamps the two year inputs on blur/change: each value is
 // clamped to [YEAR_MIN, YEAR_MAX], a non-numeric entry falls back to its

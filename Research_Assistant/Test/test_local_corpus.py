@@ -38,8 +38,43 @@ class LocalCorpusTests(SimpleTestCase):
         args, kwargs = post.call_args
         self.assertEqual(args[0], "https://x.example/retrieve")
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer k")
-        self.assertEqual(kwargs["json"]["max_papers"], 10)
+        self.assertEqual(kwargs["json"]["max_papers"], 25)
         self.assertEqual(kwargs["timeout"], (6, 30))
+
+    @patch(POST)
+    def test_pdf_url_resolved_against_server_host(self, post):
+        """The server returns pdf_url as a path relative to its own host
+        (e.g. "/papers/foo.pdf"), not an absolute URL. Q&A fetches pdf_url
+        server-side and requires a real http(s) URL with a host, so it must
+        be resolved against RESEARCH_API_URL before leaving this service."""
+        post.return_value = _resp(
+            body={
+                "sources": [dict(SRC, pdf_url="/papers/t.pdf")],
+                "confidence": {"label": "High"},
+            }
+        )
+        paper = LocalCorpusService().search("q")["papers"][0]
+        self.assertEqual(paper["pdf_url"], "https://x.example/papers/t.pdf")
+        self.assertEqual(paper["pdf_candidates"], ["https://x.example/papers/t.pdf"])
+        self.assertTrue(paper["has_pdf_link"])
+
+    @patch(POST)
+    def test_already_absolute_pdf_url_is_unchanged(self, post):
+        post.return_value = _resp(
+            body={
+                "sources": [dict(SRC, pdf_url="https://other.example/a.pdf")],
+                "confidence": {"label": "High"},
+            }
+        )
+        paper = LocalCorpusService().search("q")["papers"][0]
+        self.assertEqual(paper["pdf_url"], "https://other.example/a.pdf")
+
+    @patch(POST)
+    def test_missing_pdf_url_stays_none(self, post):
+        post.return_value = _resp(body={"sources": [SRC], "confidence": {"label": "High"}})
+        paper = LocalCorpusService().search("q")["papers"][0]
+        self.assertIsNone(paper["pdf_url"])
+        self.assertFalse(paper["has_pdf_link"])
 
     @patch(POST)
     def test_empty_year_becomes_none(self, post):

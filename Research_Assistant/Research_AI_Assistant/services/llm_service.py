@@ -43,9 +43,17 @@ def _make_ollama():
 class FallbackLLM:
     """Try the primary backend; on LLMError try the secondary one."""
 
-    def __init__(self, primary, secondary_factory: Callable):
+    def __init__(
+        self,
+        primary,
+        secondary_factory: Callable,
+        primary_label: str = "primary",
+        secondary_label: str = "secondary",
+    ):
         self._primary = primary
         self._secondary_factory = secondary_factory
+        self._primary_label = primary_label
+        self._secondary_label = secondary_label
 
     def complete(
         self,
@@ -66,26 +74,33 @@ class FallbackLLM:
         )
         try:
             result = self._primary.complete(**kwargs)
-            logger.info("LLM answered by Ollama (request_type=%s).", request_type)
+            logger.info(
+                "LLM answered by %s (request_type=%s).",
+                self._primary_label,
+                request_type,
+            )
             return result
         except LLMError as primary_error:
             logger.warning(
-                "SWITCHING TO OPENROUTER for request_type=%s: Ollama failed (%s).",
+                "SWITCHING TO %s for request_type=%s: %s failed (%s).",
+                self._secondary_label.upper(),
                 request_type,
+                self._primary_label,
                 primary_error,
             )
             try:
                 secondary = self._secondary_factory()
                 result = secondary.complete(**kwargs)
                 logger.warning(
-                    "LLM answered by OpenRouter fallback (request_type=%s).",
+                    "LLM answered by %s fallback (request_type=%s).",
+                    self._secondary_label,
                     request_type,
                 )
                 return result
             except LLMError as secondary_error:
                 raise LLMError(
-                    f"All LLM backends failed. Primary: {primary_error}. "
-                    f"Fallback: {secondary_error}"
+                    f"All LLM backends failed. {self._primary_label}: {primary_error}. "
+                    f"{self._secondary_label} fallback: {secondary_error}"
                 ) from secondary_error
 
 
@@ -109,4 +124,6 @@ def get_llm():
             exc,
         )
         return _make_openrouter()
-    return FallbackLLM(primary, _make_openrouter)
+    return FallbackLLM(
+        primary, _make_openrouter, primary_label="Ollama", secondary_label="OpenRouter"
+    )

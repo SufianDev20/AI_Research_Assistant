@@ -1,21 +1,6 @@
-import { AppState } from './state.js';
+import { getCsrfToken } from './utils.js';
 
-// Safely obtain CSRF token after DOM ready. Falls back to cookie if hidden input not present.
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-}
-
-let csrfToken = null;
-const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-if (csrfInput && csrfInput.value) {
-  csrfToken = csrfInput.value;
-} else {
-  csrfToken = getCookie('csrftoken');
-}
-window.csrfToken = csrfToken;
+window.csrfToken = getCsrfToken();
 
 // ==================== DOM MANAGER ====================
 export class DOMManager {
@@ -69,12 +54,6 @@ export class DOMManager {
       loadMoreContainer: document.getElementById("loadMoreContainer"),
       loadMoreBtn: document.getElementById("loadMoreBtn"),
       loadMoreStatus: document.getElementById("loadMoreStatus"),
-
-      // Modal elements (backwards compatibility)
-      modalOverlay: document.getElementById("modalOverlay"),
-      modalChatContainer: document.getElementById("modalChatContainer"),
-      modalInput: document.getElementById("modal-input"),
-      modalSendBtn: document.getElementById("modal-send-btn"),
 
       // Profile elements: the account menu (#profileMenu) is entirely
       // owned by profile.js, including its own outside-click/Escape
@@ -173,12 +152,9 @@ export class DOMManager {
 
     this.setupAdvancedOptionsToggle();
 
-    // Research view listeners
-    // Follow-up submissions now open the paper analysis page (see
-    // handleFollowUpQuestion in research.js) instead of continuing the
-    // in-page chat. handleResearchMessage() below is unused by this
-    // wiring but left in place, not deleted, in case anything else
-    // still calls it.
+    // Research view listeners. Follow-up submissions open the paper
+    // analysis page (see handleFollowUpQuestion in research.js) instead
+    // of continuing an in-page chat.
     if (elements.researchSendBtn) {
       elements.researchSendBtn.addEventListener(
         "click",
@@ -228,28 +204,6 @@ export class DOMManager {
       );
     }
 
-    // Modal listeners (backwards compatibility)
-    if (elements.modalSendBtn) {
-      elements.modalSendBtn.addEventListener(
-        "click",
-        function () {
-          this.handleModalMessage();
-        }.bind(this),
-      );
-    }
-
-    if (elements.modalInput) {
-      elements.modalInput.addEventListener(
-        "keydown",
-        function (e) {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            this.handleModalMessage();
-          }
-        }.bind(this),
-      );
-    }
-
     // Global keyboard shortcuts
     document.addEventListener("keydown", function (e) {
       if (e.metaKey && e.key === "k") {
@@ -291,37 +245,6 @@ export class DOMManager {
       console.error("Error in handleSearch:", error);
       alert("Failed to start research. Please try again.");
     }
-  }
-
-  handleResearchMessage() {
-    var input = this.elements.researchInput;
-    var text = input ? input.value.trim() : "";
-    if (!text || window.appState.isThinking || !window.appState.currentResearchBinder)
-      return;
-
-    window.appState.currentResearchBinder.messages.push({
-      role: "user",
-      content: text,
-    });
-    this.addMessage(text, true, this.elements.researchChatContainer);
-    input.value = "";
-    this.generateResearchResponse();
-  }
-
-  handleModalMessage() {
-    var input = this.elements.modalInput;
-    var text = input ? input.value.trim() : "";
-    if (!text || appState.isThinking || !appState.currentOpenBinderId) return;
-
-    var binder = appState.binders.find(function (b) {
-      return b.id === appState.currentOpenBinderId;
-    });
-    if (!binder) return;
-
-    binder.messages.push({ role: "user", content: text });
-    this.addMessage(text, true, this.elements.modalChatContainer);
-    input.value = "";
-    this.generateAssistantResponse(binder, this.elements.modalChatContainer);
   }
 
   // ==================== DOM MANIPULATION ====================

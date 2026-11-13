@@ -2,7 +2,9 @@ from rest_framework import serializers
 from .models import ModelPerformance, QueryLog, ModelReliability, ResponseLog
 from .services.extract_service import MAX_PDF_CANDIDATES
 
-MAX_PDF_URL_LENGTH = 500
+# Stricter than pdf_service.MAX_PDF_URL_LENGTH (2000): this is an early
+# request-validation cap, not the SSRF-guard's hard safety limit.
+MAX_PDF_URL_INPUT_LENGTH = 500
 
 
 class QueryLogSerializer(serializers.ModelSerializer):
@@ -63,9 +65,9 @@ class PDFUrlsValueField(serializers.Field):
         for url in urls:
             if not isinstance(url, str) or not url.strip():
                 raise serializers.ValidationError("Each PDF URL must be a non-empty string.")
-            if len(url.strip()) > MAX_PDF_URL_LENGTH:
+            if len(url.strip()) > MAX_PDF_URL_INPUT_LENGTH:
                 raise serializers.ValidationError(
-                    f"PDF URLs must be {MAX_PDF_URL_LENGTH} characters or fewer."
+                    f"PDF URLs must be {MAX_PDF_URL_INPUT_LENGTH} characters or fewer."
                 )
             cleaned.append(url.strip())
         return cleaned
@@ -98,12 +100,7 @@ class PaperMetaField(serializers.Field):
 
 
 class QARequestSerializer(serializers.Serializer):
-    """
-    Validate an incoming Multi-Paper Q&A request.
-
-    Not a ModelSerializer: this request has no matching model, it is a
-    pass-through validation shape for views.multi_paper_qa's payload.
-    """
+    """Validate an incoming Multi-Paper Q&A request (views.multi_paper_qa)."""
 
     paper_ids = serializers.ListField(
         child=serializers.CharField(min_length=1),

@@ -3,26 +3,24 @@ Performance monitoring views for OpenRouter model statistics.
 Provides API endpoints for model performance data and insights.
 """
 
-import logging
-from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework import status
-from rest_framework.response import Response
 
+from .error_handling import handle_internal_errors
 from .models import ModelPerformance, ResponseLog, ModelReliability
 from .services.performance_tracker import PerformanceTracker
 from .throttles import PerformanceRateThrottle
-
-logger = logging.getLogger(__name__)
+from .views import clerk_context
 
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 @throttle_classes([PerformanceRateThrottle])
+@handle_internal_errors("Failed to retrieve performance stats")
 def model_performance_stats(request):
     """
     Get comprehensive model performance statistics.
@@ -39,60 +37,52 @@ def model_performance_stats(request):
         "performance_summary": {...}
     }
     """
-    try:
-        stats = PerformanceTracker.get_model_stats()
+    stats = PerformanceTracker.get_model_stats()
 
-        # Add additional performance summary
-        performance_summary = {
-            "avg_success_rate": 0.0,
-            "avg_response_time": 0.0,
-            "total_requests_today": 0,
-            "success_rate_trend": "stable",  # Could be calculated from historical data
-        }
+    # Add additional performance summary
+    performance_summary = {
+        "avg_success_rate": 0.0,
+        "avg_response_time": 0.0,
+        "total_requests_today": 0,
+    }
 
-        # Calculate averages
-        active_models = ModelPerformance.objects.filter(is_active=True)
-        if active_models.exists():
-            total_success_rate = sum(model.success_rate for model in active_models)
-            performance_summary["avg_success_rate"] = (
-                total_success_rate / active_models.count()
-            )
-
-            total_response_time = sum(
-                model.avg_response_time for model in active_models
-            )
-            performance_summary["avg_response_time"] = (
-                total_response_time / active_models.count()
-            )
-
-        # Today's requests
-        from django.utils import timezone
-
-        today = timezone.now().date()
-        performance_summary["total_requests_today"] = ResponseLog.objects.filter(
-            created_at__date=today
-        ).count()
-
-        stats["performance_summary"] = performance_summary
-
-        return JsonResponse(stats)
-
-    except Exception as exc:
-        logger.error(f"Error in model_performance_stats: {exc}")
-        return JsonResponse(
-            {"error": "Failed to retrieve performance stats"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    # Calculate averages
+    active_models = ModelPerformance.objects.filter(is_active=True)
+    if active_models.exists():
+        total_success_rate = sum(model.success_rate for model in active_models)
+        performance_summary["avg_success_rate"] = (
+            total_success_rate / active_models.count()
         )
+
+        total_response_time = sum(
+            model.avg_response_time for model in active_models
+        )
+        performance_summary["avg_response_time"] = (
+            total_response_time / active_models.count()
+        )
+
+    # Today's requests
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    performance_summary["total_requests_today"] = ResponseLog.objects.filter(
+        created_at__date=today
+    ).count()
+
+    stats["performance_summary"] = performance_summary
+
+    return JsonResponse(stats)
 
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 @throttle_classes([PerformanceRateThrottle])
+@handle_internal_errors("Failed to retrieve model details")
 def model_details(request):
     """
     Get detailed information for a specific model.
 
-    GET /api/performance/model/<str:model_name>/
+    GET /api/performance/model/?model_name=<str>
 
     Returns JSON:
     {
@@ -111,98 +101,89 @@ def model_details(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    try:
-        # Get model performance data
-        performance = ModelPerformance.objects.filter(model_name=model_name).first()
-        if not performance:
-            return JsonResponse(
-                {"error": f"Model '{model_name}' not found"}, status=404
-            )
+    # Get model performance data
+    performance = ModelPerformance.objects.filter(model_name=model_name).first()
+    if not performance:
+        return JsonResponse({"error": f"Model '{model_name}' not found"}, status=404)
 
-        # Get reliability configuration
-        reliability = ModelReliability.objects.filter(model_name=model_name).first()
+    # Get reliability configuration
+    reliability = ModelReliability.objects.filter(model_name=model_name).first()
 
-        # Get recent logs
-        recent_logs = ResponseLog.objects.filter(model_name=model_name).order_by(
-            "-created_at"
-        )[:20]
+    # Get recent logs
+    recent_logs = ResponseLog.objects.filter(model_name=model_name).order_by(
+        "-created_at"
+    )[:20]
 
-        # Get error analysis
-        error_logs = ResponseLog.objects.filter(
-            model_name=model_name, success=False
-        ).order_by("-created_at")[:10]
+    # Get error analysis
+    error_logs = ResponseLog.objects.filter(
+        model_name=model_name, success=False
+    ).order_by("-created_at")[:10]
 
-        # Build response
-        response_data = {
-            "model_name": model_name,
-            "performance": {
-                "total_requests": performance.total_requests,
-                "successful_requests": performance.successful_requests,
-                "failed_requests": performance.failed_requests,
-                "success_rate": performance.success_rate,
-                "avg_response_time": performance.avg_response_time,
-                "reliability_score": performance.reliability_score,
-                "consecutive_failures": performance.consecutive_failures,
-                "is_active": performance.is_active,
-                "last_success": (
-                    performance.last_success.isoformat()
-                    if performance.last_success
-                    else None
-                ),
-                "last_failure": (
-                    performance.last_failure.isoformat()
-                    if performance.last_failure
-                    else None
-                ),
-            },
-            "reliability": (
-                {
-                    "tier": reliability.tier,
-                    "priority": reliability.priority,
-                    "custom_temperature": reliability.custom_temperature,
-                    "max_retries": reliability.max_retries,
-                    "circuit_breaker_threshold": reliability.circuit_breaker_threshold,
-                }
-                if reliability
+    # Build response
+    response_data = {
+        "model_name": model_name,
+        "performance": {
+            "total_requests": performance.total_requests,
+            "successful_requests": performance.successful_requests,
+            "failed_requests": performance.failed_requests,
+            "success_rate": performance.success_rate,
+            "avg_response_time": performance.avg_response_time,
+            "reliability_score": performance.reliability_score,
+            "consecutive_failures": performance.consecutive_failures,
+            "is_active": performance.is_active,
+            "last_success": (
+                performance.last_success.isoformat()
+                if performance.last_success
                 else None
             ),
-            "recent_logs": [
+            "last_failure": (
+                performance.last_failure.isoformat()
+                if performance.last_failure
+                else None
+            ),
+        },
+        "reliability": (
+            {
+                "tier": reliability.tier,
+                "priority": reliability.priority,
+                "custom_temperature": reliability.custom_temperature,
+                "max_retries": reliability.max_retries,
+                "circuit_breaker_threshold": reliability.circuit_breaker_threshold,
+            }
+            if reliability
+            else None
+        ),
+        "recent_logs": [
+            {
+                "request_type": log.request_type,
+                "success": log.success,
+                "response_time": log.response_time,
+                "response_length": log.response_length,
+                "error_message": log.error_message,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log in recent_logs
+        ],
+        "error_analysis": {
+            "recent_errors": [
                 {
-                    "request_type": log.request_type,
-                    "success": log.success,
-                    "response_time": log.response_time,
-                    "response_length": log.response_length,
                     "error_message": log.error_message,
+                    "response_time": log.response_time,
                     "created_at": log.created_at.isoformat(),
                 }
-                for log in recent_logs
+                for log in error_logs
             ],
-            "error_analysis": {
-                "recent_errors": [
-                    {
-                        "error_message": log.error_message,
-                        "response_time": log.response_time,
-                        "created_at": log.created_at.isoformat(),
-                    }
-                    for log in error_logs
-                ],
-                "common_errors": _get_common_errors(model_name),
-            },
-        }
+            "common_errors": _get_common_errors(model_name),
+        },
+    }
 
-        return JsonResponse(response_data)
-
-    except Exception as exc:
-        logger.error(f"Error in model_details for {model_name}: {exc}")
-        return JsonResponse(
-            {"error": "Failed to retrieve model details"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+    return JsonResponse(response_data)
 
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 @throttle_classes([PerformanceRateThrottle])
+@handle_internal_errors("Failed to compare models")
 def model_comparison(request):
     """
     Compare performance between multiple models.
@@ -231,61 +212,53 @@ def model_comparison(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    try:
-        models_data = []
+    models_data = []
 
-        for model_name in model_names:
-            performance = ModelPerformance.objects.filter(model_name=model_name).first()
-            if performance:
-                reliability = ModelReliability.objects.filter(
-                    model_name=model_name
-                ).first()
+    for model_name in model_names:
+        performance = ModelPerformance.objects.filter(model_name=model_name).first()
+        if performance:
+            reliability = ModelReliability.objects.filter(
+                model_name=model_name
+            ).first()
 
-                models_data.append(
-                    {
-                        "model_name": model_name,
-                        "success_rate": performance.success_rate,
-                        "reliability_score": performance.reliability_score,
-                        "avg_response_time": performance.avg_response_time,
-                        "total_requests": performance.total_requests,
-                        "tier": reliability.tier if reliability else "unknown",
-                    }
-                )
+            models_data.append(
+                {
+                    "model_name": model_name,
+                    "success_rate": performance.success_rate,
+                    "reliability_score": performance.reliability_score,
+                    "avg_response_time": performance.avg_response_time,
+                    "total_requests": performance.total_requests,
+                    "tier": reliability.tier if reliability else "unknown",
+                }
+            )
 
-        # Calculate comparison metrics
-        if models_data:
-            comparison_metrics = {
-                "fastest_model": min(models_data, key=lambda x: x["avg_response_time"])[
-                    "model_name"
-                ],
-                "most_reliable": max(models_data, key=lambda x: x["reliability_score"])[
-                    "model_name"
-                ],
-                "highest_success_rate": max(
-                    models_data, key=lambda x: x["success_rate"]
-                )["model_name"],
-                "most_used": max(models_data, key=lambda x: x["total_requests"])[
-                    "model_name"
-                ],
-            }
-        else:
-            comparison_metrics = {
-                "fastest_model": None,
-                "most_reliable": None,
-                "highest_success_rate": None,
-                "most_used": None,
-            }
+    # Calculate comparison metrics
+    if models_data:
+        comparison_metrics = {
+            "fastest_model": min(models_data, key=lambda x: x["avg_response_time"])[
+                "model_name"
+            ],
+            "most_reliable": max(models_data, key=lambda x: x["reliability_score"])[
+                "model_name"
+            ],
+            "highest_success_rate": max(
+                models_data, key=lambda x: x["success_rate"]
+            )["model_name"],
+            "most_used": max(models_data, key=lambda x: x["total_requests"])[
+                "model_name"
+            ],
+        }
+    else:
+        comparison_metrics = {
+            "fastest_model": None,
+            "most_reliable": None,
+            "highest_success_rate": None,
+            "most_used": None,
+        }
 
-        return JsonResponse(
-            {"models": models_data, "comparison_metrics": comparison_metrics}
-        )
-
-    except Exception as exc:
-        logger.error(f"Error in model_comparison: {exc}")
-        return JsonResponse(
-            {"error": "Failed to compare models"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+    return JsonResponse(
+        {"models": models_data, "comparison_metrics": comparison_metrics}
+    )
 
 
 @staff_member_required
@@ -297,51 +270,43 @@ def performance_dashboard(request):
 
     GET /performance/
     """
-    try:
-        # Get top performers
-        top_models = ModelPerformance.objects.filter(
-            is_active=True, total_requests__gte=5
-        ).order_by("-reliability_score")[:10]
+    # Get top performers
+    top_models = ModelPerformance.objects.filter(
+        is_active=True, total_requests__gte=5
+    ).order_by("-reliability_score")[:10]
 
-        # Get recent activity
-        recent_logs = ResponseLog.objects.select_related().order_by("-created_at")[:20]
+    # Get recent activity
+    recent_logs = ResponseLog.objects.select_related().order_by("-created_at")[:20]
 
-        # Get tier distribution
-        tier_stats = {}
-        for tier_choice, tier_label in ModelReliability.TIER_CHOICES:
-            count = ModelReliability.objects.filter(tier=tier_choice).count()
-            tier_stats[tier_label] = count
+    # Get tier distribution
+    tier_stats = {}
+    for tier_choice, tier_label in ModelReliability.TIER_CHOICES:
+        count = ModelReliability.objects.filter(tier=tier_choice).count()
+        tier_stats[tier_label] = count
 
-        # Share of each tier among all configured models, for display only
-        tier_total = sum(tier_stats.values())
-        tier_rows = [
-            {
-                "label": label,
-                "count": count,
-                "percent": round(count / tier_total * 100, 1) if tier_total else 0.0,
-            }
-            for label, count in tier_stats.items()
-        ]
-
-        context = {
-            "top_models": top_models,
-            "recent_logs": recent_logs,
-            "tier_stats": tier_stats,
-            "tier_rows": tier_rows,
-            "tier_total": tier_total,
-            "total_models": ModelPerformance.objects.count(),
-            "active_models": ModelPerformance.objects.filter(is_active=True).count(),
-            "clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY,
+    # Share of each tier among all configured models, for display only
+    tier_total = sum(tier_stats.values())
+    tier_rows = [
+        {
+            "label": label,
+            "count": count,
+            "percent": round(count / tier_total * 100, 1) if tier_total else 0.0,
         }
+        for label, count in tier_stats.items()
+    ]
 
-        return render(request, "admin/performance_dashboard.html", context)
+    context = {
+        "top_models": top_models,
+        "recent_logs": recent_logs,
+        "tier_stats": tier_stats,
+        "tier_rows": tier_rows,
+        "tier_total": tier_total,
+        "total_models": ModelPerformance.objects.count(),
+        "active_models": ModelPerformance.objects.filter(is_active=True).count(),
+        **clerk_context(),
+    }
 
-    except Exception as exc:
-        logger.error(f"Error in performance_dashboard: {exc}")
-        return JsonResponse(
-            {"error": "Failed to load dashboard"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+    return render(request, "admin/performance_dashboard.html", context)
 
 
 def _get_common_errors(model_name: str, limit: int = 5) -> list:

@@ -1,4 +1,5 @@
 import { DOMManager } from './core.js';
+import { MAX_ANALYZABLE_PAPERS, YEAR_MAX } from './constants.js';
 
 // Extend DOMManager prototype with research-related methods
 
@@ -39,8 +40,7 @@ DOMManager.prototype.handleFollowUpQuestion = function() {
   const question = input ? input.value.trim() : "";
 
   // No navigation for an empty submission, and nothing to carry over
-  // without an active research session (matches handleResearchMessage's
-  // own guard above).
+  // without an active research session.
   if (!question || !window.appState.currentResearchBinder) return;
 
   const binder = window.appState.currentResearchBinder;
@@ -48,7 +48,7 @@ DOMManager.prototype.handleFollowUpQuestion = function() {
 
   const selectedIds = papers
     .filter((p) => p && (p.pdf_url || p.oa_url))
-    .slice(0, 10)
+    .slice(0, MAX_ANALYZABLE_PAPERS)
     .map((p) => p.openalex_id);
 
   if (!writeAnalysisSession({ binder, question, papers, selectedIds })) return;
@@ -230,7 +230,7 @@ DOMManager.prototype.generateResearchResponse = async function() {
     const maxYear =
       this.elements.yearMax?.value ||
       this.elements.yearFilter?.value ||
-      "2026";
+      String(YEAR_MAX);
     const sortPref = this.elements.searchBy?.value || "best_match";
     const maxPapers = parseInt(this.elements.quota?.value || "5");
 
@@ -692,22 +692,4 @@ DOMManager.prototype.updatePaginationInfo = function() {
       this.elements.loadMoreContainer.style.display = "none";
     }
   }
-};
-
-DOMManager.prototype.renderAdditionalPapers = function(papers) {
-  if (!papers?.length) return;
-
-  // Create a new separate papers section for loaded more papers
-  const papersContainer = document.createElement("div");
-  papersContainer.className = "papers-grid mt-4 mb-4";
-  papersContainer.innerHTML =
-    '<div class="papers-grid-title mb-3">ADDITIONAL PAPERS</div>';
-
-  papers.forEach((paper, i) => {
-    const paperCard = this.createPaperCard(paper, i);
-    papersContainer.appendChild(paperCard);
-  });
-
-  // Add the new section to the chat container
-  this.elements.researchChatContainer.appendChild(papersContainer);
 };

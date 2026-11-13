@@ -138,33 +138,6 @@ class ExtractionService:
         return " ".join(words[i] for i in sorted(words.keys()))
 
     @staticmethod
-    def _extract_full_text_url(work: Dict) -> Optional[str]:
-        """
-        Extract open-access full text URL if available.
-        Reference: https://developers.openalex.org
-        """
-        best_oa = work.get("best_oa_location")
-        if best_oa:
-            # Prefer direct PDF if available
-            pdf_url = best_oa.get("pdf_url")
-            if pdf_url:
-                return pdf_url
-
-            # Fall back to landing page (publisher's open-access page)
-            landing_page = best_oa.get("landing_page_url")
-            if landing_page:
-                return landing_page
-
-        # Fallback to content_urls if best_oa_location not available
-        content_urls = work.get("content_urls")
-        if content_urls:
-            pdf_url = content_urls.get("pdf")
-            if pdf_url:
-                return pdf_url
-
-        return None
-
-    @staticmethod
     def _collect_pdf_candidates(work: Dict) -> List[str]:
         """
         Direct PDF URLs OpenAlex lists for this work, best first (max 3).

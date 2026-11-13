@@ -17,7 +17,7 @@ from typing import Dict, List, Union
 
 from django.utils import timezone
 
-from ..models import PaperPDF
+from ..models import PaperQAChunks
 from .qa_pipeline import QAChunkError, QAChunkService
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class QAChunkCache:
                 Callers must catch this per-paper so one bad paper does not
                 stop Q&A for the rest of the selected set.
         """
-        record = PaperPDF.objects.filter(openalex_id=openalex_id).first()
+        record = PaperQAChunks.objects.filter(openalex_id=openalex_id).first()
 
         candidates = [pdf_url] if isinstance(pdf_url, str) else list(pdf_url or [])
         if record and record.qa_source_pdf_url and record.qa_source_pdf_url not in candidates:
@@ -99,14 +99,14 @@ class QAChunkCache:
         try:
             result = QAChunkService.fetch_and_chunk(pdf_url, openalex_id)
         except QAChunkError as exc:
-            QAChunkCache._record_failure(openalex_id, pdf_url, str(exc))
+            QAChunkCache._record_failure(openalex_id, str(exc))
             raise
 
         QAChunkCache._record_success(openalex_id, pdf_url, result)
         return result
 
     @staticmethod
-    def _in_failure_cooldown(record: PaperPDF) -> bool:
+    def _in_failure_cooldown(record: PaperQAChunks) -> bool:
         if not record.qa_error or not record.qa_last_attempt_at:
             return False
         cutoff = timezone.now() - timedelta(minutes=CHUNK_FAILURE_COOLDOWN_MIN)
@@ -123,12 +123,9 @@ class QAChunkCache:
     def _record_success(
         openalex_id: str, pdf_url: Union[str, List[str]], result: Dict
     ) -> None:
-        # markdown_content and pdf_url are non-null on PaperPDF, so a row
-        # created from the Q&A path (which produces chunks, not markdown)
-        # has to supply defaults for them.
         url = QAChunkCache._first_url(pdf_url)
         try:
-            PaperPDF.objects.update_or_create(
+            PaperQAChunks.objects.update_or_create(
                 openalex_id=openalex_id,
                 defaults={
                     "qa_chunks": result["chunks"],
@@ -138,37 +135,17 @@ class QAChunkCache:
                     "qa_last_attempt_at": timezone.now(),
                     "page_count": result.get("page_count") or 0,
                 },
-                create_defaults={
-                    "pdf_url": url,
-                    "markdown_content": "",
-                    "extraction_success": "pending",
-                    "qa_chunks": result["chunks"],
-                    "qa_chunk_version": CHUNK_SCHEMA_VERSION,
-                    "qa_source_pdf_url": url,
-                    "qa_last_attempt_at": timezone.now(),
-                    "page_count": result.get("page_count") or 0,
-                },
             )
         except Exception:
             # A cache write must never turn a successful answer into an error.
             logger.exception("Could not cache Q&A chunks for %s", openalex_id)
 
     @staticmethod
-    def _record_failure(
-        openalex_id: str, pdf_url: Union[str, List[str]], reason: str
-    ) -> None:
-        url = QAChunkCache._first_url(pdf_url)
+    def _record_failure(openalex_id: str, reason: str) -> None:
         try:
-            PaperPDF.objects.update_or_create(
+            PaperQAChunks.objects.update_or_create(
                 openalex_id=openalex_id,
                 defaults={
-                    "qa_error": reason,
-                    "qa_last_attempt_at": timezone.now(),
-                },
-                create_defaults={
-                    "pdf_url": url,
-                    "markdown_content": "",
-                    "extraction_success": "failed",
                     "qa_error": reason,
                     "qa_last_attempt_at": timezone.now(),
                 },

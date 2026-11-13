@@ -8,7 +8,6 @@ References:
 """
 
 import logging
-import time
 from typing import Callable, Dict, List, Optional
 
 import requests
@@ -17,6 +16,7 @@ from django.core.cache import cache
 
 from .llm_service import LLMError
 from .performance_tracker import PerformanceTracker
+from ..request_types import JSON_REQUEST_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -294,15 +294,14 @@ class OpenRouterService:
 
         last_error = None
 
-        for attempt, model_name in enumerate(models_to_try, 1):
-            request_start_time = time.time()
-            request_id, query_hash = PerformanceTracker.log_request_start(
+        for attempt_num, model_name in enumerate(models_to_try, 1):
+            attempt = PerformanceTracker.start_attempt(
                 model_name, request_type, user_message
             )
 
             try:
                 logger.info(
-                    f"Trying model {attempt}/{len(models_to_try)}: {model_name}"
+                    f"Trying model {attempt_num}/{len(models_to_try)}: {model_name}"
                 )
 
                 # Get model-specific temperature
@@ -329,7 +328,7 @@ class OpenRouterService:
 
                 # JSON mode is not supported consistently by free providers.
                 # QA still validates/parses JSON through response_validator.
-                if request_type == "qa" and self.use_json_mode:
+                if request_type in JSON_REQUEST_TYPES and self.use_json_mode:
                     payload["response_format"] = {"type": "json_object"}
 
                 response = requests.post(
@@ -349,17 +348,7 @@ class OpenRouterService:
                     error_msg = f"OpenRouter returned no choices. Full response: {data}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-
-                    # Log failure
-                    response_time = time.time() - request_start_time
-                    PerformanceTracker.log_request_failure(
-                        model_name,
-                        request_id,
-                        request_type,
-                        response_time,
-                        error_msg,
-                        query_hash,
-                    )
+                    attempt.failure(error_msg)
                     continue
 
                 choice = choices[0]
@@ -368,17 +357,7 @@ class OpenRouterService:
                     error_msg = f"OpenRouter model error: {choice['error']}"
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-
-                    # Log failure
-                    response_time = time.time() - request_start_time
-                    PerformanceTracker.log_request_failure(
-                        model_name,
-                        request_id,
-                        request_type,
-                        response_time,
-                        error_msg,
-                        query_hash,
-                    )
+                    attempt.failure(error_msg)
                     continue
 
                 content = choice.get("message", {}).get("content")
@@ -386,17 +365,7 @@ class OpenRouterService:
                     error_msg = "OpenRouter response missing message.content."
                     logger.warning(f"Model {model_name}: {error_msg}")
                     last_error = OpenRouterAPIError(error_msg)
-
-                    # Log failure
-                    response_time = time.time() - request_start_time
-                    PerformanceTracker.log_request_failure(
-                        model_name,
-                        request_id,
-                        request_type,
-                        response_time,
-                        error_msg,
-                        query_hash,
-                    )
+                    attempt.failure(error_msg)
                     continue
 
                 if response_validator is not None:
@@ -408,32 +377,13 @@ class OpenRouterService:
                         )
                         logger.warning(error_msg)
                         last_error = OpenRouterAPIError(error_msg)
-
-                        # Log failure
-                        response_time = time.time() - request_start_time
-                        PerformanceTracker.log_request_failure(
-                            model_name,
-                            request_id,
-                            request_type,
-                            response_time,
-                            error_msg,
-                            query_hash,
-                        )
+                        attempt.failure(error_msg)
                         continue
 
-                # Log success
-                response_time = time.time() - request_start_time
-                PerformanceTracker.log_request_success(
-                    model_name,
-                    request_id,
-                    request_type,
-                    response_time,
-                    content,
-                    query_hash,
-                )
+                attempt.success(content)
 
                 logger.info(
-                    f"OpenRouter completion: model={model_name} tokens={data.get('usage', {}).get('total_tokens')} time={response_time:.2f}s"
+                    f"OpenRouter completion: model={model_name} tokens={data.get('usage', {}).get('total_tokens')}"
                 )
 
                 return content.strip()
@@ -464,17 +414,7 @@ class OpenRouterService:
                     error_msg = f"Model {model_name} failed: {str(exc)}"
                 logger.warning(error_msg)
                 last_error = OpenRouterAPIError(error_msg)
-
-                # Log failure
-                response_time = time.time() - request_start_time
-                PerformanceTracker.log_request_failure(
-                    model_name,
-                    request_id,
-                    request_type,
-                    response_time,
-                    error_msg,
-                    query_hash,
-                )
+                attempt.failure(error_msg)
                 continue
 
         # All models failed

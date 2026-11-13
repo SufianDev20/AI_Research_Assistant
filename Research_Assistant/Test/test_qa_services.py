@@ -353,6 +353,25 @@ class TestQAPipeline(unittest.TestCase):
 
 
 class TestPDFService(unittest.TestCase):
+    @override_settings(OPENALEX_API_KEY="openalex-test-key")
+    def test_fetch_pdf_bytes_authenticates_openalex_content_url(self):
+        response = MagicMock()
+        response.headers = {"Content-Length": "4"}
+        response.iter_content = MagicMock(return_value=iter([b"%PDF"]))
+
+        with patch(
+            "Research_AI_Assistant.services.pdf_service.requests.get",
+            return_value=response,
+        ) as get:
+            self.assertEqual(
+                fetch_pdf_bytes(
+                    "https://content.openalex.org/works/W1.pdf", "W1"
+                ),
+                b"%PDF",
+            )
+
+        self.assertEqual(get.call_args.kwargs["params"], {"api_key": "openalex-test-key"})
+
     def test_fetch_pdf_bytes_rejects_content_length_over_limit(self):
         response = MagicMock()
         response.headers = {"Content-Length": str(MAX_PDF_BYTES + 1)}

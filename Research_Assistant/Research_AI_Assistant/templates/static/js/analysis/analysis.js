@@ -7,22 +7,11 @@
 // wholesale, so a slow answer cannot overwrite a newer one.
 
 import { fetchResearchPapers, requestPaperAnalysis, isPublisherBlock } from "./analysis_api.js";
+import { getCsrfToken, escapeHtml, doiUrl } from "../utils.js";
+import { MAX_ANALYZABLE_PAPERS } from "../constants.js";
 
 const SESSION_KEY = "scholara:analysisSession";
-const MAX_ANALYZABLE_PAPERS = 10; // matches QARequestSerializer cap
 const MAX_TURNS = 20; // sessionStorage is ~5MB and a transcript grows without bound
-
-function getCsrfToken() {
-  const input = document.querySelector('[name=csrfmiddlewaretoken]');
-  if (input?.value) return input.value;
-  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
 
 function formatAuthors(paper, limit = 3) {
   const names = (paper?.authors ?? []).map((a) => a?.name).filter(Boolean);
@@ -233,8 +222,16 @@ function renderSelectedCard(paper) {
   const metaParts = [paper.publication_year, paper.source].filter(Boolean);
   if (typeof paper.cited_by_count === "number") metaParts.push(`${paper.cited_by_count.toLocaleString()} citations`);
 
-  const linkUrl = paper.pdf_url || paper.oa_url || (paper.doi ? `https://doi.org/${paper.doi}` : null);
-  const linkHtml = linkUrl ? `<a class="an-detail__link" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer">View source ↗</a>` : "";
+  const pdfUrl = paper.pdf_url || paper.full_text_url || paper.oa_url || "";
+  const doi = paper.doi || "";
+  const linksHtml = [
+    pdfUrl
+      ? `<a class="an-detail__link" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener noreferrer">Open PDF / full text ↗</a>`
+      : "",
+    doi
+      ? `<a class="an-detail__link" href="${escapeHtml(doiUrl(doi))}" target="_blank" rel="noopener noreferrer">Open DOI ↗</a>`
+      : "",
+  ].filter(Boolean).join(" · ");
 
   // Only rendered if the backend attaches these fields later; never fabricated here.
   const optionalSections = ["summary", "methodology", "findings"]
@@ -253,7 +250,7 @@ function renderSelectedCard(paper) {
     <div class="an-detail__section">
       <h4>Citation</h4>
       <p class="an-detail__citation">${escapeHtml(buildCitationLine(paper))}</p>
-      ${linkHtml}
+      ${linksHtml ? `<p>${linksHtml}</p>` : ""}
     </div>
   `;
 }

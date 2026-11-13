@@ -8,6 +8,8 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 
+from .request_types import REQUEST_TYPE_CHOICES
+
 
 class QueryLog(models.Model):
     """
@@ -147,15 +149,7 @@ class ResponseLog(models.Model):
     """
 
     model_name = models.CharField(max_length=100, db_index=True)
-    request_type = models.CharField(
-        max_length=20,
-        choices=[
-            ("summary", "Paper Summary"),
-            ("title", "Title Generation"),
-            ("qa", "Multi-Paper Q&A"),
-            ("other", "Other"),
-        ],
-    )
+    request_type = models.CharField(max_length=20, choices=REQUEST_TYPE_CHOICES)
     success = models.BooleanField()
     response_time = models.FloatField()  # in seconds
     response_length = models.PositiveIntegerField(null=True, blank=True)
@@ -221,10 +215,11 @@ class ModelReliability(models.Model):
             raise ValidationError("Priority cannot be negative")
 
 
-class PaperPDF(models.Model):
+class PaperExtraction(models.Model):
     """
-    Stores extracted PDF content for open-access papers.
-    Keyed by OpenAlex work ID to avoid re-fetching.
+    Stores extracted PDF content (Markdown + images) for open-access papers.
+    Keyed by OpenAlex work ID to avoid re-fetching. Written by
+    services/pdf_service.py.
     """
 
     openalex_id = models.CharField(max_length=100, unique=True)
@@ -233,39 +228,36 @@ class PaperPDF(models.Model):
     markdown_content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     page_count = models.PositiveIntegerField(null=True, blank=True)
-    extraction_success = models.CharField(
+    extraction_status = models.CharField(
         max_length=20,
         choices=[("success", "Success"), ("pending", "Pending"), ("failed", "Failed")],
         default="pending",
     )
     error_message = models.TextField(null=True, blank=True)
 
-    # Multi-paper Q&A cache. The Q&A path needs page-tagged chunks, not the
-    # single markdown blob above, and re-chunking means re-downloading and
-    # re-OCRing the PDF for every follow-up question. Written and read only by
-    # services/qa_chunk_cache.py.
+    def __str__(self):
+        return f"PaperExtraction {self.openalex_id} - {self.extraction_status}"
+
+
+class PaperQAChunks(models.Model):
+    """
+    Multi-paper Q&A chunk cache. Keyed by OpenAlex work ID. The Q&A path
+    needs page-tagged chunks, and re-chunking means re-downloading and
+    re-OCRing the PDF for every follow-up question, so this is a separate
+    cache from PaperExtraction rather than extra columns on it. Written and
+    read only by services/qa_chunk_cache.py.
+    """
+
+    openalex_id = models.CharField(max_length=100, unique=True)
     qa_chunks = models.JSONField(default=list, blank=True)
     qa_chunk_version = models.PositiveSmallIntegerField(default=0)
     qa_source_pdf_url = models.URLField(max_length=500, blank=True, default="")
     qa_last_attempt_at = models.DateTimeField(null=True, blank=True)
     qa_error = models.TextField(blank=True, default="")
+    page_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"PaperPdf {self.openalex_id} - {self.extraction_success}"
-
-    @property
-    def extraction_status(self):
-        """Backward-compatible alias for views expecting `extraction_status`.
-
-        Some parts of the codebase (views) reference `extraction_status` while
-        the model field is named `extraction_success`. Provide a property with
-        a setter so both read and write use the same underlying field.
-        """
-        return self.extraction_success
-
-    @extraction_status.setter
-    def extraction_status(self, value):
-        self.extraction_success = value
+        return f"PaperQAChunks {self.openalex_id} ({len(self.qa_chunks)} chunks)"
 
 
 class UserManager(BaseUserManager):

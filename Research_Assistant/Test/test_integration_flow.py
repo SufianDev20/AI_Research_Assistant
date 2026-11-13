@@ -13,6 +13,9 @@ from Research_AI_Assistant.services.local_corpus_service import LocalCorpusError
 from Research_AI_Assistant.services.openrouter_service import OpenRouterAPIError
 from Research_AI_Assistant.tests import ClerkAuthTestMixin
 
+# /api/search/ requires a signed-in user (settings.py's DRF defaults), so
+# SearchFlowTests needs the same Clerk-bypass mixin SummariseChainTests uses.
+
 CFG = dict(RESEARCH_API_URL="https://x.example", RESEARCH_API_KEY="k",
            LLM_TIMEOUT=(6, 240), LLM_NUM_CTX=8192, RESEARCH_TIMEOUT=(6, 30))
 V = "Research_AI_Assistant.views"
@@ -32,8 +35,9 @@ def _resp(status=200, body=None):
 
 
 @override_settings(**CFG)
-class SearchFlowTests(TestCase):
+class SearchFlowTests(ClerkAuthTestMixin, TestCase):
     def setUp(self):
+        super().setUp()
         cache.clear()
 
     def _get(self, **extra):

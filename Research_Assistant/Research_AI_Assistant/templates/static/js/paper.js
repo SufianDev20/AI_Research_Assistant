@@ -1,4 +1,5 @@
 import { DOMManager } from './core.js';
+import { escapeHtml, doiUrl } from './utils.js';
 
 DOMManager.prototype.markdownToHtml = function(text) {
   if (!text) return "";
@@ -266,84 +267,13 @@ DOMManager.prototype.linesToBlocks = function(text) {
 };
 
 DOMManager.prototype.escapeHtml = function(unsafe) {
-  return String(unsafe ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+  return escapeHtml(unsafe);
 };
 
-// A paper's DOI as a doi.org URL. OpenAlex returns doi as a full
-// https://doi.org/... URL; only bare DOIs need the resolver prefix. The
-// result always starts with http(s)://, so it is safe as a link target once
-// escaped with escapeHtml.
+// The result always starts with http(s)://, so it is safe as a link target
+// once escaped with escapeHtml.
 DOMManager.prototype.paperDoiUrl = function(doi) {
-  if (!doi) return "";
-  const value = String(doi);
-  return /^https?:\/\//i.test(value) ? value : "https://doi.org/" + value;
-};
-
-DOMManager.prototype.renderPaperCards = function(papers, container) {
-  if (!papers?.length || !container) return;
-
-  const papersContainer = document.createElement("div");
-  papersContainer.className = "papers-grid mt-4 mb-4";
-
-  // Create sort bar
-  const sortBar = document.createElement("div");
-  sortBar.className = "paper-sort-bar";
-  sortBar.innerHTML = `
-    <span class="sort-label">Sort by:</span>
-    <button class="sort-btn active" data-sort="default">Relevance</button>
-    <button class="sort-btn" data-sort="citations">Most Cited</button>
-    <button class="sort-btn" data-sort="recency">Most Recent</button>
-  `;
-
-  // Sort functionality using closure over papers
-  sortBar.addEventListener("click", (e) => {
-    const btn = e.target.closest(".sort-btn");
-    if (!btn) return;
-
-    sortBar
-      .querySelectorAll(".sort-btn")
-      .forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    const mode = btn.dataset.sort;
-    let sorted = [...papers];
-
-    if (mode === "citations") {
-      sorted.sort(
-        (a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0),
-      );
-    } else if (mode === "recency") {
-      sorted.sort(
-        (a, b) => (b.publication_year || 0) - (a.publication_year || 0),
-      );
-    }
-    // else default keeps original order
-
-    // Remove existing cards
-    const existingCards = papersContainer.querySelectorAll(".paper-card");
-    existingCards.forEach((c) => c.remove());
-
-    // Re-add title and render sorted cards
-    sorted.forEach((paper, i) => {
-      const paperCard = this.createPaperCard(paper, i);
-      papersContainer.appendChild(paperCard);
-    });
-  });
-
-  papersContainer.appendChild(sortBar);
-
-  // Add paper cards
-  papers.forEach((paper, i) => {
-    const paperCard = this.createPaperCard(paper, i);
-    papersContainer.appendChild(paperCard);
-  });
-
-  container.appendChild(papersContainer);
+  return doiUrl(doi);
 };
 
 DOMManager.prototype.createPaperCard = function(paper, index) {
@@ -390,17 +320,6 @@ DOMManager.prototype.createPaperCard = function(paper, index) {
 
 DOMManager.prototype.saveToBinder = function() {
   if (!window.appState.currentResearchBinder) return;
-
-  // Migrate additionalPapers to main papers array for compatibility
-  if (
-    window.appState.currentResearchBinder.additionalPapers &&
-    window.appState.currentResearchBinder.additionalPapers.length > 0
-  ) {
-    window.appState.currentResearchBinder.papers.push(
-      ...window.appState.currentResearchBinder.additionalPapers,
-    );
-    delete window.appState.currentResearchBinder.additionalPapers; // Remove old array
-  }
 
   window.appState.binders.push({ ...window.appState.currentResearchBinder });
   this.renderBinders();

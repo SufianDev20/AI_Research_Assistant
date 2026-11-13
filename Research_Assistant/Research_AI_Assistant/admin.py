@@ -6,7 +6,14 @@ Provides interface for monitoring OpenRouter model performance.
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from django.db.models import Count, Avg
-from .models import QueryLog, ModelPerformance, ResponseLog, ModelReliability, PaperPDF
+from .models import (
+    QueryLog,
+    ModelPerformance,
+    ResponseLog,
+    ModelReliability,
+    PaperExtraction,
+    PaperQAChunks,
+)
 
 
 @admin.register(QueryLog)
@@ -207,12 +214,19 @@ class ModelReliabilityAdmin(admin.ModelAdmin):
     demote_to_emergency.short_description = "Demote to Emergency tier"
 
 
-@admin.register(PaperPDF)
-class PaperPdfAdmin(admin.ModelAdmin):
+@admin.register(PaperExtraction)
+class PaperExtractionAdmin(admin.ModelAdmin):
     list_display = ["openalex_id", "page_count", "created_at"]
-    list_filter = ["extraction_success"]
+    list_filter = ["extraction_status"]
     search_fields = ["openalex_id", "pdf_url"]
     readonly_fields = ["markdown_content", "image_paths", "created_at"]
+
+
+@admin.register(PaperQAChunks)
+class PaperQAChunksAdmin(admin.ModelAdmin):
+    list_display = ["openalex_id", "page_count", "qa_chunk_version", "qa_last_attempt_at"]
+    search_fields = ["openalex_id", "qa_source_pdf_url"]
+    readonly_fields = ["qa_chunks", "qa_last_attempt_at"]
 
 
 # Customize admin site header

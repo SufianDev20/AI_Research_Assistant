@@ -8,12 +8,13 @@ import hashlib
 import json
 import time
 from datetime import timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
 
 from ..models import ModelPerformance, ResponseLog, ModelReliability
+from ..request_types import JSON_REQUEST_TYPES, SUMMARY_REQUIRED_FIELDS
 
 logger = logging.getLogger(__name__)
 # How long does a circuit breaker model stays disable before being retried
@@ -22,15 +23,46 @@ CIRCUIT_BREAKER_RESET_MIN = 30
 
 def _passed_format_check(request_type: str, response_content: str) -> bool:
     """Check whether a model's response matches the expected shape for its request type."""
-    if request_type == "qa":
+    if request_type in JSON_REQUEST_TYPES:
         try:
             parsed = json.loads(response_content.strip().strip("`"))
         except (ValueError, TypeError):
             return False
         return isinstance(parsed, dict) and "answer" in parsed
 
-    required_fields = ["Authors:", "Year:", "Source:", "DOI:", "Summary:", "References:"]
-    return all(field in response_content for field in required_fields)
+    return all(field in response_content for field in SUMMARY_REQUIRED_FIELDS)
+
+
+class ModelAttempt:
+    """Tracks one model-call attempt from start to success/failure, so a
+    caller looping over several models doesn't have to thread
+    response_time/query_hash through every log call by hand."""
+
+    def __init__(self, model_name: str, request_type: str, user_query: Optional[str] = None):
+        self.model_name = model_name
+        self.request_type = request_type
+        self.query_hash = (
+            hashlib.sha256(user_query.encode()).hexdigest()[:64] if user_query else None
+        )
+        self._start = time.time()
+
+    def success(self, response_content: str) -> None:
+        PerformanceTracker.log_request_success(
+            self.model_name,
+            self.request_type,
+            time.time() - self._start,
+            response_content,
+            self.query_hash,
+        )
+
+    def failure(self, error_message: str) -> None:
+        PerformanceTracker.log_request_failure(
+            self.model_name,
+            self.request_type,
+            time.time() - self._start,
+            error_message,
+            self.query_hash,
+        )
 
 
 class PerformanceTracker:
@@ -39,33 +71,15 @@ class PerformanceTracker:
     """
 
     @staticmethod
-    def log_request_start(
-        model_name: str, request_type: str = "summary", user_query: str = None
-    ) -> Tuple[str, Optional[str]]:
-        """
-        Log the start of a model request and return a request ID.
-
-        Args:
-            model_name: Name of the OpenRouter model
-            request_type: Type of request (summary, title, other)
-            user_query: User query for consistency analysis
-
-        Returns:
-            Request ID for tracking
-        """
-        request_id = f"{model_name}_{int(time.time() * 1000)}"
-
-        # Generate hash for consistency analysis if query provided
-        query_hash = None
-        if user_query:
-            query_hash = hashlib.sha256(user_query.encode()).hexdigest()[:64]
-
-        return request_id, query_hash
+    def start_attempt(
+        model_name: str, request_type: str = "summary", user_query: Optional[str] = None
+    ) -> "ModelAttempt":
+        """Begin tracking one model-call attempt; call .success()/.failure() on it when done."""
+        return ModelAttempt(model_name, request_type, user_query)
 
     @staticmethod
     def log_request_success(
         model_name: str,
-        request_id: str,
         request_type: str,
         response_time: float,
         response_content: str,
@@ -76,7 +90,6 @@ class PerformanceTracker:
 
         Args:
             model_name: Name of the OpenRouter model
-            request_id: Unique request identifier
             request_type: Type of request (summary, title, other)
             response_time: Time taken for response in seconds
             response_content: The response content
@@ -144,7 +157,6 @@ class PerformanceTracker:
     @staticmethod
     def log_request_failure(
         model_name: str,
-        request_id: str,
         request_type: str,
         response_time: float,
         error_message: str,
@@ -155,7 +167,6 @@ class PerformanceTracker:
 
         Args:
             model_name: Name of the OpenRouter model
-            request_id: Unique request identifier
             request_type: Type of request (summary, title, other)
             response_time: Time taken before failure in seconds
             error_message: Error message from the failure

@@ -9,6 +9,8 @@ from typing import List, Optional, Dict
 import logging, pyalex, time
 import requests
 
+from ..constants import DEFAULT_MIN_YEAR, DEFAULT_MAX_YEAR
+
 logger = logging.getLogger(__name__)
 
 # Configure PyAlex API key if available
@@ -139,22 +141,30 @@ class OpenAlexService:
 
         # Validate year parameters
         if min_year is not None and (
-            not isinstance(min_year, int) or min_year < 1900 or min_year > 2026
+            not isinstance(min_year, int)
+            or min_year < DEFAULT_MIN_YEAR
+            or min_year > DEFAULT_MAX_YEAR
         ):
-            raise ValueError("min_year must be an integer between 1900 and 2026")
+            raise ValueError(
+                f"min_year must be an integer between {DEFAULT_MIN_YEAR} and {DEFAULT_MAX_YEAR}"
+            )
 
         if max_year is not None and (
-            not isinstance(max_year, int) or max_year < 1900 or max_year > 2026
+            not isinstance(max_year, int)
+            or max_year < DEFAULT_MIN_YEAR
+            or max_year > DEFAULT_MAX_YEAR
         ):
-            raise ValueError("max_year must be an integer between 1900 and 2026")
+            raise ValueError(
+                f"max_year must be an integer between {DEFAULT_MIN_YEAR} and {DEFAULT_MAX_YEAR}"
+            )
 
         if min_year is not None and max_year is not None and min_year > max_year:
             raise ValueError("min_year cannot be greater than max_year")
 
-        # The frontend always sends the default range 1900-2026. That is not a filter.
-        if min_year == 1900:
+        # The frontend always sends the default full range. That is not a filter.
+        if min_year == DEFAULT_MIN_YEAR:
             min_year = None
-        if max_year == 2026:
+        if max_year == DEFAULT_MAX_YEAR:
             max_year = None
 
         year_is_exact = min_year is not None and min_year == max_year

@@ -1,27 +1,12 @@
 import { AppState } from './state.js';
 import { DOMManager } from './core.js';
+import { YEAR_MIN, YEAR_MAX } from './constants.js';
 import './search.js';
 import './binders.js';
-import './modal.js';
 import './research.js';
 import './paper.js';
 
-// Safely obtain CSRF token after DOM ready. Falls back to cookie if hidden input not present.
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-}
-
-let csrfToken = null;
-const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-if (csrfInput && csrfInput.value) {
-  csrfToken = csrfInput.value;
-} else {
-  csrfToken = getCookie('csrftoken');
-}
-window.csrfToken = csrfToken;
+// core.js (imported above via DOMManager) already sets window.csrfToken.
 
 // ==================== GLOBAL VARIABLES ====================
 let appState = new AppState(); // Initialize immediately
@@ -43,8 +28,8 @@ function resetFilters() {
   // animation is skipped (reduced motion) or CSS/JS animation support
   // is unavailable for any reason.
   if (domManager.elements.yearMin && domManager.elements.yearMax) {
-    domManager.elements.yearMin.value = "1900";
-    domManager.elements.yearMax.value = "2026";
+    domManager.elements.yearMin.value = String(YEAR_MIN);
+    domManager.elements.yearMax.value = String(YEAR_MAX);
     if (domManager.elements.yearError) domManager.elements.yearError.hidden = true;
   }
   if (domManager.elements.searchBy) {
@@ -78,64 +63,20 @@ function performSearch() {
   domManager.handleSearch();
 }
 
-function deleteBinder(binderId) {
-  console.log('deleteBinder called with ID:', binderId);
-  console.log('domManager available:', !!domManager);
-  if (domManager) domManager.deleteBinder(binderId);
-  else console.error('domManager not available when deleteBinder called');
-}
-
-function openBinder(id) {
-  if (domManager) domManager.openBinder(id);
-}
-
-function closeModal() {
-  if (domManager) domManager.hideResearchView();
-}
-
-function saveBinderName(binderId, newName) {
-  if (domManager) domManager.saveBinderName(binderId, newName);
-}
-
-function editBinderColor(binderId) {
-  if (domManager) domManager.editBinderColor(binderId);
-}
-
 // ==================== INITIALIZATION ====================
 function init() {
   domManager = new DOMManager();
-
-  // Migrate existing binders with additionalPapers to new format
-  migrateExistingBinders();
 
   // Initial render
   domManager.renderBinders();
   domManager.setupFilterListeners();
 
-  // Expose domManager to global scope AFTER initialization
+  // Expose domManager to global scope AFTER initialization. Binder
+  // card actions (open/delete/rename/recolor) are wired by delegated
+  // listeners in binders.js, not window-attached functions.
   window.domManager = domManager;
-  window.openBinder = openBinder;
-  window.closeModal = closeModal;
-  window.saveBinderName = saveBinderName;
-  window.editBinderColor = editBinderColor;
-  window.deleteBinder = deleteBinder;
 
   console.log("BRAIN AI Research Assistant initialized");
-}
-
-function migrateExistingBinders() {
-  // Fix any existing binders that have separate additionalPapers arrays
-  appState.binders.forEach((binder) => {
-    if (binder.additionalPapers && binder.additionalPapers.length > 0) {
-      // Move additional papers to main array
-      binder.papers = binder.papers || [];
-      binder.papers.push(...binder.additionalPapers);
-      delete binder.additionalPapers; // Remove old array
-      console.log(
-        `Migrated binder "${binder.name}": ${binder.papers.length} total papers`,
-      );
-    }
-  });
 }
 
 // Attach functions to window for HTML onclick attributes

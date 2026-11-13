@@ -18,7 +18,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ModelPerformance, ModelReliability, PaperPDF, User
+from .models import ModelPerformance, ModelReliability, PaperQAChunks, User
 from .services.llm_service import LLMError
 from .services.qa_chunk_cache import CHUNK_SCHEMA_VERSION, QAChunkCache
 from .services.performance_tracker import (
@@ -587,39 +587,11 @@ class TestExtractionService(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Full text URL and author search tests
+# Author search tests
 # ---------------------------------------------------------------------------
 
 
-class TestExtractFullTextUrl(TestCase):
-    """Test cases for _extract_full_text_url method."""
-
-    def test_extract_full_text_url_from_best_oa(self):
-        """Test extracting URL from best_oa_location."""
-        mock_work = {
-            "best_oa_location": {"pdf_url": "https://oa.example.com/paper.pdf"}
-        }
-
-        url = ExtractionService._extract_full_text_url(mock_work)
-
-        self.assertEqual(url, "https://oa.example.com/paper.pdf")
-
-    def test_extract_full_text_url_from_content_urls(self):
-        """Test extracting URL from content_urls when best_oa not available."""
-        mock_work = {"content_urls": {"pdf": "https://content.example.com/paper.pdf"}}
-
-        url = ExtractionService._extract_full_text_url(mock_work)
-
-        self.assertEqual(url, "https://content.example.com/paper.pdf")
-
-    def test_extract_full_text_url_none(self):
-        """Test returning None when no full text URL available."""
-        mock_work = {}
-
-        url = ExtractionService._extract_full_text_url(mock_work)
-
-        self.assertIsNone(url)
-
+class TestSearchAuthors(TestCase):
     @patch("Research_AI_Assistant.services.openalex_service.Authors")
     def test_search_authors_success(self, mock_authors_class):
         """Ensure author search produces expected results."""
@@ -1414,22 +1386,20 @@ class TestCircuitBreaker(TestCase):
         # log_request_failure only evaluates the threshold on an existing row.
         ModelPerformance.objects.create(model_name="flaky:free")
 
-        PerformanceTracker.log_request_failure(
-            "flaky:free", "req-1", "summary", 1.0, "boom"
-        )
+        PerformanceTracker.log_request_failure("flaky:free", "summary", 1.0, "boom")
         perf = ModelPerformance.objects.get(model_name="flaky:free")
         self.assertEqual(perf.consecutive_failures, 1)
         self.assertTrue(perf.is_active, "one failure must not trip the breaker")
 
         PerformanceTracker.log_request_failure(
-            "flaky:free", "req-2", "summary", 1.0, "boom again"
+            "flaky:free", "summary", 1.0, "boom again"
         )
         perf.refresh_from_db()
         self.assertEqual(perf.consecutive_failures, 2)
         self.assertFalse(perf.is_active)
 
         PerformanceTracker.log_request_success(
-            "flaky:free", "req-3", "summary", 1.0, COMPLIANT_SUMMARY
+            "flaky:free", "summary", 1.0, COMPLIANT_SUMMARY
         )
         perf.refresh_from_db()
         self.assertTrue(perf.is_active)
@@ -1439,8 +1409,18 @@ class TestCircuitBreaker(TestCase):
         OPENROUTER_API_KEY="test-key-123", OPENROUTER_MODELS=["m/one:free"]
     )
     @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
-    def test_complete_resets_breaker_before_ordering(self, mock_post):
-        """complete() must retry disabled models before it ranks them."""
+    def test_complete_retries_recovered_model_in_the_same_call(self, mock_post):
+        """A model disabled long enough ago to clear the reset window must be
+        usable again within the very call that triggers the reset, not just
+        on a later request."""
+        ModelReliability.objects.create(model_name="m/one:free", tier="primary")
+        ModelPerformance.objects.create(
+            model_name="m/one:free",
+            is_active=False,
+            consecutive_failures=5,
+            last_failure=timezone.now()
+            - timedelta(minutes=CIRCUIT_BREAKER_RESET_MIN + 5),
+        )
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -1448,27 +1428,13 @@ class TestCircuitBreaker(TestCase):
         }
         mock_post.return_value = mock_response
 
-        manager = Mock()
-        with patch.object(
-            PerformanceTracker, "reset_circuit_breaker"
-        ) as mock_reset, patch.object(
-            PerformanceTracker,
-            "get_intelligent_model_order",
-            return_value=["m/one:free"],
-        ) as mock_order:
-            manager.attach_mock(mock_reset, "reset_circuit_breaker")
-            manager.attach_mock(mock_order, "get_intelligent_model_order")
+        service = OpenRouterService()
+        result = service.complete(system_prompt="s", user_message="u")
 
-            service = OpenRouterService()
-            self.assertEqual(service.complete(system_prompt="s", user_message="u"), "ok")
-
-        called = [name for name, _args, _kwargs in manager.mock_calls]
-        self.assertIn("reset_circuit_breaker", called)
-        self.assertIn("get_intelligent_model_order", called)
-        self.assertLess(
-            called.index("reset_circuit_breaker"),
-            called.index("get_intelligent_model_order"),
-        )
+        self.assertEqual(result, "ok")
+        mock_post.assert_called_once()  # recovered model was actually tried, not skipped
+        perf = ModelPerformance.objects.get(model_name="m/one:free")
+        self.assertTrue(perf.is_active)
 
 
 # ---------------------------------------------------------------------------
@@ -1482,10 +1448,8 @@ class TestQAChunkCache(TestCase):
     the cached text belongs to it."""
 
     def test_cache_hit_served_when_source_matches(self):
-        PaperPDF.objects.create(
+        PaperQAChunks.objects.create(
             openalex_id="W1",
-            pdf_url="https://good.test/a.pdf",
-            markdown_content="",
             qa_chunks=[{"paper_id": "W1", "page": 1, "text": "hello"}],
             qa_chunk_version=CHUNK_SCHEMA_VERSION,
             qa_source_pdf_url="https://good.test/a.pdf",
@@ -1500,10 +1464,8 @@ class TestQAChunkCache(TestCase):
     def test_cache_hit_rejected_when_source_does_not_match(self):
         """A cached row built from a different URL must not be trusted for
         a request that never sent that URL for this paper_id."""
-        PaperPDF.objects.create(
+        PaperQAChunks.objects.create(
             openalex_id="W1",
-            pdf_url="https://attacker.test/fake.pdf",
-            markdown_content="",
             qa_chunks=[{"paper_id": "W1", "page": 1, "text": "poisoned"}],
             qa_chunk_version=CHUNK_SCHEMA_VERSION,
             qa_source_pdf_url="https://attacker.test/fake.pdf",
