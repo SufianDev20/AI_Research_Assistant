@@ -22,6 +22,7 @@ from Research_AI_Assistant.services.pdf_service import (
     fetch_pdf_bytes,
 )
 from Research_AI_Assistant.services.qa_llm import (
+    QA_MAX_TOKENS,
     QACompletionError,
     QACompletionService,
     build_paper_legend,
@@ -76,7 +77,7 @@ class TestQALlm(unittest.TestCase):
         call = openrouter.complete.call_args.kwargs
         self.assertEqual(call["request_type"], "qa")
         self.assertEqual(call["temperature"], 0.1)
-        self.assertEqual(call["max_tokens"], 800)
+        self.assertEqual(call["max_tokens"], QA_MAX_TOKENS)
 
     def test_paper_label_formats_one_two_and_many_authors(self):
         self.assertEqual(paper_label({"authors": ["Ann Smith"]}, "Paper 1"), "Smith")
@@ -543,7 +544,7 @@ class TestOcrAndGarbleRetry(unittest.TestCase):
 
         return SimpleNamespace(
             INFO_MESSAGES=StringIO(),
-            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop"),
+            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop", NEVER="never"),
         )
 
     def _run(self, to_markdown, dl):
@@ -580,7 +581,7 @@ class TestOcrAndGarbleRetry(unittest.TestCase):
 
         dl = SimpleNamespace(
             INFO_MESSAGES=StringIO(),
-            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop"),
+            OCRMode=SimpleNamespace(FORCE_DROP_OLD="force-drop", NEVER="never"),
         )
         held = {}
 
@@ -608,6 +609,35 @@ class TestOcrAndGarbleRetry(unittest.TestCase):
         self.assertNotIn("use_ocr", to_md.call_args.kwargs)
         self.assertEqual(result["chunks"][0]["page"], 1)
 
+    @override_settings(QA_ALLOW_OCR=False)
+    def test_ocr_off_disables_layout_and_reads_plain_page_key(self):
+        # With OCR off the ONNX layout path is switched off; the plain PyMuPDF
+        # path labels pages "page", not "page_number", and must still chunk.
+        plain = [
+            {"metadata": {"page": 1}, "text": "Clean prose. " * 40},
+            {"metadata": {"page": 2}, "text": "More prose. " * 40},
+        ]
+        to_md = MagicMock(return_value=plain)
+        use_layout = MagicMock()
+        pm4 = SimpleNamespace(to_markdown=to_md, use_layout=use_layout)
+        dl = self._dl()
+        modules = {
+            "pymupdf4llm": pm4,
+            "pymupdf4llm.helpers": SimpleNamespace(document_layout=dl),
+            "pymupdf4llm.helpers.document_layout": dl,
+            "pymupdf": SimpleNamespace(open=lambda **kw: MagicMock()),
+        }
+        with patch(
+            "Research_AI_Assistant.services.qa_pipeline.fetch_pdf_bytes",
+            return_value=b"pdf bytes",
+        ), patch.dict(sys.modules, modules):
+            result = QAChunkService.fetch_and_chunk("https://example.test/a.pdf", "W1")
+
+        use_layout.assert_called_once_with(False)
+        self.assertNotIn("use_ocr", to_md.call_args.kwargs)
+        self.assertEqual([c["page"] for c in result["chunks"]], [1, 2])
+
+    @override_settings(QA_ALLOW_OCR=True)
     def test_garbled_text_retries_with_ocr_forced(self):
         junk = [{"metadata": {"page_number": 1}, "text": "�" * 300}]
         clean = [{"metadata": {"page_number": 1}, "text": "Clean prose. " * 40}]
@@ -619,6 +649,7 @@ class TestOcrAndGarbleRetry(unittest.TestCase):
         self.assertEqual(to_md.call_args.kwargs["use_ocr"], "force-drop")
         self.assertIn("Clean prose", result["chunks"][0]["text"])
 
+    @override_settings(QA_ALLOW_OCR=True)
     def test_ocr_already_ran_skips_retry(self):
         dl = self._dl()
 
@@ -632,6 +663,7 @@ class TestOcrAndGarbleRetry(unittest.TestCase):
 
         self.assertEqual(to_md.call_count, 1)
 
+    @override_settings(QA_ALLOW_OCR=True)
     def test_worse_retry_is_ignored(self):
         first = [{"metadata": {"page_number": 1}, "text": "�" * 300}]
         worse = [{"metadata": {"page_number": 1}, "text": "�" * 301}]

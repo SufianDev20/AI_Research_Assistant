@@ -672,7 +672,8 @@ def multi_paper_qa(request):
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    with ThreadPoolExecutor(max_workers=min(3, len(paper_ids))) as pool:
+    chunk_workers = min(settings.QA_CHUNK_WORKERS, len(paper_ids))
+    with ThreadPoolExecutor(max_workers=chunk_workers) as pool:
         futures = {pool.submit(_chunk_one, pid): pid for pid in paper_ids}
         for future in as_completed(futures):
             pid = futures[future]

@@ -168,10 +168,16 @@ class QAChunkService:
                 except Exception as exc:
                     logger.warning("OCR retry failed for %s: %s", openalex_id, exc)
         else:
-            # Memory-safe path: skip onnxruntime OCR entirely.
-            ocr_mode = dl.OCRMode.NEVER if dl is not None else None
+            # Memory-safe path. With pymupdf-layout installed, pymupdf4llm runs
+            # an ONNX layout model on every page even when OCR is off: on an
+            # 83-page PDF that peaked at ~410 MB and took ~52 s, vs ~200 MB and
+            # ~22 s on the plain PyMuPDF path. OCR needs the layout path, so
+            # only switch it off here. QA_ALLOW_OCR is process-wide, so every
+            # call sets the same value and concurrent requests cannot race.
+            if hasattr(pm4, "use_layout"):
+                pm4.use_layout(False)
             page_dicts, _, text = QAChunkService._to_markdown_pages(
-                pdf_bytes, openalex_id, pm4, dl, use_ocr=ocr_mode
+                pdf_bytes, openalex_id, pm4, dl=None
             )
             if _looks_garbled(text):
                 raise QAChunkError(
@@ -181,11 +187,10 @@ class QAChunkService:
 
         chunks: List[Dict] = []
         for page_dict in page_dicts:
-            page_number = (
-                page_dict.get("metadata", {}).get("page_number")
-                if isinstance(page_dict, dict)
-                else None
-            )
+            # The layout path labels pages "page_number"; the plain PyMuPDF
+            # path (used when OCR is off) labels them "page". Both are 1-based.
+            metadata = page_dict.get("metadata", {}) if isinstance(page_dict, dict) else {}
+            page_number = metadata.get("page_number") or metadata.get("page")
 
             page_text = page_dict.get("text", "") if isinstance(page_dict, dict) else ""
 

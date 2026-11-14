@@ -70,6 +70,11 @@ LLM_NUM_CTX = env.int("LLM_NUM_CTX", default=8192)
 # hosts with ≥ 2 GB RAM.
 QA_ALLOW_OCR = env.bool("QA_ALLOW_OCR", default=False)
 
+# How many papers one Q&A request extracts at the same time. Each extraction
+# holds the whole PDF plus every page's Markdown in memory, so 1 is the safe
+# value on a 512 MB instance; raise it on hosts with more RAM for speed.
+QA_CHUNK_WORKERS = max(1, env.int("QA_CHUNK_WORKERS", default=1))
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
