@@ -4,6 +4,7 @@ import requests
 from django.test import SimpleTestCase, override_settings
 
 from Research_AI_Assistant.services.llm_service import (
+    STREAM_RESET,
     FallbackLLM,
     LLMError,
     get_llm,
@@ -65,6 +66,17 @@ class OllamaServiceTests(SimpleTestCase):
         self.assertFalse(kwargs["json"]["json_mode"])
         self.assertEqual(get.call_args.args[0], "https://x.example/llm/jobs/j1")
         self.assertEqual(get.call_count, 3)
+
+    @patch(GET)
+    @patch(POST)
+    def test_max_tokens_is_clamped_to_server_limit(self, post, get):
+        """The university server answers HTTP 400 "max_tokens must be between
+        1 and 4096." for anything larger, and the Q&A and summary budgets
+        (up to 8000) are sized for OpenRouter."""
+        post.return_value = _submitted()
+        get.return_value = _job()
+        OllamaService().complete(**KW, max_tokens=6000)
+        self.assertEqual(post.call_args.kwargs["json"]["max_tokens"], 4096)
 
     @patch(GET)
     @patch(POST)
@@ -244,6 +256,30 @@ class FallbackLLMTests(SimpleTestCase):
         primary.complete.side_effect = KeyError("bug")
         with self.assertRaises(KeyError):
             FallbackLLM(primary, MagicMock()).complete(**KW)
+
+    @staticmethod
+    def _streams(*tokens, error=None):
+        def stream_complete(**_kwargs):
+            yield from tokens
+            if error:
+                raise error
+        return stream_complete
+
+    def test_stream_reset_after_primary_failed_mid_stream(self):
+        primary, secondary = MagicMock(), MagicMock()
+        primary.stream_complete = self._streams(
+            '{"answer": "cut', error=OllamaAPIError("died mid-answer")
+        )
+        secondary.stream_complete = self._streams('{"answer": "ok"}')
+        out = list(FallbackLLM(primary, lambda: secondary).stream_complete(**KW))
+        self.assertEqual(out, ['{"answer": "cut', STREAM_RESET, '{"answer": "ok"}'])
+
+    def test_no_stream_reset_when_primary_sent_nothing(self):
+        primary, secondary = MagicMock(), MagicMock()
+        primary.stream_complete = self._streams(error=OllamaAPIError("down"))
+        secondary.stream_complete = self._streams('{"answer": "ok"}')
+        out = list(FallbackLLM(primary, lambda: secondary).stream_complete(**KW))
+        self.assertEqual(out, ['{"answer": "ok"}'])
 
 
 @override_settings(**CFG)

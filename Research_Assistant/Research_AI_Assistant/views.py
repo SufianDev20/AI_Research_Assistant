@@ -31,6 +31,9 @@ from .services.prompt_builder import (
     system_prompt,
     build_user_message,
     extract_final_summary,
+    ensure_references,
+    require_all_papers,
+    summary_max_tokens,
     InvalidSummaryFormat,
 )
 
@@ -487,10 +490,14 @@ def summarise(request):
         user_message = build_user_message(papers, query)
 
         # Get summary from LLM
+        max_tokens = summary_max_tokens(len(papers))
+        validator = require_all_papers(len(papers))
         summary = llm.complete(
             system_prompt=system_prompt,
             user_message=user_message,
+            max_tokens=max_tokens,
             request_type="summary",
+            response_validator=validator,
         )
         try:
             summary = extract_final_summary(summary)
@@ -511,9 +518,14 @@ def summarise(request):
                     "your reasoning, use JSON, or add markdown fences."
                 ),
                 user_message=user_message,
+                max_tokens=max_tokens,
                 request_type="summary",
+                response_validator=validator,
             )
             summary = extract_final_summary(summary)
+
+        # Models (notably the Ollama VM) often leave out the References list.
+        summary = ensure_references(summary, papers)
 
         return JsonResponse({"summary": summary})
 
@@ -792,6 +804,8 @@ def _multi_paper_qa_stream(context_chunks, question, legend, paper_errors, conte
             ):
                 if event_type == "token":
                     yield _sse_event("token", {"t": data})
+                elif event_type == "reset":
+                    yield _sse_event("reset", {})
                 elif event_type == "done":
                     validated_citations = QACitationValidator.validate_citations(
                         data["citations"], context_chunks

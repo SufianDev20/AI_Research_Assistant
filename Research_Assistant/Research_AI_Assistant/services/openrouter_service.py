@@ -9,13 +9,14 @@ References:
 
 import json
 import logging
+import time
 from typing import Callable, Dict, List, Optional
 
 import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from .llm_service import LLMError
+from .llm_service import LLMError, STREAM_RESET
 from .performance_tracker import PerformanceTracker
 from ..request_types import JSON_REQUEST_TYPES
 
@@ -30,6 +31,15 @@ DEFAULT_MAX_MODELS_PER_REQUEST = 10
 
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 FREE_MODELS_CACHE_KEY = "openrouter:free_models"
+REASONING_MODELS_CACHE_KEY = "openrouter:free_reasoning_models"
+
+# Q&A limits. Each free-model attempt counts against OpenRouter's daily
+# free-request quota (50/day under 10 credits), and a 10-model walk on one
+# question also kept the browser waiting for minutes.
+DEFAULT_QA_MAX_MODELS = 4
+DEFAULT_QA_DEADLINE_SECONDS = 90
+# Not worth starting another model with less time than this left.
+MIN_ATTEMPT_SECONDS = 5
 DEFAULT_MODELS_CACHE_SECONDS = 6 * 60 * 60
 MODELS_FETCH_TIMEOUT = 10
 
@@ -61,6 +71,31 @@ def _as_bool(value, default: bool = False) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
+
+
+def _is_reasoning_model(entry: dict) -> bool:
+    """
+    True when the models API says the model reasons. A `reasoning` object
+    is present only for models with reasoning configuration, and
+    supported_parameters lists "reasoning"/"include_reasoning" for them.
+    complete() sends reasoning.effort="low" to every model, which switches
+    reasoning on for optional-reasoning models too, so both count.
+
+    Reference: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+    """
+    if isinstance(entry.get("reasoning"), dict):
+        return True
+    params = entry.get("supported_parameters") or []
+    return "reasoning" in params or "include_reasoning" in params
+
+
+def reasoning_model_ids() -> set:
+    """Free model ids recorded as reasoning models by the last discovery.
+
+    Empty when nothing is cached (e.g. OPENROUTER_MODELS overrides
+    discovery), which leaves the model order unchanged.
+    """
+    return set(cache.get(REASONING_MODELS_CACHE_KEY) or ())
 
 
 def fetch_free_models() -> List[str]:
@@ -116,6 +151,7 @@ def fetch_free_models() -> List[str]:
         # missing key means "keep": a model is only excluded on positive
         # evidence that it is unusable.
         usable = []
+        reasoning = []
         for entry in entries:
             model_id = (entry or {}).get("id") or ""
             if not model_id.endswith(":free"):
@@ -131,6 +167,8 @@ def fetch_free_models() -> List[str]:
             ):
                 continue
             usable.append((model_id, entry.get("context_length") or 0))
+            if _is_reasoning_model(entry):
+                reasoning.append(model_id)
 
         if not usable:
             raise OpenRouterAPIError("OpenRouter returned no usable free models.")
@@ -142,15 +180,14 @@ def fetch_free_models() -> List[str]:
             models.remove(LAST_RESORT_MODEL)
             models.append(LAST_RESORT_MODEL)
 
-        cache.set(
-            FREE_MODELS_CACHE_KEY,
-            models,
-            getattr(
-                settings,
-                "OPENROUTER_MODELS_CACHE_SECONDS",
-                DEFAULT_MODELS_CACHE_SECONDS,
-            ),
+        cache_seconds = getattr(
+            settings,
+            "OPENROUTER_MODELS_CACHE_SECONDS",
+            DEFAULT_MODELS_CACHE_SECONDS,
         )
+        # Written first so it is never older than the model list it describes.
+        cache.set(REASONING_MODELS_CACHE_KEY, reasoning, cache_seconds)
+        cache.set(FREE_MODELS_CACHE_KEY, models, cache_seconds)
         logger.info("Discovered %d free OpenRouter models.", len(models))
 
         # A newly discovered model has no tracking rows, so it would sort to
@@ -210,6 +247,95 @@ class OpenRouterService:
         self.pin_default_model: bool = _as_bool(
             getattr(settings, "OPENROUTER_PIN_DEFAULT_MODEL", False)
         )
+        self.qa_max_models: int = max(
+            1,
+            int(getattr(settings, "OPENROUTER_QA_MAX_MODELS", DEFAULT_QA_MAX_MODELS)),
+        )
+        self.qa_deadline_seconds: float = float(
+            getattr(
+                settings, "OPENROUTER_QA_DEADLINE_SECONDS", DEFAULT_QA_DEADLINE_SECONDS
+            )
+        )
+
+    def _models_for_request(self, request_type: str) -> List[str]:
+        """
+        Models to try, in order, for one request.
+
+        Ranked by PerformanceTracker, then capped. For Q&A, models that are
+        not reasoning models go first: a reasoning model spends part of
+        max_tokens on hidden reasoning and is the usual cause of an empty or
+        cut-off JSON answer. The partition is stable, so the reliability
+        ranking still decides order within each group. Q&A is also capped at
+        qa_max_models attempts so one question cannot use up the daily
+        free-model quota.
+        """
+        configured_models = getattr(settings, "OPENROUTER_MODELS", None)
+        if isinstance(configured_models, str):
+            configured_models = [
+                model.strip() for model in configured_models.split(",") if model.strip()
+            ]
+        if not configured_models:
+            configured_models = fetch_free_models()
+
+        # Retry models the circuit breaker disabled, before ranking: nothing
+        # else clears is_active, so a model that recovered from a transient
+        # outage would otherwise stay at the back of the chain forever.
+        try:
+            PerformanceTracker.reset_circuit_breaker()
+        except Exception as exc:
+            logger.warning("Circuit breaker reset failed: %s", exc)
+
+        # Get intelligent model order based on performance, then cap the
+        # request. Trying every stale or rate-limited free model creates a
+        # long chain of avoidable failures for one user request.
+        models_to_try = PerformanceTracker.get_intelligent_model_order(
+            list(dict.fromkeys(configured_models))
+        )
+
+        limit = self.max_models_per_request
+        if request_type == "qa":
+            reasoning = reasoning_model_ids()
+            if reasoning:
+                models_to_try = [m for m in models_to_try if m not in reasoning] + [
+                    m for m in models_to_try if m in reasoning
+                ]
+            limit = min(limit, self.qa_max_models)
+
+        # Pinning the default model to the front overrides the reliability
+        # ranking, which also means it overrides the circuit breaker: a model
+        # with dozens of consecutive failures would still be tried first on
+        # every request. Off by default; opt in only to force one model.
+        if self.pin_default_model and self.model in models_to_try:
+            models_to_try.remove(self.model)
+            models_to_try.insert(0, self.model)
+        return models_to_try[:limit]
+
+    def _deadline_for(self, request_type: str) -> Optional[float]:
+        """time.monotonic() value after which a Q&A request stops; None otherwise."""
+        if request_type == "qa" and self.qa_deadline_seconds > 0:
+            return time.monotonic() + self.qa_deadline_seconds
+        return None
+
+    def _attempt_timeout(self, deadline: Optional[float]) -> Optional[float]:
+        """
+        Per-attempt HTTP timeout, shortened to the time left before the
+        deadline. Returns None when too little time is left to start another
+        model.
+        """
+        if deadline is None:
+            return self.timeout
+        remaining = deadline - time.monotonic()
+        if remaining < MIN_ATTEMPT_SECONDS:
+            return None
+        return min(self.timeout, remaining)
+
+    def _deadline_error(self, attempts: int, last_error) -> "OpenRouterAPIError":
+        error_msg = (
+            f"Q&A time limit of {self.qa_deadline_seconds:g}s reached after "
+            f"{attempts} model attempt(s). Last error: {last_error}"
+        )
+        logger.warning(error_msg)
+        return OpenRouterAPIError(error_msg)
 
     def _build_headers(self) -> Dict[str, str]:
         """
@@ -261,41 +387,17 @@ class OpenRouterService:
         Reference:
             https://openrouter.ai/docs/api/reference/overview#completions-request-format
         """
-        configured_models = getattr(settings, "OPENROUTER_MODELS", None)
-        if isinstance(configured_models, str):
-            configured_models = [
-                model.strip() for model in configured_models.split(",") if model.strip()
-            ]
-        if not configured_models:
-            configured_models = fetch_free_models()
-
-        # Retry models the circuit breaker disabled, before ranking: nothing
-        # else clears is_active, so a model that recovered from a transient
-        # outage would otherwise stay at the back of the chain forever.
-        try:
-            PerformanceTracker.reset_circuit_breaker()
-        except Exception as exc:
-            logger.warning("Circuit breaker reset failed: %s", exc)
-
-        # Get intelligent model order based on performance, then cap the
-        # request. Trying every stale or rate-limited free model creates a
-        # long chain of avoidable failures for one user request.
-        models_to_try = PerformanceTracker.get_intelligent_model_order(
-            list(dict.fromkeys(configured_models))
-        )
-
-        # Pinning the default model to the front overrides the reliability
-        # ranking, which also means it overrides the circuit breaker: a model
-        # with dozens of consecutive failures would still be tried first on
-        # every request. Off by default; opt in only to force one model.
-        if self.pin_default_model and self.model in models_to_try:
-            models_to_try.remove(self.model)
-            models_to_try.insert(0, self.model)
-        models_to_try = models_to_try[: self.max_models_per_request]
+        models_to_try = self._models_for_request(request_type)
+        deadline = self._deadline_for(request_type)
 
         last_error = None
 
         for attempt_num, model_name in enumerate(models_to_try, 1):
+            attempt_timeout = self._attempt_timeout(deadline)
+            if attempt_timeout is None:
+                last_error = self._deadline_error(attempt_num - 1, last_error)
+                break
+
             attempt = PerformanceTracker.start_attempt(
                 model_name, request_type, user_message
             )
@@ -336,7 +438,7 @@ class OpenRouterService:
                     OPENROUTER_API_URL,
                     headers=self._build_headers(),
                     json=payload,
-                    timeout=self.timeout,
+                    timeout=attempt_timeout,
                 )
                 response.raise_for_status()
 
@@ -452,30 +554,28 @@ class OpenRouterService:
         Raises:
             OpenRouterAPIError on total failure.
         """
-        configured_models = getattr(settings, "OPENROUTER_MODELS", None)
-        if isinstance(configured_models, str):
-            configured_models = [
-                m.strip() for m in configured_models.split(",") if m.strip()
-            ]
-        if not configured_models:
-            configured_models = fetch_free_models()
-
-        try:
-            PerformanceTracker.reset_circuit_breaker()
-        except Exception as exc:
-            logger.warning("Circuit breaker reset failed: %s", exc)
-
-        models_to_try = PerformanceTracker.get_intelligent_model_order(
-            list(dict.fromkeys(configured_models))
-        )
-        if self.pin_default_model and self.model in models_to_try:
-            models_to_try.remove(self.model)
-            models_to_try.insert(0, self.model)
-        models_to_try = models_to_try[: self.max_models_per_request]
+        models_to_try = self._models_for_request(request_type)
+        deadline = self._deadline_for(request_type)
 
         last_error = None
+        # True once a token from an earlier, failed model has been yielded.
+        # The caller has already shown those, so the next model's first
+        # token is preceded by STREAM_RESET.
+        stale_tokens_sent = False
+        collected: List[str] = []
 
         for attempt_num, model_name in enumerate(models_to_try, 1):
+            # Reaching another attempt means the previous one failed, so any
+            # tokens it yielded are stale.
+            if collected:
+                stale_tokens_sent = True
+            collected = []
+
+            attempt_timeout = self._attempt_timeout(deadline)
+            if attempt_timeout is None:
+                last_error = self._deadline_error(attempt_num - 1, last_error)
+                break
+
             attempt = PerformanceTracker.start_attempt(
                 model_name, request_type, user_message
             )
@@ -505,15 +605,22 @@ class OpenRouterService:
                     OPENROUTER_API_URL,
                     headers=self._build_headers(),
                     json=payload,
-                    timeout=self.timeout,
+                    timeout=attempt_timeout,
                     stream=True,
                 )
                 response.raise_for_status()
 
-                collected = []
                 finish_reason = None
                 usage = None
+                timed_out = False
                 for line in response.iter_lines(decode_unicode=True):
+                    # The requests timeout only bounds the gap between
+                    # reads, so a model that keeps trickling tokens would
+                    # otherwise run past the Q&A deadline.
+                    if deadline is not None and time.monotonic() > deadline:
+                        timed_out = True
+                        response.close()
+                        break
                     if not line or not line.startswith("data: "):
                         continue
                     data_str = line[6:]
@@ -532,8 +639,19 @@ class OpenRouterService:
                     delta = choices[0].get("delta", {})
                     token = delta.get("content")
                     if token:
+                        if not collected and stale_tokens_sent:
+                            yield STREAM_RESET
+                            stale_tokens_sent = False
                         collected.append(token)
                         yield token
+
+                if timed_out:
+                    error_msg = f"Model {model_name} stream passed the Q&A time limit."
+                    attempt.failure(error_msg)
+                    last_error = self._deadline_error(
+                        attempt_num, OpenRouterAPIError(error_msg)
+                    )
+                    break
 
                 content = "".join(collected)
                 if not content:

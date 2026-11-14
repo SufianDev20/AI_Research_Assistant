@@ -126,6 +126,81 @@ def extract_final_summary(raw_content: str) -> str:
     return raw_content[match.start():].strip()
 
 
+# Output budget for a summary. The old fixed 4000 cap cut long answers off
+# before their References list (the answer still came back as "success").
+SUMMARY_MAX_TOKENS = 8000
+_SUMMARY_TOKENS_BASE = 1500
+_SUMMARY_TOKENS_PER_PAPER = 600
+
+
+def summary_max_tokens(paper_count: int) -> int:
+    """Token budget for a summary of ``paper_count`` papers, capped."""
+    return min(
+        SUMMARY_MAX_TOKENS,
+        _SUMMARY_TOKENS_BASE + _SUMMARY_TOKENS_PER_PAPER * max(1, paper_count),
+    )
+
+
+_REFERENCES_RE = re.compile(r"(?im)^\s*References\s*:")
+
+
+def require_all_papers(paper_count: int):
+    """
+    Build a response validator for complete(): the reply must contain a
+    "Paper N:" block for every paper. A reply cut off by max_tokens misses
+    the later blocks, so the call falls through to the next model instead of
+    showing the user half a summary. A missing References list is not
+    rejected; ensure_references() rebuilds it.
+    """
+
+    def validate(raw_content: str) -> None:
+        summary = extract_final_summary(raw_content)
+        found = len(_PAPER_BLOCK_RE.findall(summary))
+        if found < paper_count:
+            raise InvalidSummaryFormat(
+                f"Summary covers {found} of {paper_count} papers (cut off?)."
+            )
+
+    return validate
+
+
+def _harvard_author(name: str) -> str:
+    """"Fabian Pedregosa" -> "Pedregosa, F." (names are "Given Family")."""
+    parts = name.replace(",", " ").split()
+    if len(parts) < 2:
+        return name.strip()
+    return f"{parts[-1]}, " + " ".join(f"{p[0]}." for p in parts[:-1])
+
+
+def build_references(papers: List[Dict]) -> str:
+    """Harvard-style References list built from paper metadata alone."""
+    lines = ["References:"]
+    for n, paper in enumerate(papers, start=1):
+        names = [a.get("name", "").strip() for a in paper.get("authors") or [] if a.get("name")]
+        authors = "; ".join(_harvard_author(x) for x in names[:3])
+        if len(names) > 3:
+            authors += " et al."
+        parts = [authors] if authors else []
+        if paper.get("publication_year"):
+            parts.append(f"({paper['publication_year']})")
+        parts.append(f"'{paper.get('title') or 'N/A'}'.")
+        source = paper.get("source")
+        if source and source != "N/A":
+            parts.append(f"{source}.")
+        doi = paper.get("doi")
+        if doi and doi != "N/A":
+            parts.append(f"doi: {doi}.")
+        lines.append(f"[{n}] " + " ".join(parts))
+    return "\n".join(lines)
+
+
+def ensure_references(summary: str, papers: List[Dict]) -> str:
+    """Append a References list built from metadata when the model left it out."""
+    if _REFERENCES_RE.search(summary):
+        return summary
+    return f"{summary}\n\n{build_references(papers)}"
+
+
 def _format_author_list(authors: List[Dict]) -> str:
     """
     Convert author dicts to a comma-separated display string.

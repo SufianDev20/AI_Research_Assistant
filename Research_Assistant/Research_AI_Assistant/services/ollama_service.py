@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 # Submit and poll requests return immediately; only the job itself is slow.
 SHORT_TIMEOUT = (6, 30)
+# The university server rejects a larger max_tokens with HTTP 400 ("max_tokens
+# must be between 1 and 4096"), while the Q&A/summary budgets are sized for
+# OpenRouter. Clamp here so Ollama gets a request it accepts.
+SERVER_MAX_TOKENS = 4096
 POLL_INTERVAL_SECONDS = 2
 
 
@@ -166,7 +170,7 @@ class OllamaService:
             "system_prompt": system_prompt,
             "user_message": user_message,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": min(max_tokens, SERVER_MAX_TOKENS),
             "num_ctx": self.num_ctx,
             "json_mode": request_type in JSON_REQUEST_TYPES,
         }

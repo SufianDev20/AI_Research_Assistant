@@ -20,7 +20,9 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_PDF_BYTES = 50 * 1024 * 1024
+# Kept low for a 512 MB host: the downloaded bytes stay in memory while
+# PyMuPDF parses them, and parsing needs several times the file size again.
+MAX_PDF_BYTES = 15 * 1024 * 1024
 FETCH_TIMEOUT = 30
 MAX_PDF_URL_LENGTH = 2000
 ALLOWED_PDF_URL_SCHEMES = {"http", "https"}
@@ -86,8 +88,13 @@ def _reject_unsafe_pdf_url(pdf_url: str, context_id: str) -> None:
             )
 
 
-def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
-    """Download PDF bytes with a response-size guard."""
+def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytearray:
+    """Download PDF bytes with a response-size guard.
+
+    Returns the download buffer itself (a bytearray) rather than a bytes()
+    copy, so the PDF is held in memory once, not twice. pymupdf.open(stream=)
+    and file.write() both accept a bytearray.
+    """
     _reject_unsafe_pdf_url(pdf_url, context_id)
     parsed_url = urlparse(pdf_url)
     openalex_api_key = getattr(settings, "OPENALEX_API_KEY", None)
@@ -119,14 +126,15 @@ def fetch_pdf_bytes(pdf_url: str, context_id: str) -> bytes:
         # A server can omit or lie about Content-Length, so the real guard is
         # checked while downloading: stop as soon as the running total passes
         # the limit instead of pulling the whole body into memory first.
-        chunks = bytearray()
+        pdf_bytes = bytearray()
         for piece in response.iter_content(chunk_size=65536):
-            chunks += piece
-            if len(chunks) > MAX_PDF_BYTES:
+            pdf_bytes += piece
+            if len(pdf_bytes) > MAX_PDF_BYTES:
+                response.close()
                 raise PDFExtractionError(
-                    f"PDF for {context_id} exceeds 50MB limit."
+                    f"PDF for {context_id} exceeds "
+                    f"{MAX_PDF_BYTES // (1024 * 1024)}MB limit."
                 )
-        pdf_bytes = bytes(chunks)
 
         # Some publishers (e.g. Springer) answer 200 with an HTML bot-check page
         # instead of a PDF. Worded to match the frontend's publisher-block pattern.

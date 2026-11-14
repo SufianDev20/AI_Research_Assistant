@@ -14,6 +14,7 @@ The paper/data processing pipeline itself is kept in qa_pipeline.py.
 import json, logging
 from typing import Dict, List, Optional, Tuple
 
+from .llm_service import STREAM_RESET
 from .qa_pipeline import resolve_paper_id
 
 # Configuration/Constants
@@ -21,8 +22,9 @@ from .qa_pipeline import resolve_paper_id
 # Reasoning models spend part of this budget on hidden reasoning tokens (the
 # `reasoning.exclude` flag only hides them, it does not exempt them from
 # max_tokens). 800 left only ~250 tokens of content, so the JSON answer was
-# cut mid-string or came back empty.
-QA_MAX_TOKENS = 2500
+# cut mid-string or came back empty. 2500 still let some reasoning models run
+# out before the JSON closed, so the budget leaves room for both.
+QA_MAX_TOKENS = 6000
 QA_TEMPERATURE = 0.1
 
 # Logging
@@ -265,6 +267,8 @@ class QACompletionService:
         """
         Streaming variant of ask(). Yields (event_type, data) tuples:
             ("token", str)   — a content delta from the LLM
+            ("reset", None)  — the backend moved to another model; discard
+                               every token shown so far
             ("done", dict)   — the parsed and alias-resolved result
 
         Raises QACompletionError if the LLM fails or returns invalid JSON.
@@ -283,6 +287,10 @@ class QACompletionService:
                 request_type="qa",
                 response_validator=QACompletionService._parse_response,
             ):
+                if token is STREAM_RESET:
+                    collected.clear()
+                    yield ("reset", None)
+                    continue
                 collected.append(token)
                 yield ("token", token)
         except Exception as exc:

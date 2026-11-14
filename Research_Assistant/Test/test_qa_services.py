@@ -21,6 +21,7 @@ from Research_AI_Assistant.services.pdf_service import (
     PDFService,
     fetch_pdf_bytes,
 )
+from Research_AI_Assistant.services.llm_service import STREAM_RESET
 from Research_AI_Assistant.services.qa_llm import (
     QA_MAX_TOKENS,
     QACompletionError,
@@ -78,6 +79,29 @@ class TestQALlm(unittest.TestCase):
         self.assertEqual(call["request_type"], "qa")
         self.assertEqual(call["temperature"], 0.1)
         self.assertEqual(call["max_tokens"], QA_MAX_TOKENS)
+
+    def test_ask_streaming_discards_tokens_from_a_model_that_was_reset(self):
+        """A backend that falls through to another model after streaming
+        tokens sends STREAM_RESET: the caller is told to discard what it has
+        shown, and the answer comes from the last model only."""
+        llm = MagicMock()
+        llm.stream_complete.return_value = iter([
+            '{"answer":"cut off by the first mo',
+            STREAM_RESET,
+            '{"answer":"Second model answer",',
+            '"citations":[]}',
+        ])
+
+        events = list(QACompletionService.ask_streaming(
+            llm,
+            [{"paper_id": "W1", "page": 2, "text": "Supported evidence."}],
+            "What is supported?",
+        ))
+
+        self.assertEqual(
+            [kind for kind, _ in events], ["token", "reset", "token", "token", "done"]
+        )
+        self.assertEqual(events[-1][1]["answer"], "Second model answer")
 
     def test_paper_label_formats_one_two_and_many_authors(self):
         self.assertEqual(paper_label({"authors": ["Ann Smith"]}, "Paper 1"), "Smith")
@@ -373,7 +397,10 @@ class TestPDFService(unittest.TestCase):
 
         self.assertEqual(get.call_args.kwargs["params"], {"api_key": "openalex-test-key"})
 
-    def test_fetch_pdf_bytes_rejects_content_length_over_limit(self):
+    # example.test never resolves, so the SSRF guard's DNS lookup is patched
+    # out; these tests are about the size limit, not the guard.
+    @patch("Research_AI_Assistant.services.pdf_service._reject_unsafe_pdf_url")
+    def test_fetch_pdf_bytes_rejects_content_length_over_limit(self, _guard):
         response = MagicMock()
         response.headers = {"Content-Length": str(MAX_PDF_BYTES + 1)}
         response.content = b"small"
@@ -385,7 +412,8 @@ class TestPDFService(unittest.TestCase):
             with self.assertRaisesRegex(PDFExtractionError, "too large"):
                 fetch_pdf_bytes("https://example.test/a.pdf", "W1")
 
-    def test_fetch_pdf_bytes_rejects_download_over_limit(self):
+    @patch("Research_AI_Assistant.services.pdf_service._reject_unsafe_pdf_url")
+    def test_fetch_pdf_bytes_rejects_download_over_limit(self, _guard):
         """
         A server with no (or a false) Content-Length must still be stopped
         mid-download, not after the whole body is already in memory.
@@ -400,7 +428,7 @@ class TestPDFService(unittest.TestCase):
             "Research_AI_Assistant.services.pdf_service.requests.get",
             return_value=response,
         ):
-            with self.assertRaisesRegex(PDFExtractionError, "exceeds 50MB"):
+            with self.assertRaisesRegex(PDFExtractionError, "exceeds 15MB"):
                 fetch_pdf_bytes("https://example.test/a.pdf", "W1")
 
     @override_settings(MEDIA_ROOT=tempfile.gettempdir())

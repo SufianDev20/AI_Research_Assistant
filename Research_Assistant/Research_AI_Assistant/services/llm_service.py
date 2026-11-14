@@ -27,6 +27,19 @@ class LLMError(Exception):
     """Base class for every LLM failure. Views catch this one type."""
 
 
+class _StreamReset:
+    """Type of STREAM_RESET; a class so the marker has a readable repr."""
+
+    def __repr__(self):
+        return "STREAM_RESET"
+
+
+# Yielded by a stream_complete() generator in place of a token when it moves
+# on to another model or backend after already yielding tokens. Everything
+# yielded before it belongs to an answer that failed and must be discarded.
+STREAM_RESET = _StreamReset()
+
+
 def _make_openrouter():
     # Imported lazily so the module can be deleted once OpenRouter is removed.
     from .openrouter_service import OpenRouterService
@@ -120,8 +133,11 @@ class FallbackLLM:
             request_type=request_type,
             response_validator=response_validator,
         )
+        primary_sent_tokens = False
         try:
-            yield from self._primary.stream_complete(**kwargs)
+            for token in self._primary.stream_complete(**kwargs):
+                primary_sent_tokens = True
+                yield token
             logger.info(
                 "LLM stream answered by %s (request_type=%s).",
                 self._primary_label,
@@ -135,6 +151,9 @@ class FallbackLLM:
                 self._primary_label,
                 primary_error,
             )
+            # The caller already holds the primary's partial answer.
+            if primary_sent_tokens:
+                yield STREAM_RESET
             try:
                 secondary = self._secondary_factory()
                 yield from secondary.stream_complete(**kwargs)

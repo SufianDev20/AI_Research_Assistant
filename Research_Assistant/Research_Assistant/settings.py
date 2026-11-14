@@ -43,6 +43,11 @@ OPENROUTER_PIN_DEFAULT_MODEL = env.bool("OPENROUTER_PIN_DEFAULT_MODEL", default=
 OPENROUTER_MODELS_CACHE_SECONDS = env.int(
     "OPENROUTER_MODELS_CACHE_SECONDS", default=6 * 60 * 60
 )
+# Q&A only: at most this many models per question (each attempt uses one of
+# the 50 free requests/day under 10 credits), and stop walking the chain once
+# this many seconds have passed. Non-reasoning models are tried first.
+OPENROUTER_QA_MAX_MODELS = env.int("OPENROUTER_QA_MAX_MODELS", default=4)
+OPENROUTER_QA_DEADLINE_SECONDS = env.int("OPENROUTER_QA_DEADLINE_SECONDS", default=90)
 
 # University research server (PostgreSQL corpus + Ollama), reached through the
 # Cloudflare tunnel. An empty URL or key disables the local corpus and Ollama.

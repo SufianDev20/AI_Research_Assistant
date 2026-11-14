@@ -46,11 +46,13 @@ export async function requestPaperAnalysis({ paperIds, question, pdfUrls, paperM
 
 /**
  * Streaming variant: sends the same POST but with ?stream=1.
- * Calls onToken(text), onProgress(data), onDone(result), onError(msg).
+ * Calls onToken(text), onProgress(data), onDone(result), onError(msg), and
+ * onReset() when the server moved to another model mid-answer: every token
+ * received before it belongs to a failed answer and must be discarded.
  */
 export async function requestPaperAnalysisStream({
   paperIds, question, pdfUrls, paperMeta, csrfToken, signal,
-  onToken, onProgress, onDone, onError,
+  onToken, onProgress, onDone, onError, onReset,
 }) {
   let response;
   try {
@@ -101,6 +103,7 @@ export async function requestPaperAnalysisStream({
         try { parsed = JSON.parse(dataLines.join("\n")); } catch { continue; }
 
         if (eventType === "token") onToken?.(parsed.t ?? "");
+        else if (eventType === "reset") onReset?.();
         else if (eventType === "progress") onProgress?.(parsed);
         else if (eventType === "done") onDone?.(parsed);
         else if (eventType === "error") onError?.(parsed.error ?? "Unknown streaming error");

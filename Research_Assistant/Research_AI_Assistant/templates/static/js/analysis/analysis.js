@@ -569,6 +569,10 @@ async function runAnalysis(turn) {
           updateTurn(turn);
           scrollTranscriptToEnd();
         },
+        onReset() {
+          turn.streamedTokens = "";
+          updateTurn(turn);
+        },
         onDone(result) {
           turn.status = "done";
           turn.answer = result.answer;

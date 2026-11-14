@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import ModelPerformance, ModelReliability, PaperQAChunks, User
-from .services.llm_service import LLMError
+from .services.llm_service import LLMError, STREAM_RESET
 from .services.qa_chunk_cache import CHUNK_SCHEMA_VERSION, QAChunkCache
 from .services.performance_tracker import (
     CIRCUIT_BREAKER_RESET_MIN,
@@ -33,9 +33,19 @@ from django.core.cache import cache
 from .services.openrouter_service import (
     OpenRouterService,
     OpenRouterAPIError,
+    REASONING_MODELS_CACHE_KEY,
     fetch_free_models,
+    reasoning_model_ids,
 )
-from .services.prompt_builder import system_prompt, build_user_message
+from .services.prompt_builder import (
+    InvalidSummaryFormat,
+    SUMMARY_MAX_TOKENS,
+    ensure_references,
+    require_all_papers,
+    summary_max_tokens,
+    system_prompt,
+    build_user_message,
+)
 
 
 class ClerkAuthTestMixin:
@@ -1270,6 +1280,212 @@ class TestFetchFreeModels(TestCase):
         models = fetch_free_models()
         self.assertNotIn("a/image-model:free", models)
         self.assertIn("b/chat-model:free", models)
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.get")
+    def test_records_reasoning_models(self, mock_get):
+        """A `reasoning` object or a reasoning entry in supported_parameters
+        marks the model as reasoning; a model with neither is not."""
+        mock_get.return_value = MagicMock(
+            json=lambda: {
+                "data": [
+                    {"id": "a/thinker:free", "reasoning": {"mandatory": True}},
+                    {
+                        "id": "b/hybrid:free",
+                        "supported_parameters": ["max_tokens", "reasoning"],
+                    },
+                    {"id": "c/plain:free", "supported_parameters": ["max_tokens"]},
+                ]
+            }
+        )
+        fetch_free_models()
+        self.assertEqual(
+            reasoning_model_ids(), {"a/thinker:free", "b/hybrid:free"}
+        )
+
+
+def _empty_choices_response():
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"choices": []}
+    return response
+
+
+@override_settings(
+    OPENROUTER_API_KEY="test-key-123",
+    OPENROUTER_MODELS=[
+        "r/one:free", "n/one:free", "r/two:free",
+        "n/two:free", "n/three:free", "n/four:free",
+    ],
+    OPENROUTER_QA_MAX_MODELS=4,
+    OPENROUTER_QA_DEADLINE_SECONDS=90,
+    OPENROUTER_TIMEOUT_SECONDS=60,
+)
+@patch(
+    "Research_AI_Assistant.services.openrouter_service.PerformanceTracker."
+    "get_intelligent_model_order",
+    side_effect=lambda models: list(models),
+)
+class TestOpenRouterQALimits(TestCase):
+    """Q&A tries non-reasoning models first, caps the attempts, and stops
+    walking the chain at a total deadline."""
+
+    def setUp(self):
+        cache.clear()
+        cache.set(REASONING_MODELS_CACHE_KEY, ["r/one:free", "r/two:free"])
+
+    def _posted_models(self, mock_post):
+        return [c.kwargs["json"]["model"] for c in mock_post.call_args_list]
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_qa_tries_non_reasoning_first_and_caps_attempts(self, mock_post, _order):
+        mock_post.return_value = _empty_choices_response()
+        with self.assertRaises(OpenRouterAPIError):
+            OpenRouterService().complete("s", "u", request_type="qa")
+        self.assertEqual(
+            self._posted_models(mock_post),
+            ["n/one:free", "n/two:free", "n/three:free", "n/four:free"],
+        )
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_non_qa_order_and_cap_unchanged(self, mock_post, _order):
+        mock_post.return_value = _empty_choices_response()
+        with self.assertRaises(OpenRouterAPIError):
+            OpenRouterService().complete("s", "u", request_type="summary")
+        self.assertEqual(
+            self._posted_models(mock_post),
+            ["r/one:free", "n/one:free", "r/two:free",
+             "n/two:free", "n/three:free", "n/four:free"],
+        )
+
+    @patch("Research_AI_Assistant.services.openrouter_service.time")
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_qa_stops_at_deadline(self, mock_post, mock_time, _order):
+        # Deadline set at t=0 (so 90); attempt 1 starts at t=0; by attempt 2
+        # it is t=88, leaving less than MIN_ATTEMPT_SECONDS.
+        mock_time.monotonic.side_effect = [0, 0, 88]
+        mock_post.return_value = _empty_choices_response()
+        with self.assertRaises(OpenRouterAPIError) as cm:
+            OpenRouterService().complete("s", "u", request_type="qa")
+        self.assertEqual(mock_post.call_count, 1)
+        self.assertIn("time limit", str(cm.exception))
+        # The single attempt's HTTP timeout was capped by the time left.
+        self.assertEqual(mock_post.call_args.kwargs["timeout"], 60)
+
+    @patch("Research_AI_Assistant.services.openrouter_service.time")
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_qa_stream_stops_mid_stream_at_deadline(self, mock_post, mock_time, _order):
+        chunk = 'data: {"choices":[{"delta":{"content":"tok"}}]}'
+        response = MagicMock()
+        response.iter_lines.return_value = iter([chunk, chunk, chunk])
+        mock_post.return_value = response
+        # deadline=90; attempt start t=0; first line t=10; second line t=95.
+        mock_time.monotonic.side_effect = [0, 0, 10, 95]
+
+        tokens = []
+        with self.assertRaises(OpenRouterAPIError) as cm:
+            for token in OpenRouterService().stream_complete(
+                "s", "u", request_type="qa"
+            ):
+                tokens.append(token)
+        self.assertEqual(tokens, ["tok"])
+        self.assertEqual(mock_post.call_count, 1)
+        response.close.assert_called_once()
+        self.assertIn("time limit", str(cm.exception))
+
+
+def _sse_response(*contents):
+    """A streamed chat-completion response whose deltas are `contents`."""
+    lines = [
+        "data: " + json.dumps({"choices": [{"delta": {"content": c}}]})
+        for c in contents
+    ] + ["data: [DONE]"]
+    response = MagicMock()
+    response.iter_lines.return_value = iter(lines)
+    return response
+
+
+def _reject_unless_valid_json(content):
+    json.loads(content)
+
+
+@override_settings(
+    OPENROUTER_API_KEY="test-key-123",
+    OPENROUTER_MODELS=["a/first:free", "b/second:free"],
+)
+@patch(
+    "Research_AI_Assistant.services.openrouter_service.PerformanceTracker."
+    "get_intelligent_model_order",
+    side_effect=lambda models: list(models),
+)
+class TestOpenRouterStreamReset(TestCase):
+    """When stream_complete falls through to another model after tokens
+    were already yielded, it yields STREAM_RESET before the next model's."""
+
+    def _stream(self):
+        return list(OpenRouterService().stream_complete(
+            "s", "u", request_type="qa",
+            response_validator=_reject_unless_valid_json,
+        ))
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_reset_between_a_failed_partial_stream_and_the_next_model(
+        self, mock_post, _order
+    ):
+        mock_post.side_effect = [
+            _sse_response('{"answer": "cut off'),
+            _sse_response('{"answer": "ok"}'),
+        ]
+        self.assertEqual(
+            self._stream(), ['{"answer": "cut off', STREAM_RESET, '{"answer": "ok"}']
+        )
+
+    @patch("Research_AI_Assistant.services.openrouter_service.requests.post")
+    def test_no_reset_when_the_failed_model_sent_nothing(self, mock_post, _order):
+        import requests as req_lib
+
+        failed = MagicMock()
+        failed.raise_for_status.side_effect = req_lib.exceptions.HTTPError(
+            "429 Too Many Requests", response=MagicMock(status_code=429)
+        )
+        mock_post.side_effect = [failed, _sse_response('{"answer": "ok"}')]
+        self.assertEqual(self._stream(), ['{"answer": "ok"}'])
+
+
+class TestSummaryCompleteness(TestCase):
+    """A summary cut off before its References list must not be accepted,
+    and the token budget grows with the number of papers."""
+
+    COMPLETE = (
+        "Paper 1: Title\nAuthors: Smith, J.\nYear: 2022\nSummary: A result.\n"
+        "References:\nSmith, J. (2022) Title. Journal."
+    )
+    CUT_OFF = "Paper 1: Title\nAuthors: Smith, J.\nYear: 2022\nSummary: A res"
+
+    PAPERS = [{
+        "title": "Title", "publication_year": 2022, "source": "Journal",
+        "doi": "10.1/x", "authors": [{"name": "Jane Smith"}],
+    }]
+
+    def test_complete_summary_is_accepted(self):
+        require_all_papers(1)(self.COMPLETE)
+
+    def test_summary_missing_a_paper_is_rejected(self):
+        with self.assertRaises(InvalidSummaryFormat):
+            require_all_papers(2)(self.COMPLETE)
+
+    def test_missing_references_are_built_from_metadata(self):
+        no_refs = self.COMPLETE.split("References:")[0].strip()
+        out = ensure_references(no_refs, self.PAPERS)
+        self.assertIn(
+            "References:\n[1] Smith, J. (2022) 'Title'. Journal. doi: 10.1/x.", out
+        )
+
+    def test_existing_references_are_left_alone(self):
+        self.assertEqual(ensure_references(self.COMPLETE, self.PAPERS), self.COMPLETE)
+
+    def test_budget_grows_with_papers_and_is_capped(self):
+        self.assertLess(summary_max_tokens(1), summary_max_tokens(5))
+        self.assertEqual(summary_max_tokens(50), SUMMARY_MAX_TOKENS)
 
 
 # ---------------------------------------------------------------------------
