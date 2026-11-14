@@ -64,6 +64,12 @@ LLM_JOB_DEADLINE_SECONDS = env.int("LLM_JOB_DEADLINE_SECONDS", default=240)
 LLM_QA_JOB_DEADLINE_SECONDS = env.int("LLM_QA_JOB_DEADLINE_SECONDS", default=60)
 LLM_NUM_CTX = env.int("LLM_NUM_CTX", default=8192)
 
+# When False (default), Q&A PDF extraction skips OCR entirely to avoid the
+# ~260 MB onnxruntime memory spike that OOM-crashes small instances.  Scanned
+# PDFs without a text layer will fail gracefully instead.  Set True only on
+# hosts with ≥ 2 GB RAM.
+QA_ALLOW_OCR = env.bool("QA_ALLOW_OCR", default=False)
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 

@@ -44,6 +44,74 @@ export async function requestPaperAnalysis({ paperIds, question, pdfUrls, paperM
   };
 }
 
+/**
+ * Streaming variant: sends the same POST but with ?stream=1.
+ * Calls onToken(text), onProgress(data), onDone(result), onError(msg).
+ */
+export async function requestPaperAnalysisStream({
+  paperIds, question, pdfUrls, paperMeta, csrfToken, signal,
+  onToken, onProgress, onDone, onError,
+}) {
+  let response;
+  try {
+    response = await fetch(ENDPOINT + "?stream=1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      body: JSON.stringify({ paper_ids: paperIds, question, pdf_urls: pdfUrls, paper_meta: paperMeta }),
+      signal,
+    });
+  } catch (networkErr) {
+    if (networkErr?.name === "AbortError") return;
+    onError?.("Could not reach the analysis service. Check your connection and try again.");
+    return;
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const detail = data?.error ?? `Analysis request failed (HTTP ${response.status}).`;
+    onError?.(detail);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse complete SSE messages from the buffer.
+      let boundary;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+
+        let eventType = "message";
+        let dataLines = [];
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) eventType = line.slice(7);
+          else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+        }
+        if (!dataLines.length) continue;
+
+        let parsed;
+        try { parsed = JSON.parse(dataLines.join("\n")); } catch { continue; }
+
+        if (eventType === "token") onToken?.(parsed.t ?? "");
+        else if (eventType === "progress") onProgress?.(parsed);
+        else if (eventType === "done") onDone?.(parsed);
+        else if (eventType === "error") onError?.(parsed.error ?? "Unknown streaming error");
+      }
+    }
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+    onError?.(err?.message || "Stream read error");
+  }
+}
+
 const SEARCH_ENDPOINT = "/api/search/";
 
 export async function fetchResearchPapers(searchParams) {

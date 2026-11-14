@@ -103,6 +103,47 @@ class FallbackLLM:
                     f"{self._secondary_label} fallback: {secondary_error}"
                 ) from secondary_error
 
+    def stream_complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.3,
+        max_tokens: int = 4000,
+        request_type: str = "summary",
+        response_validator: Optional[Callable[[str], None]] = None,
+    ):
+        kwargs = dict(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            request_type=request_type,
+            response_validator=response_validator,
+        )
+        try:
+            yield from self._primary.stream_complete(**kwargs)
+            logger.info(
+                "LLM stream answered by %s (request_type=%s).",
+                self._primary_label,
+                request_type,
+            )
+        except LLMError as primary_error:
+            logger.warning(
+                "SWITCHING TO %s stream for request_type=%s: %s failed (%s).",
+                self._secondary_label.upper(),
+                request_type,
+                self._primary_label,
+                primary_error,
+            )
+            try:
+                secondary = self._secondary_factory()
+                yield from secondary.stream_complete(**kwargs)
+            except LLMError as secondary_error:
+                raise LLMError(
+                    f"All LLM backends failed. {self._primary_label}: {primary_error}. "
+                    f"{self._secondary_label} fallback: {secondary_error}"
+                ) from secondary_error
+
 
 def get_llm():
     backend = (getattr(settings, "LLM_BACKEND", "openrouter") or "openrouter").strip()

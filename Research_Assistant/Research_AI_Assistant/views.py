@@ -9,7 +9,7 @@ import re
 
 from django.conf import settings
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -665,17 +665,26 @@ def multi_paper_qa(request):
     papers_chunks = {}
     paper_errors = {}
 
-    # Chunk each paper independently so one bad PDF does not stop the rest.
-    for paper_id in paper_ids:
-        try:
-            result = QAChunkCache.get_or_chunk(pdf_urls[paper_id], paper_id)
-            papers_chunks[paper_id] = result["chunks"]
-        except QAChunkError as exc:
-            logger.warning("Chunking failed for %s: %s", paper_id, exc)
-            paper_errors[paper_id] = str(exc)
-        except Exception as exc:
-            logger.exception("Unexpected chunking error for %s", paper_id)
-            paper_errors[paper_id] = f"Unexpected error: {exc}"
+    # Chunk papers in parallel: network fetches overlap and, with OCR off,
+    # pymupdf4llm extractions run without the process-wide lock.
+    def _chunk_one(pid):
+        return pid, QAChunkCache.get_or_chunk(pdf_urls[pid], pid)
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    with ThreadPoolExecutor(max_workers=min(3, len(paper_ids))) as pool:
+        futures = {pool.submit(_chunk_one, pid): pid for pid in paper_ids}
+        for future in as_completed(futures):
+            pid = futures[future]
+            try:
+                _, result = future.result()
+                papers_chunks[pid] = result["chunks"]
+            except QAChunkError as exc:
+                logger.warning("Chunking failed for %s: %s", pid, exc)
+                paper_errors[pid] = str(exc)
+            except Exception as exc:
+                logger.exception("Unexpected chunking error for %s", pid)
+                paper_errors[pid] = f"Unexpected error: {exc}"
 
     if not papers_chunks:
         return Response(
@@ -698,6 +707,13 @@ def multi_paper_qa(request):
 
     # The LLM sees short aliases + author labels, never OpenAlex URLs.
     _, legend = build_paper_legend(validated.get("paper_meta"), papers_chunks.keys())
+
+    use_stream = request.query_params.get("stream") == "1"
+
+    if use_stream:
+        return _multi_paper_qa_stream(
+            context_chunks, question, legend, paper_errors, context_stats,
+        )
 
     try:
         llm = get_llm()
@@ -739,3 +755,70 @@ def multi_paper_qa(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+def _sse_event(event_type, data):
+    """Format a single SSE event."""
+    payload = json.dumps(data, ensure_ascii=False)
+    return f"event: {event_type}\ndata: {payload}\n\n"
+
+
+def _multi_paper_qa_stream(context_chunks, question, legend, paper_errors, context_stats):
+    """Return a StreamingHttpResponse that sends SSE events as the LLM generates tokens."""
+
+    def event_stream():
+        # Send paper errors and context stats upfront so the UI can show them.
+        yield _sse_event("progress", {
+            "paper_errors": paper_errors,
+            "context_trimmed": context_stats["trimmed"],
+            "context_papers": context_stats["papers"],
+            "papers": {
+                pid: {"title": info["title"], "label": info["label"]}
+                for pid, info in legend.items()
+            },
+        })
+
+        try:
+            llm = get_llm()
+        except LLMError as exc:
+            logger.error("Multi-paper Q&A stream: LLM unavailable: %s", exc)
+            yield _sse_event("error", {"error": "Service temporarily unavailable"})
+            return
+
+        try:
+            for event_type, data in QACompletionService.ask_streaming(
+                llm, context_chunks, question, legend
+            ):
+                if event_type == "token":
+                    yield _sse_event("token", {"t": data})
+                elif event_type == "done":
+                    validated_citations = QACitationValidator.validate_citations(
+                        data["citations"], context_chunks
+                    )
+                    yield _sse_event("done", {
+                        "answer": data["answer"],
+                        "citations": validated_citations,
+                        "paper_errors": paper_errors,
+                        "context_trimmed": context_stats["trimmed"],
+                        "context_papers": context_stats["papers"],
+                        "papers": {
+                            pid: {"title": info["title"], "label": info["label"]}
+                            for pid, info in legend.items()
+                        },
+                    })
+        except QACompletionError as exc:
+            logger.error("Multi-paper Q&A stream failed: %s", exc)
+            yield _sse_event("error", {"error": f"LLM request failed: {exc}"})
+        except LLMError as exc:
+            logger.error("Multi-paper Q&A stream: LLM error: %s", exc)
+            yield _sse_event("error", {"error": "Service temporarily unavailable"})
+        except Exception as exc:
+            logger.exception("Unexpected error during Q&A stream")
+            yield _sse_event("error", {"error": f"Internal server error: {exc}"})
+
+    response = StreamingHttpResponse(
+        event_stream(), content_type="text/event-stream"
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response

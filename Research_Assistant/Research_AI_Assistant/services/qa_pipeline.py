@@ -16,6 +16,8 @@ from collections import Counter
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple, Union
 
+from django.conf import settings as django_settings
+
 from .pdf_service import PDFExtractionError, fetch_pdf_bytes
 
 # Configurations / Constants
@@ -149,19 +151,33 @@ class QAChunkService:
         except ImportError:
             dl = None  # pymupdf4llm internals moved: OCR logging and retry are off
 
-        page_dicts, ocr_pages, text = QAChunkService._to_markdown_pages(
-            pdf_bytes, openalex_id, pm4, dl
-        )
-        if dl is not None and ocr_pages == 0 and _looks_garbled(text):
-            # Junk text layer and OCR did not run: retry once with OCR forced.
-            try:
-                retry = QAChunkService._to_markdown_pages(
-                    pdf_bytes, openalex_id, pm4, dl, dl.OCRMode.FORCE_DROP_OLD
+        allow_ocr = getattr(django_settings, "QA_ALLOW_OCR", False)
+
+        if allow_ocr:
+            # Full path: text extraction, then OCR retry if garbled.
+            page_dicts, ocr_pages, text = QAChunkService._to_markdown_pages(
+                pdf_bytes, openalex_id, pm4, dl
+            )
+            if dl is not None and ocr_pages == 0 and _looks_garbled(text):
+                try:
+                    retry = QAChunkService._to_markdown_pages(
+                        pdf_bytes, openalex_id, pm4, dl, dl.OCRMode.FORCE_DROP_OLD
+                    )
+                    if _garble_score(retry[2]) < _garble_score(text):
+                        page_dicts = retry[0]
+                except Exception as exc:
+                    logger.warning("OCR retry failed for %s: %s", openalex_id, exc)
+        else:
+            # Memory-safe path: skip onnxruntime OCR entirely.
+            ocr_mode = dl.OCRMode.NEVER if dl is not None else None
+            page_dicts, _, text = QAChunkService._to_markdown_pages(
+                pdf_bytes, openalex_id, pm4, dl, use_ocr=ocr_mode
+            )
+            if _looks_garbled(text):
+                raise QAChunkError(
+                    "This paper appears to be a scanned document without a "
+                    "text layer; text extraction is not available for it."
                 )
-                if _garble_score(retry[2]) < _garble_score(text):
-                    page_dicts = retry[0]
-            except Exception as exc:
-                logger.warning("OCR retry failed for %s: %s", openalex_id, exc)
 
         chunks: List[Dict] = []
         for page_dict in page_dicts:
@@ -202,8 +218,13 @@ class QAChunkService:
 
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         kwargs = {} if use_ocr is None else {"use_ocr": use_ocr}
+
+        # When OCR is explicitly disabled (NEVER) there are no writes to
+        # dl.INFO_MESSAGES, so the lock is unnecessary and would serialise
+        # extractions that can safely run in parallel.
+        needs_lock = dl is not None and use_ocr is not getattr(dl, "OCRMode", type(None)).NEVER
         try:
-            if dl:
+            if dl and needs_lock:
                 # Hold the lock across clear -> extract -> read so a concurrent
                 # request's OCR lines are never counted as this call's.
                 with _OCR_LOG_LOCK:

@@ -6,7 +6,7 @@
 // state.session.turns and rendered in its own node. Turns are never replaced
 // wholesale, so a slow answer cannot overwrite a newer one.
 
-import { fetchResearchPapers, requestPaperAnalysis, isPublisherBlock } from "./analysis_api.js";
+import { fetchResearchPapers, requestPaperAnalysis, requestPaperAnalysisStream, isPublisherBlock } from "./analysis_api.js";
 import { getCsrfToken, escapeHtml, doiUrl } from "../utils.js";
 import { MAX_ANALYZABLE_PAPERS } from "../constants.js";
 
@@ -349,6 +349,13 @@ function turnBodyHtml(turn) {
     `;
   }
 
+  if (turn.status === "streaming") {
+    return `
+      ${excludedPapersNote(turn.excludedTitles)}
+      <div class="an-answer an-answer--streaming"><span class="an-streaming__waiting">Generating answer…</span><span class="an-cursor"></span></div>
+    `;
+  }
+
   if (turn.status === "error") {
     // The backend already trims to relevant excerpts, so a 413 means deselect
     // papers, not retry.
@@ -459,10 +466,11 @@ function renderTranscript() {
   state.session.turns.forEach((turn) => {
     // A turn left pending by a reload can never resolve; show it as failed
     // rather than spinning forever.
-    if (turn.status === "pending") {
+    if (turn.status === "pending" || turn.status === "streaming") {
       turn.status = "error";
       turn.error = "This question was interrupted before an answer came back.";
       turn.retryable = true;
+      turn.streamedTokens = undefined;
     }
     els.transcript.appendChild(buildTurnNode(turn));
   });
@@ -538,25 +546,52 @@ async function runAnalysis(turn) {
   );
 
   try {
-    const result = await requestPaperAnalysis({
-      paperIds,
-      question: turn.question,
-      pdfUrls,
-      paperMeta,
-      csrfToken: getCsrfToken(),
-      signal: controller.signal,
+    await new Promise((resolve, reject) => {
+      let streamFailed = false;
+      requestPaperAnalysisStream({
+        paperIds,
+        question: turn.question,
+        pdfUrls,
+        paperMeta,
+        csrfToken: getCsrfToken(),
+        signal: controller.signal,
+        onProgress(data) {
+          if (data.paper_errors) turn.paperErrors = data.paper_errors;
+          if (data.papers) turn.papers = data.papers;
+          if (data.context_trimmed != null) turn.contextTrimmed = data.context_trimmed;
+          if (data.context_papers) turn.coverage = data.context_papers;
+          turn.status = "streaming";
+          turn.streamedTokens = "";
+          updateTurn(turn);
+        },
+        onToken(text) {
+          turn.streamedTokens = (turn.streamedTokens || "") + text;
+          updateTurn(turn);
+          scrollTranscriptToEnd();
+        },
+        onDone(result) {
+          turn.status = "done";
+          turn.answer = result.answer;
+          turn.citations = result.citations;
+          turn.papers = result.papers;
+          turn.paperErrors = result.paper_errors;
+          turn.contextTrimmed = result.context_trimmed;
+          turn.coverage = result.context_papers;
+          turn.streamedTokens = undefined;
+          updateTurn(turn);
+          renderSelectedPapers();
+          resolve();
+        },
+        onError(msg) {
+          streamFailed = true;
+          reject(new Error(msg));
+        },
+      }).then(() => {
+        if (!streamFailed) resolve();
+      }).catch(reject);
     });
-    turn.status = "done";
-    turn.answer = result.answer;
-    turn.citations = result.citations;
-    turn.papers = result.papers;
-    turn.paperErrors = result.paper_errors;
-    turn.contextTrimmed = result.context_trimmed;
-    turn.coverage = result.context_papers;
-    updateTurn(turn);
-    renderSelectedPapers(); // coverage bars follow the newest answer
   } catch (err) {
-    if (err?.name === "AbortError") return; // page is going away
+    if (err?.name === "AbortError") return;
     failTurn(turn, err?.message || "Unknown error.", { retryable: true, status: err?.status ?? null });
   } finally {
     setBusy(false);

@@ -466,6 +466,22 @@ html:has(.an-body) { height: 100%; }
 .an-answer p { margin: 0 0 0.75em; }
 .an-answer p:last-child { margin-bottom: 0; }
 
+.an-answer--streaming { border-bottom: none; }
+.an-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--ink-body);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.an-streaming__waiting {
+  color: var(--ink-muted, #888);
+  font-style: italic;
+}
+
 .an-evidence__head {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.66rem;

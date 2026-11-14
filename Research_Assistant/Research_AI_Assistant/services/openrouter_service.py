@@ -7,6 +7,7 @@ References:
 2)OpenRouter API overview:https://openrouter.ai/docs/api/reference/overview
 """
 
+import json
 import logging
 from typing import Callable, Dict, List, Optional
 
@@ -428,4 +429,142 @@ class OpenRouterService:
         logger.error(
             f"All {len(models_to_try)} models failed. Last error: {last_error}"
         )
+        raise last_error or OpenRouterAPIError("All available free models failed")
+
+    def stream_complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.3,
+        max_tokens: int = 4000,
+        request_type: str = "summary",
+        response_validator: Optional[Callable[[str], None]] = None,
+    ):
+        """
+        Streaming variant of complete(). Yields (token: str) as they arrive,
+        then raises on validation failure. Falls back across models the same
+        way complete() does; streaming starts only once a model begins
+        producing tokens.
+
+        Yields:
+            str — each content delta from the SSE stream.
+
+        Raises:
+            OpenRouterAPIError on total failure.
+        """
+        configured_models = getattr(settings, "OPENROUTER_MODELS", None)
+        if isinstance(configured_models, str):
+            configured_models = [
+                m.strip() for m in configured_models.split(",") if m.strip()
+            ]
+        if not configured_models:
+            configured_models = fetch_free_models()
+
+        try:
+            PerformanceTracker.reset_circuit_breaker()
+        except Exception as exc:
+            logger.warning("Circuit breaker reset failed: %s", exc)
+
+        models_to_try = PerformanceTracker.get_intelligent_model_order(
+            list(dict.fromkeys(configured_models))
+        )
+        if self.pin_default_model and self.model in models_to_try:
+            models_to_try.remove(self.model)
+            models_to_try.insert(0, self.model)
+        models_to_try = models_to_try[: self.max_models_per_request]
+
+        last_error = None
+
+        for attempt_num, model_name in enumerate(models_to_try, 1):
+            attempt = PerformanceTracker.start_attempt(
+                model_name, request_type, user_message
+            )
+            try:
+                logger.info(
+                    "Streaming model %d/%d: %s",
+                    attempt_num, len(models_to_try), model_name,
+                )
+                model_temperature = PerformanceTracker.get_model_temperature(
+                    model_name, temperature
+                )
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message},
+                    ],
+                    "temperature": model_temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                    "reasoning": {"effort": "low", "exclude": True},
+                }
+                if request_type in JSON_REQUEST_TYPES and self.use_json_mode:
+                    payload["response_format"] = {"type": "json_object"}
+
+                response = requests.post(
+                    OPENROUTER_API_URL,
+                    headers=self._build_headers(),
+                    json=payload,
+                    timeout=self.timeout,
+                    stream=True,
+                )
+                response.raise_for_status()
+
+                collected = []
+                for line in response.iter_lines(decode_unicode=True):
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                    except (ValueError, TypeError):
+                        continue
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+                    token = delta.get("content")
+                    if token:
+                        collected.append(token)
+                        yield token
+
+                content = "".join(collected)
+                if not content:
+                    error_msg = f"Model {model_name} streamed no content."
+                    logger.warning(error_msg)
+                    last_error = OpenRouterAPIError(error_msg)
+                    attempt.failure(error_msg)
+                    continue
+
+                if response_validator is not None:
+                    try:
+                        response_validator(content)
+                    except Exception as exc:
+                        error_msg = f"Model {model_name} streamed invalid content: {exc}"
+                        logger.warning(error_msg)
+                        last_error = OpenRouterAPIError(error_msg)
+                        attempt.failure(error_msg)
+                        continue
+
+                attempt.success(content)
+                logger.info("OpenRouter stream complete: model=%s", model_name)
+                return
+
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.HTTPError,
+                requests.exceptions.RequestException,
+                ValueError,
+            ) as exc:
+                status_code = getattr(
+                    getattr(exc, "response", None), "status_code", None
+                )
+                error_msg = f"Model {model_name} stream failed: {exc}"
+                logger.warning(error_msg)
+                last_error = OpenRouterAPIError(error_msg)
+                attempt.failure(error_msg)
+                continue
+
         raise last_error or OpenRouterAPIError("All available free models failed")

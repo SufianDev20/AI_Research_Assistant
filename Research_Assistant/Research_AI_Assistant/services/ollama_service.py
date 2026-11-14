@@ -190,3 +190,23 @@ class OllamaService:
                     "Ollama reply failed validation (attempt %d/2): %s", attempt, exc
                 )
         raise OllamaAPIError("Ollama reply did not match the required format.") from last_error
+
+    def stream_complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.3,
+        max_tokens: int = 4000,
+        request_type: str = "summary",
+        response_validator: Optional[Callable[[str], None]] = None,
+    ):
+        """Non-streaming fallback: yields the full response as one chunk."""
+        content = self.complete(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            request_type=request_type,
+            response_validator=response_validator,
+        )
+        yield content

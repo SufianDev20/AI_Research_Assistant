@@ -252,6 +252,51 @@ class QACompletionService:
         return result
 
     @staticmethod
+    def ask_streaming(
+        llm,
+        context_chunks: List[Dict],
+        question: str,
+        papers: Optional[Dict[str, Dict]] = None,
+    ):
+        """
+        Streaming variant of ask(). Yields (event_type, data) tuples:
+            ("token", str)   — a content delta from the LLM
+            ("done", dict)   — the parsed and alias-resolved result
+
+        Raises QACompletionError if the LLM fails or returns invalid JSON.
+        """
+        from .qa_pipeline import resolve_paper_id
+
+        user_message = build_qa_user_message(context_chunks, question, papers)
+
+        collected = []
+        try:
+            for token in llm.stream_complete(
+                system_prompt=QA_SYSTEM_PROMPT,
+                user_message=user_message,
+                temperature=QA_TEMPERATURE,
+                max_tokens=QA_MAX_TOKENS,
+                request_type="qa",
+                response_validator=QACompletionService._parse_response,
+            ):
+                collected.append(token)
+                yield ("token", token)
+        except Exception as exc:
+            raise QACompletionError(f"LLM streaming failed: {exc}") from exc
+
+        raw_content = "".join(collected)
+        result = QACompletionService._parse_response(raw_content)
+
+        if papers:
+            alias_map = {info["alias"]: pid for pid, info in papers.items()}
+            for citation in result["citations"]:
+                citation["paper_id"] = resolve_paper_id(
+                    citation["paper_id"], alias_map, papers.keys()
+                )
+
+        yield ("done", result)
+
+    @staticmethod
     def _parse_response(
         raw_content: str,
     ) -> Dict:
