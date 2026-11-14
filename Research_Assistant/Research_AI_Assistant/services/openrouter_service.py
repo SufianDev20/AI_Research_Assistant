@@ -511,6 +511,8 @@ class OpenRouterService:
                 response.raise_for_status()
 
                 collected = []
+                finish_reason = None
+                usage = None
                 for line in response.iter_lines(decode_unicode=True):
                     if not line or not line.startswith("data: "):
                         continue
@@ -521,9 +523,12 @@ class OpenRouterService:
                         chunk = json.loads(data_str)
                     except (ValueError, TypeError):
                         continue
+                    if chunk.get("usage"):
+                        usage = chunk["usage"]
                     choices = chunk.get("choices", [])
                     if not choices:
                         continue
+                    finish_reason = choices[0].get("finish_reason") or finish_reason
                     delta = choices[0].get("delta", {})
                     token = delta.get("content")
                     if token:
@@ -533,7 +538,12 @@ class OpenRouterService:
                 content = "".join(collected)
                 if not content:
                     error_msg = f"Model {model_name} streamed no content."
-                    logger.warning(error_msg)
+                    # finish_reason "length" means max_tokens was spent on
+                    # reasoning before any content was produced.
+                    logger.warning(
+                        "%s finish_reason=%r max_tokens=%s usage=%s",
+                        error_msg, finish_reason, max_tokens, usage,
+                    )
                     last_error = OpenRouterAPIError(error_msg)
                     attempt.failure(error_msg)
                     continue
@@ -543,7 +553,10 @@ class OpenRouterService:
                         response_validator(content)
                     except Exception as exc:
                         error_msg = f"Model {model_name} streamed invalid content: {exc}"
-                        logger.warning(error_msg)
+                        logger.warning(
+                            "%s finish_reason=%r max_tokens=%s usage=%s",
+                            error_msg, finish_reason, max_tokens, usage,
+                        )
                         last_error = OpenRouterAPIError(error_msg)
                         attempt.failure(error_msg)
                         continue

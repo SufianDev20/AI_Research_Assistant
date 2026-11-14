@@ -18,7 +18,11 @@ from .qa_pipeline import resolve_paper_id
 
 # Configuration/Constants
 
-QA_MAX_TOKENS = 800
+# Reasoning models spend part of this budget on hidden reasoning tokens (the
+# `reasoning.exclude` flag only hides them, it does not exempt them from
+# max_tokens). 800 left only ~250 tokens of content, so the JSON answer was
+# cut mid-string or came back empty.
+QA_MAX_TOKENS = 2500
 QA_TEMPERATURE = 0.1
 
 # Logging
